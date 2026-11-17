@@ -1,0 +1,27 @@
+# GATE 0 spike workspace (throwaway). Default cluster stays localnet so that
+# `anchor test` (LiteSVM via cargo test) can never deploy to devnet by accident.
+# Devnet deploy is explicit:  anchor deploy --provider.cluster devnet
+skip_local_validator = true
+
+[toolchain]
+anchor_version = "1.2.2"
+solana_version = "4.1.2"
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+pda_vault_spike = "C31ntvRNLT8YuMuqHNkto5Pj3hgkQbCE1YZ4uaent8Zc"
+
+[programs.devnet]
+pda_vault_spike = "C31ntvRNLT8YuMuqHNkto5Pj3hgkQbCE1YZ4uaent8Zc"
+
+[provider]
+cluster = "localnet"
+wallet = "~/.config/solsend/devnet/deployer.json"
+
+[scripts]
+test = "cargo test"
+
+[hooks]

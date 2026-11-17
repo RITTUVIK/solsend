@@ -1,0 +1,50 @@
+# ── Secrets: never commit ─────────────────────────────────────────────
+# Env files (only .env.example templates are allowed)
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Keypairs / private keys. Project devnet keys live OUTSIDE the repo in
+# ~/.config/solsend/devnet/ — these patterns are a second line of defence.
+*keypair*.json
+id.json
+**/keys/
+**/.keys/
+*.pem
+*.key
+*.p12
+
+# ── Solana / Anchor ──────────────────────────────────────────────────
+target/
+.anchor/
+test-ledger/
+**/*.so
+
+# ── Node / web ───────────────────────────────────────────────────────
+node_modules/
+dist/
+build/
+.next/
+.turbo/
+.vercel/
+coverage/
+*.tsbuildinfo
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# ── Test artifacts ───────────────────────────────────────────────────
+playwright-report/
+test-results/
+
+# ── Raw spike captures (may contain provider payloads; curated evidence
+#    goes into spikes/evidence/*.json after review) ─────────────────────
+spikes/.raw/
+
+# ── OS / editor ──────────────────────────────────────────────────────
+.DS_Store
+.idea/
+*.swp

@@ -1,0 +1,37 @@
+# SolSend secret-scan config (gitleaks v8). Extends the default ruleset.
+title = "SolSend gitleaks config"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "solana-keypair-json"
+description = "Solana keypair file contents (64-byte JSON array)"
+regex = '''\[\s*(?:\d{1,3}\s*,\s*){63}\d{1,3}\s*\]'''
+
+[[rules]]
+id = "quicknode-tokenized-endpoint"
+description = "QuickNode endpoint URL with embedded auth token"
+regex = '''https?://[a-z0-9-]+\.[a-z0-9-]+\.quiknode\.pro/[A-Za-z0-9]{16,}'''
+keywords = ["quiknode"]
+
+[[rules]]
+id = "bridge-api-key-assignment"
+description = "Bridge API key assigned in code/config"
+regex = '''(?i)bridge[_-]?api[_-]?key\s*[:=]\s*['"]?[A-Za-z0-9_\-]{20,}'''
+keywords = ["bridge"]
+
+[[rules]]
+id = "privy-app-secret-assignment"
+description = "Privy app secret assigned in code/config"
+regex = '''(?i)privy[_-]?app[_-]?secret\s*[:=]\s*['"]?[A-Za-z0-9_\-]{20,}'''
+keywords = ["privy"]
+
+[[rules]]
+id = "raw-card-pan"
+description = "Possible raw card PAN (PCI hard rule 7: never store/log PAN)"
+regex = '''\b(?:4\d{3}|5[1-5]\d{2}|2[2-7]\d{2}|3[47]\d{2})[ -]?\d{4}[ -]?\d{4}[ -]?\d{3,4}\b'''
+
+[allowlist]
+description = "Lockfiles contain integrity hashes, not secrets"
+paths = ['''(^|/)pnpm-lock\.yaml$''', '''(^|/)Cargo\.lock$''']

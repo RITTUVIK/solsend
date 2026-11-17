@@ -1,0 +1,22 @@
+#!/bin/sh
+# SolSend pre-commit hook. Enable once per clone:
+#   git config core.hooksPath .githooks
+set -eu
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "pre-commit: gitleaks is required (brew install gitleaks). Commit blocked." >&2
+  exit 1
+fi
+
+# 1) Block sensitive files by name, even if someone used `git add -f`.
+bad=$(git diff --cached --name-only --diff-filter=ACMR \
+  | grep -E '(^|/)\.env($|\.)|keypair[^/]*\.json$|(^|/)id\.json$|\.(pem|key|p12)$' \
+  | grep -vE '(^|/)\.env\.example$' || true)
+if [ -n "$bad" ]; then
+  echo "pre-commit: refusing to commit sensitive file(s):" >&2
+  echo "$bad" >&2
+  exit 1
+fi
+
+# 2) Secret scan of the staged diff.
+gitleaks git --pre-commit --staged --redact --no-banner --config .gitleaks.toml .
