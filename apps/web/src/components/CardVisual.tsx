@@ -1,77 +1,128 @@
 "use client";
-import { KIND_LABEL, displayStatus, limitSuffix, usd, type CardView, type DisplayStatus } from "@/client/format";
+import { cardArt } from "@/client/cardArt";
+import { KIND_LABEL, displayStatus, expiresIn, limitSuffix, sandboxName, usd, type CardView, type DisplayStatus } from "@/client/format";
 import { Icon } from "./ui";
 
-const THEMES: Record<string, string> = {
-  temu: "from-orange-600 via-orange-700 to-rose-700",
-  amazon: "from-zinc-800 via-zinc-900 to-black",
-  netflix: "from-red-700 via-red-800 to-zinc-950",
-  default: "from-indigo-600 via-violet-700 to-fuchsia-800",
-};
-export const themeFor = (name: string): string => THEMES[name.trim().toLowerCase()] ?? THEMES.default!;
+const KIND_ICON = { STORE_LOCKED: "lock", ONE_TIME: "one", SUBSCRIPTION: "repeat" } as const;
+const DEAD: DisplayStatus[] = ["Closed", "Revoked", "Used", "Expired", "Failed"];
 
-const STATUS_STYLE: Record<DisplayStatus, string> = {
-  Active: "bg-emerald-400/90 text-emerald-950",
-  Frozen: "bg-sky-300 text-sky-950",
-  Used: "bg-zinc-300 text-zinc-900",
-  Closed: "bg-zinc-400 text-zinc-950",
-  Revoked: "bg-rose-300 text-rose-950",
-  "Setting up": "bg-amber-300 text-amber-950",
-  "Needs retry": "bg-amber-300 text-amber-950",
-  Failed: "bg-rose-300 text-rose-950",
-};
-
-export function StatusPill({ status }: { status: DisplayStatus }) {
-  return <span className={`chip ${STATUS_STYLE[status]}`}>{status}</span>;
-}
-
-export function LimitBar({ card, tone = "light" }: { card: CardView; tone?: "light" | "plain" }) {
+/** A thin remaining-limit bar (on paper, below a card). */
+export function LimitBar({ card }: { card: CardView }) {
   const total = Number(card.limit.totalBase) || 1;
   const remaining = Number(card.limit.remainingBase);
   const pct = Math.max(0, Math.min(100, (remaining / total) * 100));
-  const track = tone === "light" ? "bg-white/25" : "bg-zinc-200 dark:bg-zinc-700";
-  const fill = tone === "light" ? "bg-white" : "bg-emerald-500";
-  const text = tone === "light" ? "text-white/90" : "text-zinc-600 dark:text-zinc-400";
   return (
     <div>
-      <div className={`flex items-baseline justify-between text-xs ${text}`}>
-        <span><strong className="text-sm tabular-nums">{usd(card.limit.remainingBase)}</strong> left</span>
-        <span className="tabular-nums">of {usd(card.limit.totalBase)} {limitSuffix(card)}</span>
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-[15px] text-ink-2"><strong className="tnum text-[17px] font-semibold text-ink">{usd(card.limit.remainingBase)}</strong> of {usd(card.limit.totalBase)} left</p>
+        <p className="text-[13px] text-ink-3">{limitSuffix(card)}</p>
       </div>
-      <div className={`mt-1.5 h-2 w-full overflow-hidden rounded-full ${track}`} role="progressbar" aria-label="Remaining limit" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)}>
-        <div className={`h-full rounded-full ${fill} transition-[width] duration-700`} style={{ width: `${pct}%` }} />
+      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-sunken" role="progressbar" aria-label="Remaining limit" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)}>
+        <div className="h-full rounded-full bg-ink transition-[width] duration-700" style={{ width: `${pct}%` }} />
       </div>
     </div>
   );
 }
 
-/** The visual card. Never shows a PAN: only the last four from the API. */
-export function CardVisual({ card, large = false }: { card: CardView; large?: boolean }) {
+/**
+ * The card. 1.586:1, per-store art, state ON the face. Never shows a PAN: only the last four from the API.
+ * `showLimit` puts "$28 left" top-right (wallet list); the detail page shows the limit below the card instead.
+ */
+export function CardVisual({ card, showLimit = false, idle = false, born = false, size = "full", className = "" }: { card: CardView; showLimit?: boolean; idle?: boolean; born?: boolean; size?: "full" | "small" | "mini"; className?: string }) {
   const status = displayStatus(card);
-  const dim = status === "Closed" || status === "Revoked" || status === "Used" || status === "Failed";
-  return (
-    <div
-      className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${themeFor(card.merchantName)} p-4 text-white shadow-lg ${large ? "min-h-52 sm:p-6" : "min-h-44"} ${dim ? "saturate-0 opacity-80" : ""} ${status === "Frozen" ? "saturate-50 brightness-110" : ""}`}
-    >
-      <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10" aria-hidden="true" />
-      <div className="pointer-events-none absolute -bottom-16 -left-8 h-44 w-44 rounded-full bg-black/10" aria-hidden="true" />
-      <div className="relative flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="truncate text-lg font-bold leading-tight">{card.label}</p>
-          <p className="truncate text-xs text-white/80">{card.merchantName} (sandbox)</p>
+  const art = cardArt(card.merchantName);
+  const dead = DEAD.includes(status);
+  const exp = expiresIn(card);
+  const warnRing = status === "Needs retry" || (idle && status === "Active");
+  if (size !== "full") {
+    const mini = size === "mini";
+    return (
+      <div className={`relative aspect-[1.586] w-full overflow-hidden ${mini ? "rounded-[10px]" : "rounded-[16px]"} text-white shadow-[0_1px_0_rgb(255_255_255/.2)_inset,0_10px_22px_-12px_rgb(11_12_14/.55)] ${className}`} data-status={status}>
+        <div className={`card-noise card-sheen absolute inset-0 rounded-[inherit] ${dead ? "opacity-75 grayscale" : status === "Frozen" ? "saturate-[.55]" : ""}`} style={{ background: art.background }} aria-hidden="true" />
+        {art.accentBar && <div className="absolute inset-x-0 bottom-0 h-[2px]" style={{ background: art.accentBar }} aria-hidden="true" />}
+        <div className={`relative flex h-full flex-col justify-between ${mini ? "p-2" : "p-3"}`}>
+          <div className="flex items-start justify-between gap-2">
+            <span className={`grid shrink-0 place-items-center rounded-[7px] bg-white/18 font-bold ring-1 ring-white/25 ${mini ? "h-5 w-5 text-[11px]" : "h-7 w-7 text-[14px]"}`} aria-hidden="true">{art.monogram}</span>
+            {!mini && showLimit && !dead && <p className="tnum text-right text-[14px] font-semibold leading-4">{usd(card.limit.remainingBase)}<span className="block text-[10px] font-medium text-white/85">left</span></p>}
+            {!mini && (dead || status === "Frozen") && <span className="rounded bg-black/40 px-1.5 text-[10px] font-bold uppercase tracking-[0.1em]">{status}</span>}
+          </div>
+          <div className="flex items-end justify-between gap-1">
+            <p className={`tnum font-mono font-medium tracking-[0.1em] ${mini ? "text-[9px]" : "text-[12px]"}`}>•••• {card.lithic.lastFour ?? "••••"}</p>
+            {!mini && <Icon name={KIND_ICON[card.kind]} className="h-3.5 w-3.5 text-white/85" strokeWidth={2.2} />}
+          </div>
         </div>
-        <StatusPill status={status} />
+        {!mini && <span className="sr-only">{card.label}, {sandboxName(card.merchantName)}, {status}</span>}
       </div>
-      <div className="relative mt-4 flex items-center gap-2 text-white/90">
-        <Icon name={card.kind === "SUBSCRIPTION" ? "refund" : card.kind === "ONE_TIME" ? "bolt" : "lock"} className="h-4 w-4" />
-        <span className="chip bg-black/25 text-white">{KIND_LABEL[card.kind]}</span>
-        {status === "Frozen" && <Icon name="snow" className="h-4 w-4" />}
+    );
+  }
+  return (
+    <div className={`@container relative aspect-[1.586] w-full overflow-hidden rounded-[20px] text-white shadow-[0_1px_0_rgb(255_255_255/.2)_inset,0_14px_32px_-14px_rgb(11_12_14/.55)] ${born ? "anim-born" : ""} ${className}`}
+      data-status={status}>
+      <div className={`card-noise card-sheen absolute inset-0 rounded-[inherit] transition-[filter,opacity] duration-300 ${dead ? "opacity-75 grayscale" : status === "Frozen" ? "saturate-[.55]" : ""}`} style={{ background: art.background }} aria-hidden="true" />
+      {art.accentBar && <div className={`absolute inset-x-0 bottom-0 h-[3px] ${dead ? "opacity-40" : ""}`} style={{ background: art.accentBar }} aria-hidden="true" />}
+      {born && <div className="card-sweep pointer-events-none absolute inset-0 rounded-[inherit]" aria-hidden="true" />}
+      {status === "Setting up" && <div className="skeleton !absolute inset-0 !rounded-[inherit] !bg-transparent" aria-hidden="true" />}
+
+      <div className="relative flex h-full flex-col justify-between p-[clamp(14px,5.2cqw,22px)]">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-white/18 text-[17px] font-bold ring-1 ring-white/25 backdrop-blur-sm" aria-hidden="true">{art.monogram}</span>
+            <div className="min-w-0">
+              <p className="truncate text-[15px] font-semibold leading-5 tracking-[-0.01em]">{card.label}</p>
+              <p className="truncate text-[13px] font-medium leading-4 text-white/90">{sandboxName(card.merchantName)}</p>
+            </div>
+          </div>
+          {showLimit && !dead ? (
+            <div className="shrink-0 text-right">
+              <p className="tnum text-[17px] font-semibold leading-5 tracking-[-0.02em]">{usd(card.limit.remainingBase)}</p>
+              <p className="text-[12px] font-medium leading-4 text-white/85">left of {usd(card.limit.totalBase)}</p>
+            </div>
+          ) : (
+            <span className="shrink-0 pt-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/80">Sandbox</span>
+          )}
+        </div>
+
+        <div className="flex items-end justify-between gap-3">
+          <div className="min-w-0">
+            {exp && <p className="mb-1.5 inline-flex items-center gap-1 rounded-full bg-black/30 px-2 py-0.5 text-[11px] font-semibold backdrop-blur-sm" data-testid="expiry-chip"><Icon name="clock" className="h-3 w-3" />{exp}</p>}
+            <p className="tnum font-mono text-[clamp(14px,4.6cqw,18px)] font-medium tracking-[0.12em]">•••• {card.lithic.lastFour ?? "••••"}</p>
+          </div>
+          <div className="shrink-0 text-right">
+            <p className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-white/90"><Icon name={KIND_ICON[card.kind]} className="h-3.5 w-3.5" strokeWidth={2.2} />{KIND_LABEL[card.kind]}</p>
+            {showLimit && !dead && <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/75">Sandbox</p>}
+          </div>
+        </div>
       </div>
-      <div className="relative mt-3 flex items-end justify-between gap-2">
-        <p className="font-mono text-base tracking-[.18em] tabular-nums">•••• {card.lithic.lastFour ?? "••••"}</p>
-        <span className="chip bg-amber-300 text-amber-950">SANDBOX</span>
-      </div>
-      <div className="relative mt-3"><LimitBar card={card} /></div>
+
+      {status === "Frozen" && (
+        <div className="anim-fade absolute inset-0 grid place-items-center rounded-[inherit] bg-white/25 backdrop-blur-[2px]">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-black/45 px-3 py-1.5 text-[13px] font-semibold"><Icon name="snow" className="h-4 w-4" />Frozen</span>
+        </div>
+      )}
+      {dead && (
+        <div className="absolute inset-0 grid place-items-center">
+          <span className="anim-stamp rounded-md border-2 border-white/80 bg-black/35 px-3 py-1 text-[13px] font-bold uppercase tracking-[0.16em]">{status}</span>
+        </div>
+      )}
+      {(status === "Setting up" || warnRing) && (
+        <div className={`absolute inset-0 rounded-[inherit] ${warnRing ? "ring-[3px] ring-inset ring-[#FFB547]" : ""}`}>
+          <span className={`absolute right-3 top-3 rounded-full px-2 py-0.5 text-[11px] font-semibold ${warnRing ? "bg-[#FFB547] text-[#3A2400]" : "bg-black/40"}`}>
+            {status === "Setting up" ? "Setting up…" : status === "Needs retry" ? "Needs retry" : "Idle"}
+          </span>
+        </div>
+      )}
+      <span className="sr-only">{card.label}, {sandboxName(card.merchantName)}, {status}, {usd(card.limit.remainingBase)} left of {usd(card.limit.totalBase)}</span>
     </div>
+  );
+}
+
+/** Small swatch tile (monogram on store art) for lists, pickers and activity rows. */
+export function StoreTile({ merchant, size = 36, className = "" }: { merchant: string; size?: number; className?: string }) {
+  const art = cardArt(merchant);
+  return (
+    <span className={`relative grid shrink-0 place-items-center overflow-hidden rounded-[10px] font-bold text-white ${className}`} style={{ width: size, height: size, background: art.background, fontSize: Math.round(size * 0.44) }} aria-hidden="true">
+      {art.monogram}
+      {art.accentBar && <span className="absolute inset-x-0 bottom-0 h-[2px]" style={{ background: art.accentBar }} />}
+    </span>
   );
 }

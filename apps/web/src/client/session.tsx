@@ -2,6 +2,7 @@
 // Session abstraction: one interface, two implementations (real Privy / mock Privy). The api client reaches the
 // active session through a module-level bridge so plain async functions can sign and fetch tokens.
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Sheet } from "@/components/ui";
 import { MOCK } from "./config";
 import { mockWallet } from "./mock";
 
@@ -73,25 +74,25 @@ function MockLogin({ onDone, onClose }: { onDone: (email: string) => void; onClo
   const [email, setEmail] = useState("judge@example.com");
   const [busy, setBusy] = useState(false);
   const ref = useRef<HTMLInputElement>(null);
-  useEffect(() => { ref.current?.select(); }, []);
+  useEffect(() => { const t = setTimeout(() => ref.current?.select(), 50); return () => clearTimeout(t); }, []);
   return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="mock-login-title">
-      <form
-        className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl dark:bg-zinc-900"
-        onSubmit={(e) => { e.preventDefault(); setBusy(true); void wait(500).then(() => onDone(email.trim() || "judge@example.com")); }}
-      >
-        <p className="mb-2 inline-block rounded bg-amber-300 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-amber-950">MOCK LOGIN</p>
-        <h2 id="mock-login-title" className="text-lg font-semibold">Log in with email</h2>
-        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Mock mode: no email is sent and no code is needed.</p>
-        <label className="mt-4 block text-sm font-medium" htmlFor="mock-email">Email</label>
-        <input ref={ref} id="mock-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-          className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base dark:border-zinc-700 dark:bg-zinc-950" />
-        <div className="mt-4 flex gap-2">
-          <button type="button" onClick={onClose} className="btn-secondary flex-1">Cancel</button>
-          <button type="submit" disabled={busy} className="btn-primary flex-1">{busy ? "Signing in…" : "Continue"}</button>
+    <Sheet open onClose={onClose} labelledBy="mock-login-title" testId="mock-login" dismissible={!busy}>
+      <form className="space-y-4 pt-1" onSubmit={(e) => { e.preventDefault(); setBusy(true); void wait(500).then(() => onDone(email.trim() || "judge@example.com")); }}>
+        <div>
+          <span className="chip px-2 text-mock ring-1 ring-mock-line">MOCK LOGIN</span>
+          <h2 id="mock-login-title" className="mt-2 text-[22px] font-semibold tracking-[-0.02em]">Log in with email</h2>
+          <p className="mt-1 text-[15px] text-ink-2">Mock mode: no email is sent and no code is needed.</p>
+        </div>
+        <div>
+          <label className="label" htmlFor="mock-email">Email</label>
+          <input ref={ref} id="mock-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="input" />
+        </div>
+        <div className="flex flex-col gap-2">
+          <button type="submit" disabled={busy} className="btn-primary w-full">{busy ? "Signing in…" : "Continue"}</button>
+          <button type="button" onClick={onClose} className="btn-ghost w-full">Cancel</button>
         </div>
       </form>
-    </div>
+    </Sheet>
   );
 }
 
