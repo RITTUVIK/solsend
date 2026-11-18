@@ -6,5 +6,5 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request): Promise<Response> {
-  return handleQuickNodeWebhook(req, { token: process.env.QN_STREAM_SECURITY_TOKEN, store: getStore() });
+  return handleQuickNodeWebhook(req, { token: process.env.QN_STREAM_SECURITY_TOKEN, store: getStore });
 }

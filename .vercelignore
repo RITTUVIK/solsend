@@ -1,0 +1,27 @@
+# Vercel CLI upload allowlist-by-exclusion. NEVER upload secrets, keys, spikes, research, or build junk.
+.git
+**/.env
+**/.env.*
+!**/.env.example
+**/*keypair*.json
+**/id.json
+**/keys/
+**/*.pem
+**/*.key
+spikes/
+docs/research/
+docs/evidence/
+.claude/
+.worktrees/
+target/
+programs/
+tests/program/
+node_modules/
+**/node_modules/
+**/.next/
+**/test-results/
+**/playwright-report/
+Cargo.toml
+Cargo.lock
+Anchor.toml
+rust-toolchain.toml

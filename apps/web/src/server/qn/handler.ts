@@ -44,7 +44,7 @@ export async function feedRowsFromPayload(payload: Payload, store: LookupStore):
 
 const text = (status: number, body: string) => new Response(body, { status });
 
-export async function handleQuickNodeWebhook(req: Request, deps: { token: string | undefined; store: Store; nowMs?: number }): Promise<Response> {
+export async function handleQuickNodeWebhook(req: Request, deps: { token: string | undefined; store: Store | (() => Store); nowMs?: number }): Promise<Response> {
   if (!deps.token) return text(503, "not configured");
   const body = await req.text();
   const nonce = req.headers.get("x-qn-nonce") ?? "";
@@ -52,14 +52,17 @@ export async function handleQuickNodeWebhook(req: Request, deps: { token: string
   const sig = req.headers.get("x-qn-signature") ?? "";
   if (!nonce || !ts || !sig || !verifyQuickNodeSignature(deps.token, nonce, ts, body, sig)) return text(401, "bad signature");
   if (!timestampFresh(ts, deps.nowMs)) return text(401, "stale timestamp");
-  if (!(await deps.store.recordReceipt("quicknode", nonce))) return text(409, "replay");
+  // Resolve the store only AFTER authentication, so unauthenticated requests never touch the backend.
+  let store: Store;
+  try { store = typeof deps.store === "function" ? deps.store() : deps.store; } catch { return text(503, "store not configured"); }
+  if (!(await store.recordReceipt("quicknode", nonce))) return text(409, "replay");
 
   let payload: Payload;
   try { payload = Payload.parse(JSON.parse(body)); } catch { return text(400, "bad payload"); }
 
   try {
     let inserted = 0;
-    for (const row of await feedRowsFromPayload(payload, deps.store)) if (await deps.store.insertFeedEvent(row)) inserted++;
+    for (const row of await feedRowsFromPayload(payload, store)) if (await store.insertFeedEvent(row)) inserted++;
     return Response.json({ ok: true, matches: payload.matches.length, inserted });
   } catch (e) {
     console.error("[qn] feed insert failed:", e instanceof Error ? e.message : "unknown");
