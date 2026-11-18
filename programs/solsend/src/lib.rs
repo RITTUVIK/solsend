@@ -49,8 +49,10 @@ pub const STATUS_CLOSED: u8 = 3;
 pub mod solsend {
     use super::*;
 
-    /// Admin creates the singleton Config. `treasury_destination` is the ONLY token account that
-    /// `admin_withdraw` may ever pay (fixed at init). `per_tx_max` 0 = no per-transaction cap.
+    /// The program's upgrade authority creates the singleton Config (no front-running: `admin` must
+    /// equal the ProgramData upgrade authority). `treasury_destination` is stored but RESERVED (no
+    /// withdrawal instruction in the MVP: treasury funds leave only through `refund`).
+    /// `per_tx_max` 0 = no per-transaction cap; `idle_secs` 0 = idle lock disabled.
     pub fn initialize_config(ctx: Context<InitializeConfig>, args: InitializeConfigArgs) -> Result<()> {
         handlers::initialize_config(ctx, args)
     }
@@ -70,14 +72,25 @@ pub mod solsend {
     /// Must verify: delegation owned by the Allowances program; header.delegator == owner;
     /// header.delegatee == card PDA; delegation PDA == derive(SA(owner, mint), owner, card, nonce);
     /// delegation type matches `kind` (fixed for StoreLocked/OneTime, recurring for Subscription).
-    pub fn register_card(ctx: Context<RegisterCard>, card_id: u64, kind: u8, delegation_nonce: u64, label: [u8; 32]) -> Result<()> {
-        handlers::register_card(ctx, card_id, kind, delegation_nonce, label)
+    /// `merchant_lock`: all zeros = lock to the first settled merchant; non-zero = pre-locked to that
+    /// merchant_hash from registration (every settle, including the first, must match).
+    pub fn register_card(
+        ctx: Context<RegisterCard>,
+        card_id: u64,
+        kind: u8,
+        delegation_nonce: u64,
+        label: [u8; 32],
+        merchant_lock: [u8; 32],
+    ) -> Result<()> {
+        handlers::register_card(ctx, card_id, kind, delegation_nonce, label, merchant_lock)
     }
 
     /// Settlement authority pulls `amount` (USDC base units) for ONE card authorization.
     /// Refuse when: config.paused; card not Active; per_tx_max exceeded; idle (now - max(created,last_used)
-    /// > idle_secs); merchant_hash != card.merchant_lock (lock set on first settle). Creates the
-    /// SettlementRecord (init ⇒ duplicate auth fails atomically), CPIs transfer_fixed/transfer_recurring
+    /// > idle_secs; StoreLocked/OneTime only, Subscriptions are governed by their period cap);
+    /// merchant_hash != card.merchant_lock (lock set at registration or on first settle). Creates the
+    /// SettlementRecord, seeded by auth_hash ONLY (init ⇒ an authorization settles at most once across
+    /// ALL cards, atomically), CPIs transfer_fixed/transfer_recurring
     /// with the Card PDA as delegatee signer into the treasury ATA, reads the remaining allowance from
     /// the delegation account AFTER the CPI, updates totals, OneTime ⇒ status Used, emits CardSettled.
     pub fn settle(ctx: Context<Settle>, amount: u64, auth_hash: [u8; 32], merchant_hash: [u8; 32]) -> Result<()> {
@@ -97,7 +110,9 @@ pub mod solsend {
         handlers::freeze_card(ctx)
     }
 
-    /// Owner only: Frozen -> Active. Emits CardUnfrozen.
+    /// Owner only: Frozen -> Active, or re-activate an Active card. Both reset the idle timer
+    /// (`last_used_ts = now`), so this is also the owner's recovery path for an idle-locked card.
+    /// Used / Closed are final. Emits CardUnfrozen.
     pub fn unfreeze_card(ctx: Context<OwnerCard>) -> Result<()> {
         handlers::unfreeze_card(ctx)
     }
@@ -106,11 +121,6 @@ pub mod solsend {
     /// includes Allowances `revoke_delegation` in the same transaction. Emits CardClosed.
     pub fn close_card(ctx: Context<OwnerCard>) -> Result<()> {
         handlers::close_card(ctx)
-    }
-
-    /// Admin moves treasury funds ONLY to config.treasury_destination (issuer-settlement account).
-    pub fn admin_withdraw(ctx: Context<AdminWithdraw>, amount: u64) -> Result<()> {
-        handlers::admin_withdraw(ctx, amount)
     }
 }
 
@@ -129,6 +139,8 @@ pub struct Config {
     pub admin: Pubkey,
     pub settlement_authority: Pubkey,
     pub usdc_mint: Pubkey,
+    // RESERVED (layout kept): destination for a post-MVP withdrawal capped by outstanding refunds.
+    // No instruction reads it today; treasury funds can leave only through `refund`.
     pub treasury_destination: Pubkey,
     pub per_tx_max: u64,
     pub idle_secs: i64,
@@ -159,9 +171,11 @@ pub struct Card {
     pub bump: u8,
 }
 
-// PERMANENT (CP1 amendment): there is no close instruction. The record PDA is the lifetime
-// idempotency guard for (card, auth_hash), so a re-delivered or replayed authorization can never
-// settle twice. Rent is ~0.0015 devnet SOL per record, paid by the settlement authority.
+// PERMANENT (CP1 amendment): there is no close instruction. The record PDA, seeded by
+// [SETTLE_SEED, auth_hash] only (audit L1), is the lifetime idempotency guard for one card-network
+// authorization across ALL cards: a re-delivered or replayed authorization can never settle twice.
+// `card` records which card it settled (refund enforces `has_one = card`). Rent is ~0.0015 devnet
+// SOL per record, paid by the settlement authority.
 #[account]
 #[derive(InitSpace)]
 pub struct SettlementRecord {
@@ -185,6 +199,12 @@ pub struct InitializeConfig<'info> {
     pub treasury: UncheckedAccount<'info>,
     pub usdc_mint: Account<'info, Mint>,
     pub system_program: Program<'info, System>,
+    #[account(constraint = upgrade::programdata_address(&program) == Some(program_data.key()) @ SolsendError::NotAuthorized)]
+    pub program: Program<'info, crate::program::Solsend>,
+    /// CHECK: this program's ProgramData (BPFLoaderUpgradeable-owned, address = program's
+    /// programdata_address); its upgrade authority must be `admin` (front-run guard).
+    #[account(constraint = upgrade::upgrade_authority(&program_data) == Some(admin.key()) @ SolsendError::NotAdmin)]
+    pub program_data: UncheckedAccount<'info>,
 }
 
 #[derive(Accounts)]
@@ -224,7 +244,7 @@ pub struct Settle<'info> {
     #[account(mut, seeds = [CARD_SEED, card.owner.as_ref(), &card.card_id.to_le_bytes()], bump = card.bump)]
     pub card: Account<'info, Card>,
     #[account(init, payer = settlement_authority, space = 8 + SettlementRecord::INIT_SPACE,
-              seeds = [SETTLE_SEED, card.key().as_ref(), auth_hash.as_ref()], bump)]
+              seeds = [SETTLE_SEED, auth_hash.as_ref()], bump)]
     pub settlement_record: Account<'info, SettlementRecord>,
     /// CHECK: must equal card.delegation (Allowances delegation PDA).
     #[account(mut, address = card.delegation @ SolsendError::DelegationMismatch)]
@@ -259,7 +279,7 @@ pub struct Refund<'info> {
     pub config: Account<'info, Config>,
     #[account(mut, seeds = [CARD_SEED, card.owner.as_ref(), &card.card_id.to_le_bytes()], bump = card.bump)]
     pub card: Account<'info, Card>,
-    #[account(mut, has_one = card, seeds = [SETTLE_SEED, card.key().as_ref(), auth_hash.as_ref()], bump = settlement_record.bump)]
+    #[account(mut, has_one = card, seeds = [SETTLE_SEED, auth_hash.as_ref()], bump = settlement_record.bump)]
     pub settlement_record: Account<'info, SettlementRecord>,
     #[account(mut, address = card.source_token_account @ SolsendError::SourceMismatch)]
     pub source_token_account: Account<'info, TokenAccount>,
@@ -291,28 +311,23 @@ pub struct OwnerCard<'info> {
     pub card: Account<'info, Card>,
 }
 
-#[derive(Accounts)]
-pub struct AdminWithdraw<'info> {
-    pub admin: Signer<'info>,
-    #[account(seeds = [CONFIG_SEED], bump = config.bump, has_one = admin @ SolsendError::NotAdmin)]
-    pub config: Account<'info, Config>,
-    /// CHECK: data-less treasury PDA (signs the withdrawal).
-    #[account(seeds = [TREASURY_SEED], bump = config.treasury_bump)]
-    pub treasury: UncheckedAccount<'info>,
-    #[account(mut, associated_token::mint = usdc_mint, associated_token::authority = treasury)]
-    pub treasury_ata: Account<'info, TokenAccount>,
-    #[account(mut, address = config.treasury_destination @ SolsendError::InvalidDestination)]
-    pub destination: Account<'info, TokenAccount>,
-    #[account(address = config.usdc_mint @ SolsendError::InvalidMint)]
-    pub usdc_mint: Account<'info, Mint>,
-    pub token_program: Program<'info, Token>,
-}
-
 // ── Events (decoded by the QuickNode Stream filter from `Program data:` logs) ──
 #[event]
 pub struct CardRegistered { pub card: Pubkey, pub owner: Pubkey, pub card_id: u64, pub kind: u8, pub delegation: Pubkey, pub label: [u8; 32] }
 #[event]
-pub struct CardSettled { pub card: Pubkey, pub owner: Pubkey, pub amount: u64, pub remaining_allowance: u64, pub auth_hash: [u8; 32], pub merchant_hash: [u8; 32], pub total_settled: u64, pub status_after: u8 }
+pub struct CardSettled {
+    pub card: Pubkey,
+    pub owner: Pubkey,
+    pub amount: u64,
+    /// Spending power left after this settle. Fixed (StoreLocked): the delegation's remaining
+    /// lifetime cap. Recurring (Subscription): remaining in the CURRENT period as of this pull (it
+    /// resets when the next period starts). 0 when `status_after` != Active (a Used one-time card).
+    pub remaining_allowance: u64,
+    pub auth_hash: [u8; 32],
+    pub merchant_hash: [u8; 32],
+    pub total_settled: u64,
+    pub status_after: u8,
+}
 #[event]
 pub struct CardRefunded { pub card: Pubkey, pub owner: Pubkey, pub amount: u64, pub auth_hash: [u8; 32], pub record_refunded: u64, pub destination: Pubkey }
 #[event]
@@ -354,6 +369,7 @@ pub enum SolsendError {
     SourceMismatch,
     #[msg("invalid USDC mint")]
     InvalidMint,
+    // Unused since admin_withdraw was removed (audit L2); kept so later error codes do not shift.
     #[msg("destination is not the configured treasury destination")]
     InvalidDestination,
     #[msg("invalid Allowances account")]
@@ -371,4 +387,7 @@ pub mod handlers;
 
 /// Allowances program layouts, derivations and the transfer CPI.
 pub mod allowances;
+
+/// BPFLoaderUpgradeable state readers (initialize_config front-run guard).
+pub mod upgrade;
 pub use allowances::{derive_delegation, derive_event_authority, derive_subscription_authority};
