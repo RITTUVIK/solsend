@@ -2,7 +2,8 @@
 import { useState } from "react";
 import { flushSync } from "react-dom";
 import { client, humanError, signAndSubmit } from "@/client/api";
-import { usd } from "@/client/format";
+import { blastRadius, isExpired, usd } from "@/client/format";
+import { isUserCancel } from "@/client/wallet-errors";
 import { useAppData } from "./AppShell";
 import { ErrorNote, Icon, Sheet, SigLink, Spinner } from "./ui";
 
@@ -16,9 +17,20 @@ export function OutagePanel({ outage = false }: { outage?: boolean }) {
   const [phase, setPhase] = useState<"preparing" | "signing" | "submitting" | null>(null);
   const busy = phase !== null;
   const [confirm, setConfirm] = useState(false);
-  const [err, setErr] = useState<{ text: string; sent: boolean } | null>(null);
+  const [err, setErr] = useState<{ text: string; sent: boolean; cancelled: boolean } | null>(null);
   const [done, setDone] = useState<{ sig: string; balance: string | null } | null>(null);
-  const live = (cards.data ?? []).filter((c) => c.delegationLive && c.status !== "CLOSED" && c.issueState !== "failed").length;
+  // Allowance accounts that still exist onchain (what revoke-all closes) vs cards that can still pull (home's "live cards").
+  // An expired free trial or a frozen card can't pull, but its allowance account exists until revoked.
+  const onchain = (cards.data ?? []).filter((c) => c.delegationLive && c.status !== "CLOSED" && c.issueState !== "failed");
+  const live = onchain.length;
+  const canPull = blastRadius(cards.data).count;
+  const expired = onchain.filter((c) => isExpired(c)).length;
+  const frozen = onchain.filter((c) => !isExpired(c) && c.status === "FROZEN").length;
+  const otherIdle = live - canPull - expired - frozen;
+  const breakdown = live === canPull ? null : [
+    `${canPull} live card${canPull === 1 ? "" : "s"}`,
+    expired > 0 && `${expired} expired`, frozen > 0 && `${frozen} frozen`, otherIdle > 0 && `${otherIdle} inactive`,
+  ].filter(Boolean).join(", ");
 
   async function revoke() {
     // Close OUR confirmation dialog BEFORE the wallet opens. A modal <dialog> sits in the browser's top layer and makes
@@ -34,7 +46,7 @@ export function OutagePanel({ outage = false }: { outage?: boolean }) {
       });
       setDone({ sig: r.signature, balance: wallet.data?.usdcBase ?? null });
     } catch (e) {
-      setErr({ text: humanError(e), sent });
+      setErr({ text: humanError(e), sent, cancelled: !sent && isUserCancel(e) });
     } finally {
       setPhase(null);
       // Always re-read: the live count below comes from the chain (delegation accounts), never from what we assume.
@@ -54,7 +66,10 @@ export function OutagePanel({ outage = false }: { outage?: boolean }) {
       </div>
       <div className="mt-4 flex items-end justify-between gap-3 rounded-[14px] bg-surface px-3.5 py-3">
         <div><p className="text-[12px] font-medium text-ink-3">Live wallet balance</p><p className="tnum text-[22px] font-semibold tracking-[-0.02em]" data-testid="outage-balance">{wallet.data ? usd(wallet.data.usdcBase) : "—"} <span className="text-[12px] font-medium text-ink-3">devnet USDC</span></p></div>
-        <p className="text-[13px] font-medium text-ink-3">{live} live allowance{live === 1 ? "" : "s"}</p>
+        <p className="text-right text-[13px] font-medium text-ink-3" data-testid="allowance-count">
+          {live} allowance{live === 1 ? "" : "s"} onchain
+          {breakdown && <span className="block text-[12px] font-normal">{breakdown}</span>}
+        </p>
       </div>
       {busy && (
         <div className="mt-3 flex items-center gap-2.5 rounded-[14px] bg-surface px-3.5 py-3 text-[15px] font-medium" role="status" aria-live="polite" data-testid="revoke-progress" data-phase={phase}>
@@ -62,7 +77,12 @@ export function OutagePanel({ outage = false }: { outage?: boolean }) {
           {phase === "signing" ? "Approve the revoke in your wallet window" : phase === "submitting" ? "Revoking on Solana… waiting for confirmation" : "Preparing one revoke transaction…"}
         </div>
       )}
-      {err && !busy && (
+      {err && !busy && err.cancelled && (
+        <p className="mt-3 rounded-[14px] bg-surface px-3.5 py-3 text-[15px] leading-[22px]" role="status" data-testid="revoke-cancelled">
+          You cancelled in your wallet. Nothing was sent to Solana, and your cards are unchanged.
+        </p>
+      )}
+      {err && !busy && !err.cancelled && (
         <div className="mt-3 space-y-1" data-testid="revoke-error">
           <ErrorNote>{err.text}</ErrorNote>
           <p className="text-[13px] text-ink-2">
@@ -86,7 +106,7 @@ export function OutagePanel({ outage = false }: { outage?: boolean }) {
       <Sheet open={confirm} onClose={() => { if (!busy) setConfirm(false); }} labelledBy="revoke-title" dismissible={!busy} testId="revoke-sheet">
         <div className="space-y-4 pt-1">
           <h3 id="revoke-title" className="text-[22px] font-semibold tracking-[-0.02em]">Revoke {live} card{live === 1 ? "" : "s"}?</h3>
-          <p className="text-[15px] leading-[22px] text-ink-2">One Solana transaction removes every card&apos;s allowance. It works even if SolSend and the issuer are down. Your balance doesn&apos;t move; the cards can never pull again.</p>
+          <p className="text-[15px] leading-[22px] text-ink-2">One Solana transaction removes every card&apos;s allowance{live > canPull ? ", including expired and frozen ones" : ""}. It works even if SolSend and the issuer are down. Your balance doesn&apos;t move; the cards can never pull again.</p>
           <p className="text-[13px] leading-5 text-ink-3">Next, your wallet asks you to approve one transaction. Nothing is revoked until you approve it.</p>
           <div className="flex flex-col gap-2">
             <button type="button" className="btn-primary w-full !bg-no !text-paper" onClick={() => void revoke()} disabled={busy} data-testid="revoke-confirm">

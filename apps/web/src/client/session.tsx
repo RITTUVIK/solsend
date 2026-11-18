@@ -70,7 +70,9 @@ export function MockSessionProvider({ children }: { children: ReactNode }) {
     // <dialog> left open by the app covers it exactly as it would cover Privy's (bug found in the 2026-11-18 rehearsal).
     signTx: (wire) => new Promise<Uint8Array>((resolve, reject) => {
       const id = Date.now();
-      setSign({ id, settle: (ok, why) => { setSign(null); if (ok) resolve(wire); else reject(new Error(why ?? "The user rejected the request.")); } });
+      // Reject mirrors Privy 3.51's real shape: a generic wrapper whose `cause` carries the actual reason.
+      const privyCancel = () => Object.assign(new Error("Failed to connect to wallet", { cause: new Error("User exited the modal before submitting the transaction") }), { privyErrorCode: "transaction_failure" });
+      setSign({ id, settle: (ok, why) => { setSign(null); if (ok) resolve(wire); else reject(why ? new Error(why) : privyCancel()); } });
     }),
     signMsg: async () => { await wait(250); return crypto.getRandomValues(new Uint8Array(64)); },
   }), [ready, email]);

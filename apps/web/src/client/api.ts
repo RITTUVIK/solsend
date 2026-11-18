@@ -7,6 +7,7 @@ import { getBridge } from "./session";
 import { mockRequest } from "./mock";
 import { b64ToBytes, bytesToB64 } from "./format";
 import { setSignNotice } from "./notice";
+import { isUserCancel, isWalletSignFailure } from "./wallet-errors";
 
 export class ApiCallError extends Error {
   constructor(public status: number, message: string, public code?: string, public body?: unknown) { super(message); this.name = "ApiCallError"; }
@@ -28,8 +29,9 @@ export function humanError(e: unknown): string {
     return e.message || "Something went wrong. Please try again.";
   }
   if (e instanceof Error && e.message) {
-    // Privy: "The user rejected the request." / "User exited flow" / "User exited the modal before submitting the transaction".
-    if (/reject|denied|cancel|user exited/i.test(e.message)) return "Signing was cancelled. Nothing was sent.";
+    // Privy wraps the real reason in `cause` (e.g. "Failed to connect to wallet" ← "User exited the modal…").
+    if (isUserCancel(e)) return "Signing was cancelled. Nothing was sent.";
+    if (isWalletSignFailure(e)) return "Your wallet couldn't complete the signature. Nothing was sent. Please try again.";
     return e.message;
   }
   return "Something went wrong. Please try again.";

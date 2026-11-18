@@ -166,7 +166,7 @@ test("judge journey: login → faucet → card → approve → void → decline 
   // Rehearsal bug (2026-11-18): our modal confirm <dialog> stayed open in the browser top layer and covered the wallet's
   // approval window. Manual mock-wallet mode: the test must CLICK the wallet's buttons, which fails if anything covers them.
   await page.evaluate(() => localStorage.setItem("solsend.mock.sign", "manual"));
-  const liveCount = async () => /(\d+) live allowance/.exec((await page.getByTestId("safety").textContent()) ?? "")?.[1] ?? null;
+  const liveCount = async () => /(\d+) allowances? onchain/.exec((await page.getByTestId("allowance-count").textContent()) ?? "")?.[1] ?? null;
   const liveBefore = await liveCount();
   expect(Number(liveBefore)).toBeGreaterThan(0);
   await page.getByTestId("revoke-open").click();
@@ -179,8 +179,8 @@ test("judge journey: login → faucet → card → approve → void → decline 
   await shot(page, "11b-revoke-wallet-approval");
   // Cancel in the wallet → nothing sent, cards unchanged, clear retry.
   await page.getByTestId("mock-wallet-reject").click();
-  await expect(page.getByTestId("revoke-error")).toContainText("Signing was cancelled. Nothing was sent.");
-  await expect(page.getByTestId("revoke-error")).toContainText("Nothing was sent to Solana. Your cards are unchanged.");
+  await expect(page.getByTestId("revoke-cancelled")).toHaveText("You cancelled in your wallet. Nothing was sent to Solana, and your cards are unchanged.");
+  await expect(page.getByTestId("revoke-error")).toHaveCount(0);
   await expect.poll(liveCount).toBe(liveBefore);
   // Retry → approve (a real click: proves the approval window is reachable) → confirmed.
   await page.getByTestId("revoke-open").click();
@@ -297,6 +297,9 @@ test("free-trial card: expiry chip, then expired card is declined with free-tria
   await page.clock.fastForward("02:10");
   await expect(page.getByTestId("card-tile").first()).toContainText("Expired", { timeout: 10_000 });
   await expect(page.getByTestId("blast-amount")).toHaveText("$0.00");
+  // Rehearsal question: home's "live cards" (can pull) vs the Safety card's allowance count (still onchain, revocable).
+  await expect(page.getByTestId("allowance-count")).toHaveText("1 allowance onchain0 live cards, 1 expired");
+  await shot(page, "18a-expired-allowance-count");
   await page.getByTestId("card-tile").first().click();
   await expect(page.getByTestId("expired-note")).toBeVisible();
   await shot(page, "18-expired-card");
