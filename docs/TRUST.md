@@ -18,7 +18,7 @@ can sign for it, and only inside `settle`.
 |---|---|---|
 | **You (owner, Privy embedded wallet)** | Create, freeze, unfreeze and close cards. Revoke any delegation **directly in the Allowances program, without SolSend** (escape hatch). Move your USDC freely. | — |
 | **Settlement authority** (server hot key, devnet) | `settle` **one** Lithic authorization: only while the card is Active, not paused, not idle, at the locked merchant, ≤ per-tx max, ≤ the delegation's remaining cap. Funds go **only to the treasury PDA**. `refund`: only to the card's stored source token account, capped at the amount settled for that authorization. Freeze a card (reduce-only). | Withdraw from the treasury. Raise limits. Unfreeze. Pull a revoked, closed or used card. Pay anyone else. Settle the same authorization twice (SettlementRecord PDA). |
-| **Admin** (deployer key, devnet) | Pause or unpause settles (kill switch; refunds keep working). Rotate the settlement authority. `admin_withdraw` treasury funds **only to `treasury_destination`, which is fixed at initialization** (stand-in for the issuer's settlement account). | Touch user wallets or delegations. Change a card's limits or source account. Redirect withdrawals. |
+| **Admin** (deployer key, devnet; must be the program upgrade authority to initialize) | Pause or unpause settles (kill switch; refunds keep working). Rotate the settlement authority. | Touch user wallets or delegations. Change a card's limits or source account. **Withdraw from the treasury: there is no withdrawal instruction in the MVP.** Treasury funds can leave **only** through refunds to the original source accounts. Treasury → issuer settlement is out of scope (sandbox). A post-MVP withdrawal would be capped at the treasury balance minus outstanding refundable amounts. |
 | **Fee payer** (server key) | Pay fees and rent for **server-built** transactions. It co-signs only a message byte-identical to a stored, unexpired, unconsumed intent (CP0b G0.8). | Move user funds. Sign arbitrary transactions. |
 | **Program upgrade authority** (deployer key) | Upgrade the SolSend program on devnet. **This is the largest trust assumption**; freezing the program after the hackathon is the mitigation. | — |
 
@@ -26,8 +26,9 @@ can sign for it, and only inside `settle`.
 1. **Confirmed-before-approve.** The Lithic ASA reply is `APPROVED` only after the settle transaction is
    **confirmed** on devnet, or when an existing SettlementRecord for the same authorization is readable at
    confirmed commitment. Everything else declines, including errors, timeouts and unknown state.
-2. **Atomic, permanent idempotency.** There is one SettlementRecord PDA per (card, auth_hash), and records are
-   **never closed**: the program has no close instruction. A duplicate, re-delivered or replayed
+2. **Atomic, permanent idempotency.** There is one SettlementRecord PDA per **authorization**, with seeds
+   `["settle", auth_hash]`. Records are **never closed**: the program has no close instruction. A Lithic
+   authorization can therefore pull **once in total**, across all cards. A duplicate, re-delivered or replayed
    authorization can never pull twice, no matter how old it is. Each record costs about 0.0015 devnet SOL of rent,
    which is acceptable for the MVP. A redelivery is approved only when the existing record's amount equals the
    requested amount; any other amount for the same token is declined, because incremental authorizations are not
@@ -52,6 +53,15 @@ can sign for it, and only inside `settle`.
 7. **The ASA path fails closed.** Only `AUTHORIZATION` and `FINANCIAL_AUTHORIZATION` in USD can settle. Balance
    inquiries, credits and unknown statuses decline. A `$0` authorization (card verification) approves without
    settling. A card whose Lithic state is not `OPEN` declines.
+
+## Card policy notes
+- **Merchant lock.** A card created for a known store is **pre-locked at registration**, so a leaked card is
+  declined everywhere else, even on its first use. A card for "another store" locks to the first merchant that
+  successfully charges it.
+- **Idle lock.** A store-locked or one-time card that goes unused for `idle_secs` (30 days on devnet) stops paying.
+  The owner re-activates it with an explicit signature (`unfreeze_card`). Subscription cards are exempt; their
+  recurring per-period cap governs them.
+- **Freeze.** The owner or the settlement authority can freeze a card (reduce-only). Only the owner can unfreeze it.
 
 ## Product decision: refunds do not restore the limit (MVP)
 A void or refund returns the USDC to your wallet, but **the card's consumed allowance stays consumed**.
