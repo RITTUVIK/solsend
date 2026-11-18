@@ -5,9 +5,10 @@
 // Credentials are parsed in-process from spikes/.env (override: SOLSEND_ENV_FILE). The PAN is read into memory for the
 // simulate call only and is never printed or written; all output passes through a digit-run scrubber.
 import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { DEMO_MERCHANTS, LITHIC_SANDBOX_BASE } from "../packages/shared/src/index.js";
 
-const ENV_FILE = process.env.SOLSEND_ENV_FILE ?? "/Users/darrendeepak/solsend/spikes/.env";
+const ENV_FILE = process.env.SOLSEND_ENV_FILE ?? fileURLToPath(new URL("../spikes/.env", import.meta.url));
 if (existsSync(ENV_FILE)) process.loadEnvFile(ENV_FILE);
 const KEY = process.env.LITHIC_API_KEY;
 const MAX_CENTS = 5000;

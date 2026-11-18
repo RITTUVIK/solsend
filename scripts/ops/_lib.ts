@@ -6,9 +6,9 @@ import { fileURLToPath } from "node:url";
 
 export const REPO = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const ENV_LOCAL = join(REPO, "apps", "web", ".env.local");
-export const SPIKES_ENV = process.env.SOLSEND_SPIKES_ENV ?? "/Users/darrendeepak/solsend/spikes/.env";
+export const SPIKES_ENV = process.env.SOLSEND_SPIKES_ENV ?? join(REPO, "spikes", ".env");
 /** Machine-generated secrets live here (never hand-edited); overlays SPIKES_ENV. */
-export const GEN_ENV = process.env.SOLSEND_GEN_ENV ?? "/Users/darrendeepak/solsend/spikes/.env.generated";
+export const GEN_ENV = process.env.SOLSEND_GEN_ENV ?? join(REPO, "spikes", ".env.generated");
 export const KEYS_DIR = (process.env.SOLSEND_KEYS_DIR ?? "~/.config/solsend/devnet").replace(/^~(?=\/)/, homedir());
 export const LITHIC_SANDBOX = "https://sandbox.lithic.com";
 

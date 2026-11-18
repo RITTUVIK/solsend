@@ -1,9 +1,12 @@
 // Runs filter.dist.js on QuickNode's own sandbox against one real devnet block (POST /streams/test_filter).
 // Usage: tsx infra/quicknode/test-filter.ts <slot>   (one block; no stream needed; prints a result preview only)
 import { existsSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { buildFilterSource } from "./build-filter.js";
 
-const ENV_FILE = process.env.SOLSEND_ENV_FILE ?? "/Users/darrendeepak/solsend/spikes/.env";
+/** Repo root: nearest ancestor of the working directory holding pnpm-workspace.yaml (scripts run from root or scripts/). */
+const REPO_ROOT = (() => { let d = resolve(process.cwd()); while (!existsSync(join(d, "pnpm-workspace.yaml")) && dirname(d) !== d) d = dirname(d); return d; })();
+const ENV_FILE = process.env.SOLSEND_ENV_FILE ?? join(REPO_ROOT, "spikes", ".env");
 if (existsSync(ENV_FILE)) process.loadEnvFile(ENV_FILE);
 const slot = process.argv[2];
 if (!slot || !process.env.QUICKNODE_API_KEY) { console.error("usage: test-filter <slot> (QUICKNODE_API_KEY in spikes/.env)"); process.exit(2); }

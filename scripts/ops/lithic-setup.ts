@@ -7,7 +7,7 @@
 //   npx tsx@4.23.15 scripts/ops/lithic-setup.ts --url https://<host>
 //   npx tsx@4.23.15 scripts/ops/lithic-setup.ts --disenroll      (stop Lithic calling a dead tunnel)
 //   npx tsx@4.23.15 scripts/ops/lithic-setup.ts --status
-import { SPIKES_ENV, GEN_ENV, appEnv, lithic, lithicCallsUsed, upsertEnvFile, writeEnvLocal } from "./_lib";
+import { GEN_ENV, appEnv, lithic, lithicCallsUsed, upsertEnvFile, writeEnvLocal } from "./_lib";
 
 const args = process.argv.slice(2);
 const flag = (n: string) => args.includes(`--${n}`);

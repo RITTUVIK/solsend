@@ -1,4 +1,4 @@
-// Writes apps/web/.env.local (mode 600, gitignored) from /Users/darrendeepak/solsend/spikes/.env + the key
+// Writes apps/web/.env.local (mode 600, gitignored) from spikes/.env + the key
 // files in ~/.config/solsend/devnet/, fetching the ASA secret from Lithic `GET /v1/auth_stream/secret`.
 // Prints ONLY the variable names written — never values.
 //   npx tsx@4.23.15 scripts/ops/make-env-local.ts

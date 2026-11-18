@@ -11,12 +11,15 @@
 //   tsx infra/quicknode/stream.ts usage                 best-effort credit usage (REST), reports if unavailable
 import { randomBytes } from "node:crypto";
 import { chmodSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { buildFilterSource } from "./build-filter.js";
 
 export const STREAM_NAME = "solsend-mvp-devnet";
 const API = "https://api.quicknode.com/streams/rest/v1";
-const ENV_FILE = process.env.SOLSEND_ENV_FILE ?? "/Users/darrendeepak/solsend/spikes/.env";
-const GEN_FILE = process.env.SOLSEND_GEN_ENV ?? "/Users/darrendeepak/solsend/spikes/.env.generated"; // fresh stream tokens go here
+/** Repo root: nearest ancestor of the working directory holding pnpm-workspace.yaml (scripts run from root or scripts/). */
+const REPO_ROOT = (() => { let d = resolve(process.cwd()); while (!existsSync(join(d, "pnpm-workspace.yaml")) && dirname(d) !== d) d = dirname(d); return d; })();
+const ENV_FILE = process.env.SOLSEND_ENV_FILE ?? join(REPO_ROOT, "spikes", ".env");
+const GEN_FILE = process.env.SOLSEND_GEN_ENV ?? join(REPO_ROOT, "spikes", ".env.generated"); // fresh stream tokens go here
 
 /** Parse KEY=VALUE lines into process.env (without overriding). Never prints values. */
 function loadEnv(): void {

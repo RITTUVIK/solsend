@@ -6,6 +6,7 @@
 **/.env
 **/.env.*
 !**/.env.example
+*.env
 
 # Keypairs / private keys. Project devnet keys live OUTSIDE the repo in
 # ~/.config/solsend/devnet/ — these patterns are a second line of defence.
@@ -52,15 +53,8 @@ spikes/.raw/
 # Third-party artifacts for the Allowances spike (fetched by spikes/allowances_spike/scripts/fetch-vendor.sh)
 spikes/allowances_spike/vendor/
 
-# CP1 app build artifacts
-.next/
-.vercel/
-*.tsbuildinfo
-test-results/
-playwright-report/
-.DS_Store
-.turbo/
 
-# agent worktrees
-.claude/worktrees/
+# Local tooling and private material: agent worktrees, local Claude settings, untracked research PDFs
+.claude/
 .worktrees/
+docs/research/
