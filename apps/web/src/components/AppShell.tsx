@@ -3,14 +3,16 @@ import { createContext, useContext, useEffect, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { api } from "@solsend/shared";
+import { explorerTx } from "@solsend/shared";
 import type { z } from "zod";
 import { client } from "@/client/api";
 import { DATA_POLL_MS } from "@/client/config";
 import { usePoll, type Polled } from "@/client/hooks";
-import type { CardView } from "@/client/format";
+import { isMockSig, shortId, type CardView } from "@/client/format";
 import { useSignNotice } from "@/client/notice";
 import { useSession } from "@/client/session";
-import { Icon, MockBadge, Skeleton, Spinner } from "./ui";
+import { dismissToast, useToast } from "@/client/toast";
+import { Icon, MockBadge, MockTag, OnchainGlyph, Skeleton, Spinner } from "./ui";
 
 type Wallet = z.infer<typeof api.WalletResponse>;
 interface AppData { wallet: Polled<Wallet>; cards: Polled<CardView[]> }
@@ -22,7 +24,7 @@ export const useAppData = (): AppData => {
 };
 
 const NAV = [
-  { href: "/home", label: "Wallet", icon: "home" },
+  { href: "/home", label: "Wallet", icon: "wallet" },
   { href: "/merchant", label: "Demo store", icon: "store" },
   { href: "/activity", label: "Activity", icon: "pulse" },
 ] as const;
@@ -33,17 +35,46 @@ function Data({ children }: { children: ReactNode }) {
   return <Ctx.Provider value={{ wallet, cards }}>{children}</Ctx.Provider>;
 }
 
+/** Wordmark: a card leaving a wallet (two offset rounded rects) + "solsend" set tight. */
 export function Logo({ className = "" }: { className?: string }) {
   return (
-    <span className={`inline-flex items-center gap-2 font-extrabold tracking-tight ${className}`}>
-      <span className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 text-white"><Icon name="card" className="h-4 w-4" /></span>
-      SolSend
+    <span className={`inline-flex items-center gap-2 text-[19px] font-semibold tracking-[-0.045em] ${className}`}>
+      <svg viewBox="0 0 28 28" className="h-7 w-7" aria-hidden="true">
+        <rect x="2" y="7" width="20" height="15" rx="4.5" fill="var(--ink)" />
+        <rect x="7" y="4" width="19" height="14" rx="4.5" fill="var(--mint)" stroke="var(--paper)" strokeWidth="1.5" />
+        <path d="M11 13.5h6" stroke="#04130d" strokeWidth="2" strokeLinecap="round" />
+      </svg>
+      solsend
     </span>
   );
 }
 
+function ToastHost() {
+  const t = useToast();
+  if (!t) return null;
+  return (
+    <div role="status" data-testid={t.testId} key={t.id}
+      className="anim-rise fixed inset-x-4 bottom-[88px] z-[80] mx-auto max-w-md rounded-[16px] bg-ink px-4 py-3 text-paper shadow-2xl sm:bottom-6">
+      <div className="flex items-start gap-3">
+        <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-mint text-[#04130d]"><Icon name="check" className="h-3 w-3" strokeWidth={3} /></span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[15px] font-semibold">{t.title}</p>
+          {t.sig && (
+            <a href={explorerTx(t.sig)} target="_blank" rel="noreferrer" aria-label={t.linkLabel ?? "View on Solana Explorer (devnet)"}
+              className="mt-1 inline-flex min-h-8 items-center gap-2 text-[13px] font-medium text-paper/80 hover:text-paper">
+              <OnchainGlyph className="h-4 w-4" />Recorded on Solana devnet <code className="font-mono text-[12px] opacity-80">{shortId(t.sig, 4)}</code><Icon name="ext" className="h-3.5 w-3.5" />
+              {isMockSig(t.sig) && <MockTag />}
+            </a>
+          )}
+        </div>
+        <button type="button" onClick={dismissToast} className="-mr-1 grid h-8 w-8 shrink-0 place-items-center rounded-lg text-paper/70 hover:text-paper" aria-label="Dismiss"><Icon name="x" className="h-4 w-4" /></button>
+      </div>
+    </div>
+  );
+}
+
 /** Authenticated frame: header, tab bar, session guard and the shared wallet/cards pollers. */
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({ children, wide = false }: { children: ReactNode; wide?: boolean }) {
   const s = useSession();
   const router = useRouter();
   const path = usePathname();
@@ -52,42 +83,43 @@ export function AppShell({ children }: { children: ReactNode }) {
   const notice = useSignNotice();
   const gated = !s.ready || !s.authenticated || s.walletPending || !s.wallet;
   return (
-    <div className="mx-auto flex min-h-[calc(100dvh-28px)] w-full max-w-3xl flex-col">
+    <div className={`mx-auto flex min-h-[calc(100dvh-32px)] w-full flex-col ${wide ? "max-w-5xl" : "max-w-2xl"}`}>
       <header className="flex items-center justify-between gap-3 px-4 py-3">
-        <Link href="/home" className="rounded-lg"><Logo /></Link>
-        <nav aria-label="Primary" className="hidden gap-1 sm:flex">
+        <div className="flex items-center gap-2">
+          <Link href="/home" className="rounded-lg" aria-label="SolSend home"><Logo /></Link>
+          <MockBadge />
+        </div>
+        <nav aria-label="Primary" className="hidden gap-1 rounded-full bg-sunken p-1 sm:flex">
           {NAV.map((n) => (
             <Link key={n.href} href={n.href} aria-current={path === n.href ? "page" : undefined}
-              className={`rounded-lg px-3 py-1.5 text-sm font-medium ${path === n.href ? "bg-zinc-200 dark:bg-zinc-800" : "text-zinc-600 hover:bg-zinc-200/60 dark:text-zinc-400 dark:hover:bg-zinc-800/60"}`}>{n.label}</Link>
+              className={`rounded-full px-3.5 py-1.5 text-[14px] font-medium transition ${path === n.href ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"}`}>{n.label}</Link>
           ))}
         </nav>
-        <div className="flex items-center gap-2">
-          <MockBadge />
-          {s.authenticated && (
-            <button type="button" onClick={() => void s.logout().then(() => router.replace("/"))} className="btn-ghost !min-h-9 !px-3 !py-1 text-xs" title={s.email ?? undefined}>Log out</button>
-          )}
-        </div>
+        {s.authenticated && (
+          <button type="button" onClick={() => void s.logout().then(() => router.replace("/"))} className="btn-ghost !min-h-10 !px-3 !text-[14px]" title={s.email ?? undefined}>Log out</button>
+        )}
       </header>
-      <main className="flex-1 px-4 pb-28 pt-2 sm:pb-10">
+      <main className="flex-1 px-4 pb-32 pt-2 sm:pb-12">
         {gated ? (
-          <div className="space-y-3" role="status" aria-live="polite">
-            <p className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400"><Spinner />{s.walletPending ? "Creating your Solana wallet…" : "Loading…"}</p>
-            <Skeleton className="h-28" /><Skeleton className="h-44" />
+          <div className="space-y-4" role="status" aria-live="polite">
+            <p className="flex items-center gap-2 text-sm text-ink-2"><Spinner />{s.walletPending ? "Creating your Solana wallet…" : "Loading…"}</p>
+            <Skeleton className="h-24" /><Skeleton className="aspect-[1.586] !rounded-[20px]" />
           </div>
         ) : (
           <Data>{children}</Data>
         )}
       </main>
       {notice && (
-        <div role="status" data-testid="sign-notice" className="anim-rise fixed inset-x-4 bottom-20 z-50 mx-auto max-w-md rounded-xl bg-zinc-900 px-4 py-3 text-center text-sm font-medium text-white shadow-lg sm:bottom-6 dark:bg-zinc-100 dark:text-zinc-900">{notice}</div>
+        <div role="status" data-testid="sign-notice" className="anim-rise fixed inset-x-4 bottom-[88px] z-[90] mx-auto max-w-md rounded-[16px] bg-ink px-4 py-3 text-center text-[15px] font-medium text-paper shadow-2xl sm:bottom-6">{notice}</div>
       )}
-      <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-40 border-t border-zinc-200 bg-white/90 pb-[env(safe-area-inset-bottom)] backdrop-blur sm:hidden dark:border-zinc-800 dark:bg-zinc-950/90">
-        <ul className="mx-auto flex max-w-3xl">
+      <ToastHost />
+      <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-paper/85 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl sm:hidden">
+        <ul className="mx-auto flex max-w-2xl">
           {NAV.map((n) => (
             <li key={n.href} className="flex-1">
               <Link href={n.href} aria-current={path === n.href ? "page" : undefined}
-                className={`flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium ${path === n.href ? "text-emerald-700 dark:text-emerald-400" : "text-zinc-500"}`}>
-                <Icon name={n.icon} className="h-5 w-5" />{n.label}
+                className={`flex min-h-[60px] flex-col items-center justify-center gap-0.5 text-[11px] font-semibold ${path === n.href ? "text-ink" : "text-ink-3"}`}>
+                <Icon name={n.icon} className="h-[22px] w-[22px]" strokeWidth={path === n.href ? 2.2 : 1.8} />{n.label}
               </Link>
             </li>
           ))}

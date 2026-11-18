@@ -13,7 +13,7 @@ export function Providers({ children }: { children: ReactNode }) {
     return (
       <main className="mx-auto max-w-md p-6">
         <h1 className="text-xl font-bold">Login isn&apos;t configured yet</h1>
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="mt-2 text-sm text-ink-2">
           This deployment is missing its Privy app id. Set <code>NEXT_PUBLIC_PRIVY_APP_ID</code>, or run with <code>NEXT_PUBLIC_MOCK_API=1</code> to use the in-browser mock.
         </p>
       </main>
