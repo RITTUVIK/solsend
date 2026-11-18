@@ -114,7 +114,7 @@ Every authenticated route resolves `wallet` from `users`, never from the request
 ### F5 Void / decline / late settle: the reconciler
 - `POST /api/lithic/events` receives Lithic `card_transaction.updated` (HMAC verified; dedupe on `webhook-id`
   via `webhook_receipts`).
-- `POST /api/reconcile` (GitHub Actions cron every 5 min, plus manual) sweeps `authorizations` rows with
+- `POST /api/reconcile` (GitHub Actions cron every 10 min, plus manual). GitHub runs scheduled workflows only from the default branch, so the cron starts after the final merge. Until then, piggyback sweeps on `/api/feed` and `/api/cards`, at most once per 60 s, plus the ASA late-settle watcher and the Lithic events webhook cover it sweeps `authorizations` rows with
   `reconcile_action IS NULL`.
 - **The rule is driven by Lithic transaction status. `result` is NOT authoritative after a void.**
   - `DECLINED`, `VOIDED` or `EXPIRED`, and a record with `amount > refunded` → `refund(amount − refunded)`.
