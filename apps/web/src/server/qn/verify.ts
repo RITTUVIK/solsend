@@ -1,6 +1,7 @@
 // QuickNode Streams webhook authentication (CP0b G0.7, verified live):
 //   x-qn-signature = hex(HMAC-SHA256(security_token, x-qn-nonce + x-qn-timestamp + rawBody))
 // Pure functions: no env or store access, so they are trivially unit-testable.
+import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 export const QN_TOLERANCE_MS = 5 * 60_000;

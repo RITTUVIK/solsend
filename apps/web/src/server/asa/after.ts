@@ -1,3 +1,4 @@
+import "server-only";
 // Work done AFTER the ASA reply (Vercel `waitUntil`, CP1 F4 step 7). Never affects the reply.
 //  1. persist the authorizations row + a feed row (source "lithic")
 //  2. not APPROVED but a settle was sent → keep watching that signature (~30 s) and reconcile:
@@ -13,7 +14,9 @@ import type { AsaDecision } from "./engine";
 
 export type AfterDeps = ReconcileDeps & { rpc: Rpc; store: Store; lithic: Pick<LithicApi, "getTransaction" | "setCardState">; clock: Clock; lateWatchMs?: number };
 
-export async function afterAsaReply(deps: AfterDeps, d: AsaDecision, repliedAt: string, opts: { deduped: boolean }): Promise<void> {
+export async function afterAsaReply(deps: AfterDeps, d: AsaDecision, repliedAt: string, opts: { deduped: boolean; webhookId?: string }): Promise<void> {
+  // audit L2: cross-instance replay record (best effort; the in-memory guard is the hot-path check).
+  if (opts.webhookId) await deps.store.recordReceipt("lithic_asa", opts.webhookId).catch(() => false);
   if (!d.token) return; // unparseable request: nothing to key a row on
   try {
     await persist(deps, d, repliedAt, opts.deduped);
@@ -50,8 +53,7 @@ async function persist(deps: AfterDeps, d: AsaDecision, repliedAt: string, dedup
   const prev = await deps.store.getAuthorization(d.token);
   // Never downgrade an approved authorization because a later redelivery declined (e.g. incremental auth).
   if (prev?.decision === "APPROVED" && d.result !== "APPROVED") {
-    const { updated_at: _u, ...rest } = prev;
-    await deps.store.upsertAuthorization({ ...rest, timings: { ...prev.timings, [`redelivery_declined_${Date.now()}`]: d.timings.total_ms } });
+    await deps.store.upsertAuthorization({ lithic_token: prev.lithic_token, timings: { ...prev.timings, [`redelivery_declined_${Date.now()}`]: d.timings.total_ms } }); // patch only (L1)
     return;
   }
   if (deduped && prev) return;

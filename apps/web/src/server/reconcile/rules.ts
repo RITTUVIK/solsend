@@ -1,5 +1,6 @@
 // Reconciler decision rule (CP1 F5, docs/TRUST.md invariants 3 + 4). PURE — unit-tested as a matrix.
 // Source of truth = the Lithic transaction status. `result` is NOT authoritative after a void (CP0b S2).
+import "server-only";
 import { LITHIC_TERMINAL_DECLINE } from "@solsend/shared";
 import type { RecordView } from "../solana/records";
 

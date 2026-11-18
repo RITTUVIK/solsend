@@ -46,7 +46,7 @@ function Content() {
   const setupNeeded = needSetup || wallet.data?.subscriptionAuthorityReady === false;
   const formOk = merchantName.length > 0 && merchantName.length <= 32 && limitOk && !setupNeeded;
 
-  const polled = usePoll(client.listCards, 1200, cardPda != null);
+  const polled = usePoll(client.listCards, 2000, cardPda != null); // + AppShell 3 s poll = 50/min < 60/min server limit
   const card = useMemo(() => polled.data?.find((c) => c.cardPda === cardPda) ?? null, [polled.data, cardPda]);
 
   function pickStore(s: (typeof STORES)[number]) { setStore(s.name); setKind(s.kind); setDollars(s.dollars); }

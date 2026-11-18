@@ -31,7 +31,11 @@ export interface Store {
   getAuthorization(lithicToken: string): Promise<AuthorizationRow | null>;
   /** Lookup by onchain commitment (hex of authCommitment(token)) — joins QuickNode events to Lithic authorizations. */
   getAuthorizationByAuthHash(authHashHex: string): Promise<AuthorizationRow | null>;
+  /** Rows with reconcile_action IS NULL, older than `olderThanSecs`, whose backoff elapsed (next_attempt_at null or
+   *  <= now), ordered by coalesce(next_attempt_at, created_at) — failing rows move behind fresh ones (0003). */
   listUnreconciled(olderThanSecs: number, limit: number): Promise<AuthorizationRow[]>;
+  /** Count authorizations with an exact reconcile_action (e.g. "anomaly_refund_failing" for /api/status). */
+  countAuthorizations(q: { reconcileAction: string }): Promise<number>;
 
   /** Idempotent: returns false if an identical (signature, kind, card_pda, lithic_token) row exists. A QuickNode
    *  delivery for an existing row ENRICHES it (source='quicknode', slot, remaining_base) — the onchain confirmation
@@ -88,15 +92,20 @@ export class MemoryStore implements Store {
   async upsertAuthorization(row: Partial<AuthorizationRow> & Pick<AuthorizationRow, "lithic_token">) {
     const prev = this.auths.get(row.lithic_token);
     const base: AuthorizationRow = prev ?? { lithic_token: row.lithic_token, card_pda: null, amount_cents: 0, merchant_descriptor: null, acceptor_id: null, decision: "PENDING", reason: "",
-      settle_signature: null, confirmed_at: null, replied_at: null, timings: {}, lithic_final_status: null, reconcile_action: null, refund_signature: null, created_at: now(), updated_at: now(), auth_hash: "" };
+      settle_signature: null, confirmed_at: null, replied_at: null, timings: {}, lithic_final_status: null, reconcile_action: null, refund_signature: null, created_at: now(), updated_at: now(), auth_hash: "",
+      reconcile_attempts: 0, next_attempt_at: null, last_error: null };
     this.auths.set(row.lithic_token, { ...base, ...row, updated_at: now() });
   }
   async getAuthorization(t: string) { return this.auths.get(t) ?? null; }
   async getAuthorizationByAuthHash(h: string) { return [...this.auths.values()].find((a) => a.auth_hash === h) ?? null; }
   async listUnreconciled(olderThanSecs: number, limit: number) {
-    const cutoff = new Date(Date.now() - olderThanSecs * 1000).toISOString();
-    return [...this.auths.values()].filter((a) => a.reconcile_action === null && a.created_at <= cutoff).slice(0, limit);
+    const cutoff = new Date(Date.now() - olderThanSecs * 1000).toISOString(), nowIso = now();
+    const due = (a: AuthorizationRow) => a.next_attempt_at ?? a.created_at;
+    return [...this.auths.values()]
+      .filter((a) => a.reconcile_action === null && a.created_at <= cutoff && (!a.next_attempt_at || a.next_attempt_at <= nowIso))
+      .sort((a, b) => due(a).localeCompare(due(b))).slice(0, limit);
   }
+  async countAuthorizations(q: { reconcileAction: string }) { return [...this.auths.values()].filter((a) => a.reconcile_action === q.reconcileAction).length; }
   async insertFeedEvent(ev: NewFeedEvent) {
     const key = (e: Pick<FeedEventRow, "signature" | "kind" | "card_pda" | "lithic_token">) => [e.signature ?? "", e.kind, e.card_pda ?? "", e.lithic_token ?? ""].join("|");
     const existing = this.feed.find((f) => key(f) === key(ev));
@@ -121,6 +130,8 @@ export class MemoryStore implements Store {
 
 // ── Supabase (production) ────────────────────────────────────────────────────
 const UNIQUE_VIOLATION = "23505";
+const UNDEFINED_COLUMN = "42703";
+const BACKOFF_COLS = ["reconcile_attempts", "next_attempt_at", "last_error"];
 export class SupabaseStore implements Store {
   readonly kind = "supabase" as const;
   constructor(private sb: SupabaseClient) {}
@@ -153,8 +164,12 @@ export class SupabaseStore implements Store {
   /** Update-first (partial patches never hit NOT NULL constraints), insert if absent; a concurrent insert race
    *  (unique violation) falls back to update. Inserts must carry the NOT NULL columns (auth_hash, amount_cents). */
   async upsertAuthorization(row: Partial<AuthorizationRow> & Pick<AuthorizationRow, "lithic_token">) {
-    const patch = { ...row, updated_at: now() };
-    const upd = await this.sb.from("authorizations").update(patch).eq("lithic_token", row.lithic_token).select("lithic_token");
+    let patch: Record<string, unknown> = { ...row, updated_at: now() };
+    let upd = await this.sb.from("authorizations").update(patch).eq("lithic_token", row.lithic_token).select("lithic_token");
+    if (upd.error && BACKOFF_COLS.some((c) => upd.error!.message.includes(c))) { // 0003 not applied yet: write without the backoff columns
+      patch = Object.fromEntries(Object.entries(patch).filter(([k]) => !BACKOFF_COLS.includes(k)));
+      upd = await this.sb.from("authorizations").update(patch).eq("lithic_token", row.lithic_token).select("lithic_token");
+    }
     if ((this.ok(upd, "upsertAuthorization.update") as unknown[]).length > 0) return;
     const ins = await this.sb.from("authorizations").insert(patch);
     if (ins.error?.code === UNIQUE_VIOLATION) { this.ok(await this.sb.from("authorizations").update(patch).eq("lithic_token", row.lithic_token), "upsertAuthorization.retry"); return; }
@@ -163,8 +178,19 @@ export class SupabaseStore implements Store {
   async getAuthorization(t: string) { return this.ok(await this.sb.from("authorizations").select().eq("lithic_token", t).maybeSingle(), "getAuthorization") as AuthorizationRow | null; }
   async getAuthorizationByAuthHash(h: string) { return this.ok(await this.sb.from("authorizations").select().eq("auth_hash", h).maybeSingle(), "getAuthorizationByAuthHash") as AuthorizationRow | null; }
   async listUnreconciled(olderThanSecs: number, limit: number) {
-    const cutoff = new Date(Date.now() - olderThanSecs * 1000).toISOString();
-    return this.ok(await this.sb.from("authorizations").select().is("reconcile_action", null).lte("created_at", cutoff).order("created_at").limit(limit), "listUnreconciled") as AuthorizationRow[];
+    const cutoff = new Date(Date.now() - olderThanSecs * 1000).toISOString(), nowIso = now();
+    // 0003: reconcile_due_at = coalesce(next_attempt_at, created_at) (generated column, indexed).
+    const r = await this.sb.from("authorizations").select().is("reconcile_action", null).lte("created_at", cutoff)
+      .or(`next_attempt_at.is.null,next_attempt_at.lte.${nowIso}`).order("reconcile_due_at").limit(limit);
+    if (r.error && (r.error.code === UNDEFINED_COLUMN || /does not exist|reconcile_due_at|next_attempt_at/.test(r.error.message))) { // 0003 not applied yet → pre-0003 behavior (oldest first, no backoff)
+      return this.ok(await this.sb.from("authorizations").select().is("reconcile_action", null).lte("created_at", cutoff).order("created_at").limit(limit), "listUnreconciled") as AuthorizationRow[];
+    }
+    return this.ok(r, "listUnreconciled") as AuthorizationRow[];
+  }
+  async countAuthorizations(q: { reconcileAction: string }) {
+    const r = await this.sb.from("authorizations").select("lithic_token", { count: "exact", head: true }).eq("reconcile_action", q.reconcileAction);
+    this.ok(r, "countAuthorizations");
+    return r.count ?? 0;
   }
   async insertFeedEvent(ev: NewFeedEvent) {
     const r = await this.sb.from("feed_events").insert(ev);

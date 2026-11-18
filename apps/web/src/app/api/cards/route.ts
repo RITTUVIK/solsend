@@ -1,6 +1,6 @@
 // GET /api/cards → ListCardsResponse. Reconciles non-final rows against the chain first (F3 step 5).
 import { api } from "@solsend/shared";
-import { errorResponse, requireUser } from "@/server/auth";
+import { HttpError, errorResponse, requireUser } from "@/server/auth";
 import { respond } from "@/server/lib/http";
 import { getStore } from "@/server/store";
 import { waitUntil } from "@vercel/functions";
@@ -15,6 +15,7 @@ export const maxDuration = 30;
 export async function GET(req: Request): Promise<Response> {
   try {
     const { wallet } = await requireUser(req);
+    if (!(await getStore().rateLimit(`read:cards:${wallet}`, 60, 60))) throw new HttpError(429, "too many card list requests, slow down", "rate_limited");
     try { waitUntil(maybePiggybackSweep(reconcileDeps, getStore())); } catch { /* never affects the request */ }
     const deps = cardDeps();
     const { rows, chain } = await recoverAndList(deps, wallet);

@@ -1,6 +1,7 @@
 // Minimal Lithic SANDBOX client for the Demo Merchant (F7). SANDBOX ONLY: refuses any host but https://sandbox.lithic.com.
 // PCI hygiene: the sandbox PAN is read into a closure, used for exactly one simulate call and dropped. It is never
 // returned, logged, stored, or included in an error message (all error text is scrubbed).
+import "server-only";
 import { LITHIC_SANDBOX_BASE, LithicTransactionZ } from "@solsend/shared";
 import { HttpError } from "../auth";
 

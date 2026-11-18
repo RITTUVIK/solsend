@@ -14,6 +14,8 @@ export type AuthorizationRow = {
   lithic_token: string; auth_hash: string; card_pda: string | null; amount_cents: number; merchant_descriptor: string | null; acceptor_id: string | null;
   decision: string; reason: string; settle_signature: string | null; confirmed_at: string | null; replied_at: string | null; timings: Record<string, number>;
   lithic_final_status: string | null; reconcile_action: string | null; refund_signature: string | null; created_at: string; updated_at: string;
+  /** 0003_reconcile_backoff: failed reconcile attempts, earliest next sweep, last secret-free error. */
+  reconcile_attempts: number; next_attempt_at: string | null; last_error: string | null;
 };
 export type FeedEventRow = {
   id: string; owner_wallet: string | null; card_pda: string | null; kind: string; amount_base: string | null; remaining_base: string | null; signature: string | null;

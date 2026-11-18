@@ -1,6 +1,6 @@
 // GET /api/feed?cardPda=&since=<iso> (alias: cursor) → FeedResponse, scoped to the caller's wallet.
 import { api } from "@solsend/shared";
-import { errorResponse, requireUser } from "@/server/auth";
+import { HttpError, errorResponse, requireUser } from "@/server/auth";
 import { getStore } from "@/server/store";
 import { respond } from "@/server/lib/http";
 import { waitUntil } from "@vercel/functions";
@@ -14,6 +14,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request): Promise<Response> {
   try {
     const { wallet } = await requireUser(req);
+    if (!(await getStore().rateLimit(`read:feed:${wallet}`, 60, 120))) throw new HttpError(429, "too many feed requests, slow down", "rate_limited");
     try { waitUntil(maybePiggybackSweep(reconcileDeps, getStore())); } catch { /* never affects the request */ }
     const q = new URL(req.url).searchParams;
     const cardPda = q.get("cardPda");

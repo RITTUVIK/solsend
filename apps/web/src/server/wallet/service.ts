@@ -17,10 +17,12 @@ export async function walletView(rpc: Rpc, wallet: string): Promise<z.infer<type
 
 export const FAUCET_PER_WALLET_PER_HOUR = 1;
 export const FAUCET_GLOBAL_PER_HOUR = 60;
+export const FAUCET_GLOBAL_PER_DAY = 150;
 
 export async function claimFaucet(deps: { rpc: Rpc; store: Store; faucet: Keypair; clock: Clock; amountBase: bigint }, wallet: string): Promise<z.infer<typeof api.FaucetResponse>> {
   if (!(await deps.store.rateLimit(`faucet:${wallet}`, 3600, FAUCET_PER_WALLET_PER_HOUR))) throw new HttpError(429, "faucet: 1 claim per hour per wallet", "rate_limited");
   if (!(await deps.store.rateLimit("faucet:global", 3600, FAUCET_GLOBAL_PER_HOUR))) throw new HttpError(429, "faucet busy, try later", "rate_limited");
+  if (!(await deps.store.rateLimit("faucet:global:day", 86_400, FAUCET_GLOBAL_PER_DAY))) throw new HttpError(429, "faucet daily capacity reached, try tomorrow", "rate_limited");
   const user = new PublicKey(wallet);
   const src = usdcAta(deps.faucet.publicKey);
   const srcAcc = await deps.rpc.getAccountInfo(src, "confirmed");

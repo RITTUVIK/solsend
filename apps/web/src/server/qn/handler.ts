@@ -1,5 +1,6 @@
 // QuickNode Streams webhook handler (F6). Verify -> replay guard -> parse QnPayload -> idempotent feed rows.
 // Streams deliveries are notifications for the live feed only; money correctness never depends on them (TRUST.md).
+import "server-only";
 import { z } from "zod";
 import { api } from "@solsend/shared";
 import type { NewFeedEvent, Store } from "../store";

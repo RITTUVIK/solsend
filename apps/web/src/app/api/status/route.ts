@@ -1,11 +1,17 @@
 // GET /api/status: public health/readiness. Secret-free (see server/status/checks.ts).
-import { runChecks, lithicPing, type RpcLike } from "@/server/status/checks";
+import { runChecks, lithicPing, statusCache, STATUS_CACHE_CONTROL, type RpcLike } from "@/server/status/checks";
 import { getStore } from "@/server/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const cached = statusCache(compute);
+
 export async function GET(): Promise<Response> {
+  return Response.json(await cached(), { headers: { "cache-control": STATUS_CACHE_CONTROL } });
+}
+
+async function compute() {
   let rpc: RpcLike | null = null, settler = null, feePayer = null, configError: string | undefined;
   try {
     const { connection, settlementAuthority, feePayerKey } = await import("@/server/keys");
@@ -17,6 +23,5 @@ export async function GET(): Promise<Response> {
   }
   let store = null;
   try { store = getStore(); } catch { /* reported as a failed check */ }
-  const res = await runChecks({ rpc, settler, feePayer, store, lithicPing: () => lithicPing(process.env.LITHIC_API_KEY), configError });
-  return Response.json(res, { headers: { "cache-control": "no-store" } });
+  return runChecks({ rpc, settler, feePayer, store, lithicPing: () => lithicPing(process.env.LITHIC_API_KEY), configError });
 }

@@ -22,6 +22,7 @@ function world(status: string | null) {
   const cardId = 42n;
   const pda = cardPda(owner, cardId);
   rpc.setAccount(pda, SOLSEND_PROGRAM_ID, encodeCard({ owner, cardId, delegation: cardDelegation(owner, cardId), source: usdcAta(owner) }));
+  rpc.setAccount(usdcAta(owner), Keypair.generate().publicKey, new Uint8Array(165)); // owner USDC ATA exists
   const lithicCalls: string[] = [];
   const lithic = { getTransaction: async (t: string) => { lithicCalls.push(t); return status === null ? null : { token: t, status }; }, setCardState: async () => {} };
   const deps = { rpc: rpc.asRpc(), settler: Keypair.generate(), store, lithic, clock: realClock, blockhash: async () => (await rpc.getLatestBlockhash()).blockhash };
@@ -51,12 +52,43 @@ describe("reconciler executor", () => {
     expect(feed).toMatchObject({ lithic_token: token, card_pda: w.pda.toBase58(), owner_wallet: w.owner.toBase58(), amount_base: "1140000", source: "reconciler", signature: r.refundSignature });
     expect(feed.reason).toMatch(/card limit stays used/);
   });
+  it("M3: owner closed their USDC ATA → refund tx restores it (createATAIdempotent, fee payer) then refunds", async () => {
+    const w = world("VOIDED");
+    w.rpc.accounts.delete(usdcAta(w.owner).toBase58());
+    const feePayer = Keypair.generate();
+    const token = await addAuth(w, "APPROVED", 1_140_000n);
+    const r = await reconcileAuthorization({ ...w.deps, feePayer }, (await w.store.getAuthorization(token))!);
+    expect(r.outcome).toBe("refund");
+    const tx = VersionedTransaction.deserialize(w.rpc.sent[0]!);
+    const keys = tx.message.staticAccountKeys.map((k) => k.toBase58());
+    expect(tx.message.compiledInstructions.map((ix) => keys[ix.programIdIndex])).toEqual(["ComputeBudget111111111111111111111111111111", "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL", SOLSEND_PROGRAM_ID.toBase58()]);
+    expect(keys.slice(0, tx.message.header.numRequiredSignatures).sort()).toEqual([w.deps.settler.publicKey.toBase58(), feePayer.publicKey.toBase58()].sort());
+  });
+  it("M3: missing destination that is NOT the owner ATA is never created → retry with backoff", async () => {
+    const w = world("VOIDED");
+    const other = Keypair.generate().publicKey;
+    w.rpc.setAccount(w.pda, SOLSEND_PROGRAM_ID, encodeCard({ owner: w.owner, cardId: w.cardId, delegation: cardDelegation(w.owner, w.cardId), source: other }));
+    const token = await addAuth(w, "APPROVED", 1_140_000n);
+    const r = await reconcileAuthorization({ ...w.deps, feePayer: Keypair.generate() }, (await w.store.getAuthorization(token))!);
+    expect(r.outcome).toBe("error");
+    expect(w.rpc.sent.length).toBe(0);
+    expect((await w.store.getAuthorization(token))!).toMatchObject({ reconcile_action: null, reconcile_attempts: 1 });
+  });
+  it("L1: the reconciler writes only changed fields (a concurrent field update is not clobbered)", async () => {
+    const w = world("SETTLED");
+    const token = await addAuth(w, "APPROVED", 1n);
+    const stale = (await w.store.getAuthorization(token))!;
+    await w.store.upsertAuthorization({ lithic_token: token, reason: "updated concurrently" });
+    await reconcileAuthorization(w.deps, stale);
+    expect((await w.store.getAuthorization(token))!).toMatchObject({ reason: "updated concurrently", reconcile_action: "settled" });
+  });
   it("PENDING → wait (no refund, row stays in the sweep); lookup failure → wait", async () => {
     const w = world("PENDING");
     const token = await addAuth(w, "APPROVED", 1_140_000n);
     expect((await reconcileAuthorization(w.deps, (await w.store.getAuthorization(token))!)).outcome).toBe("wait");
     expect(w.rpc.sent.length).toBe(0);
     expect((await w.store.getAuthorization(token))!.reconcile_action).toBeNull();
+    expect(Date.parse((await w.store.getAuthorization(token))!.next_attempt_at!)).toBeGreaterThan(Date.now()); // re-checked later, not at the queue head
   });
   it("APPROVED with no onchain record → anomaly flagged", async () => {
     const w = world("SETTLED");

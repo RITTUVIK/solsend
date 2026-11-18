@@ -1,5 +1,6 @@
 // Issuer-outage flag (demo beat): when ON, every swipe declines CARD_PAUSED before any settle.
 // Cached for 5 s per instance; a DB failure is treated as OFF (CP1 F4 step 3) — the chain still gates spend.
+import "server-only";
 import type { Store } from "../store";
 
 export const OUTAGE_TTL_MS = 5_000;
