@@ -231,92 +231,6 @@
       "args": []
     },
     {
-      "name": "close_settlement_record",
-      "docs": [
-        "Settlement authority reclaims rent of a SettlementRecord that is fully refunded or older than",
-        "RECORD_RETENTION_SECS."
-      ],
-      "discriminator": [
-        131,
-        85,
-        140,
-        59,
-        31,
-        144,
-        48,
-        190
-      ],
-      "accounts": [
-        {
-          "name": "settlement_authority",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "config",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "card",
-          "relations": [
-            "settlement_record"
-          ]
-        },
-        {
-          "name": "settlement_record",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  101,
-                  116,
-                  116,
-                  108,
-                  101
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "card"
-              },
-              {
-                "kind": "arg",
-                "path": "auth_hash"
-              }
-            ]
-          }
-        }
-      ],
-      "args": [
-        {
-          "name": "auth_hash",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        }
-      ]
-    },
-    {
       "name": "freeze_card",
       "docs": [
         "Owner OR settlement authority (reduce-only) freezes an Active card. Emits CardFrozen."
@@ -1548,11 +1462,6 @@
       "code": 6018,
       "name": "RefundExceedsSettled",
       "msg": "refund would exceed the settled amount for this authorization"
-    },
-    {
-      "code": 6019,
-      "name": "RecordNotClosable",
-      "msg": "settlement record is not yet closable"
     }
   ],
   "types": [

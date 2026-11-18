@@ -35,9 +35,6 @@ pub const TREASURY_SEED: &[u8] = b"treasury";
 pub const CARD_SEED: &[u8] = b"card";
 pub const SETTLE_SEED: &[u8] = b"settle";
 
-/// SettlementRecords older than this (or fully refunded) may be closed to reclaim rent.
-pub const RECORD_RETENTION_SECS: i64 = 7 * 24 * 60 * 60;
-
 // ── Enums stored as u8 (IDL-friendly) ──────────────────────────────────────
 pub const KIND_STORE_LOCKED: u8 = 0; // FixedDelegation, merchant-locked on first settle
 pub const KIND_ONE_TIME: u8 = 1; // FixedDelegation, merchant-locked, status -> Used after first settle
@@ -111,12 +108,6 @@ pub mod solsend {
         handlers::close_card(ctx)
     }
 
-    /// Settlement authority reclaims rent of a SettlementRecord that is fully refunded or older than
-    /// RECORD_RETENTION_SECS.
-    pub fn close_settlement_record(ctx: Context<CloseSettlementRecord>, auth_hash: [u8; 32]) -> Result<()> {
-        handlers::close_settlement_record(ctx, auth_hash)
-    }
-
     /// Admin moves treasury funds ONLY to config.treasury_destination (issuer-settlement account).
     pub fn admin_withdraw(ctx: Context<AdminWithdraw>, amount: u64) -> Result<()> {
         handlers::admin_withdraw(ctx, amount)
@@ -168,6 +159,9 @@ pub struct Card {
     pub bump: u8,
 }
 
+// PERMANENT (CP1 amendment): there is no close instruction. The record PDA is the lifetime
+// idempotency guard for (card, auth_hash), so a re-delivered or replayed authorization can never
+// settle twice. Rent is ~0.0015 devnet SOL per record, paid by the settlement authority.
 #[account]
 #[derive(InitSpace)]
 pub struct SettlementRecord {
@@ -298,19 +292,6 @@ pub struct OwnerCard<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(auth_hash: [u8; 32])]
-pub struct CloseSettlementRecord<'info> {
-    #[account(mut, address = config.settlement_authority @ SolsendError::NotSettlementAuthority)]
-    pub settlement_authority: Signer<'info>,
-    #[account(seeds = [CONFIG_SEED], bump = config.bump)]
-    pub config: Account<'info, Config>,
-    pub card: Account<'info, Card>,
-    #[account(mut, has_one = card, close = settlement_authority,
-              seeds = [SETTLE_SEED, card.key().as_ref(), auth_hash.as_ref()], bump = settlement_record.bump)]
-    pub settlement_record: Account<'info, SettlementRecord>,
-}
-
-#[derive(Accounts)]
 pub struct AdminWithdraw<'info> {
     pub admin: Signer<'info>,
     #[account(seeds = [CONFIG_SEED], bump = config.bump, has_one = admin @ SolsendError::NotAdmin)]
@@ -383,22 +364,11 @@ pub enum SolsendError {
     Overflow,
     #[msg("refund would exceed the settled amount for this authorization")]
     RefundExceedsSettled,
-    #[msg("settlement record is not yet closable")]
-    RecordNotClosable,
 }
 
-/// Handler bodies — implemented by W1 (program owner). Signatures above are frozen by CP1.
-pub mod handlers {
-    use super::*;
-    pub fn initialize_config(_ctx: Context<InitializeConfig>, _args: InitializeConfigArgs) -> Result<()> { err!(SolsendError::NotAuthorized) }
-    pub fn set_settlement_authority(_ctx: Context<AdminOnly>, _new: Pubkey) -> Result<()> { err!(SolsendError::NotAuthorized) }
-    pub fn set_paused(_ctx: Context<AdminOnly>, _paused: bool) -> Result<()> { err!(SolsendError::NotAuthorized) }
-    pub fn register_card(_ctx: Context<RegisterCard>, _card_id: u64, _kind: u8, _nonce: u64, _label: [u8; 32]) -> Result<()> { err!(SolsendError::NotAuthorized) }
-    pub fn settle(_ctx: Context<Settle>, _amount: u64, _auth_hash: [u8; 32], _merchant_hash: [u8; 32]) -> Result<()> { err!(SolsendError::NotAuthorized) }
-    pub fn refund(_ctx: Context<Refund>, _amount: u64, _auth_hash: [u8; 32]) -> Result<()> { err!(SolsendError::NotAuthorized) }
-    pub fn freeze_card(_ctx: Context<FreezeCard>) -> Result<()> { err!(SolsendError::NotAuthorized) }
-    pub fn unfreeze_card(_ctx: Context<OwnerCard>) -> Result<()> { err!(SolsendError::NotAuthorized) }
-    pub fn close_card(_ctx: Context<OwnerCard>) -> Result<()> { err!(SolsendError::NotAuthorized) }
-    pub fn close_settlement_record(_ctx: Context<CloseSettlementRecord>, _auth_hash: [u8; 32]) -> Result<()> { err!(SolsendError::NotAuthorized) }
-    pub fn admin_withdraw(_ctx: Context<AdminWithdraw>, _amount: u64) -> Result<()> { err!(SolsendError::NotAuthorized) }
-}
+/// Handler bodies (W1). Signatures above are frozen by CP1.
+pub mod handlers;
+
+/// Allowances program layouts, derivations and the transfer CPI.
+pub mod allowances;
+pub use allowances::{derive_delegation, derive_event_authority, derive_subscription_authority};
