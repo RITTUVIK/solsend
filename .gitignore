@@ -60,3 +60,7 @@ test-results/
 playwright-report/
 .DS_Store
 .turbo/
+
+# agent worktrees
+.claude/worktrees/
+.worktrees/
