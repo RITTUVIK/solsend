@@ -46,3 +46,13 @@ All of these return **401**:
 | Stream paused and verified | ~06:27 | `qn:stream get` → `paused` |
 
 The Lithic transaction's final state was `VOIDED`, with events `AUTHORIZATION` and `AUTHORIZATION_REVERSAL`.
+
+## Re-verification after the backend audit fixes (2026-11-18 14:2x UTC; deployment after commit `ad98e3c`)
+- **Real Lithic sandbox approve** on the post-audit stack: token `ce7b1d47-e4ff-4827-b49b-e5fbeae5e9c6`, **APPROVED** only after
+  settle [`rn4fpLVA…`](https://explorer.solana.com/tx/rn4fpLVAGe2T6ZdFFDX87UbPfqALUDQyEZvarzKrEsD8H9mhnhynTZ5J9PvkSPLZS6feCbSJ6KqqmnEydAMaNY3?cluster=devnet) confirmed.
+- **Authenticated reconcile sweep:** 4 MOCK-harness rows (unknown to Lithic) were closed as `not_in_lithic_approved`, with no false
+  anomalies. A malformed body returns 400 (audit Info fix).
+- **Unauthenticated access:** 9 sensitive routes return 401. `/api/status` is served from the CDN cache (`x-vercel-cache: HIT`)
+  and shows 11/11 checks OK, including "settler SOL runway" and "refunds failing".
+- **Secrets hygiene:** generated secrets moved to `spikes/.env.generated`. The reconcile and admin tokens were rotated. The ASA
+  secret was verified equal to Lithic's live value (equality check only, never printed).
