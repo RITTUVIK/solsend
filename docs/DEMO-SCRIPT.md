@@ -67,7 +67,7 @@ Timing is cumulative. "Say" is one or two plain sentences.
 - **Click:** **Demo store**, **Netflix (sandbox)** with the trial card, **Pay**.
 - **Expect:** **DECLINED** because the card's allowance has expired onchain; failed-transaction link.
 - **Say:** "This is a free trial I signed up for two minutes ago. It expired on its own, onchain, with no cancel button to hunt for and no click-to-cancel flow to fight."
-- **Proof:** `<!-- TODO: signature -->` (the expiry feature is being implemented; record a real devnet signature and add it to [EVIDENCE.md](EVIDENCE.md) before presenting this beat. If it is not ready, skip the beat and say nothing about expiry.)
+- **Proof (devnet):** settle before expiry [`3BovUnii…`](https://explorer.solana.com/tx/3BovUniidkydXRQMBfFY9KMdv38hSsKyfsADmv12FtvpwdDAoy4mG1f8eJADSM2GZ2xjwwXg65rVRDKYTwuu3CDt?cluster=devnet) ok; the same settle after expiry [`42fhAuNK…`](https://explorer.solana.com/tx/42fhAuNKvytc4iR6sRaH9RTsRNNXqqaqskG2k4z7yf7JL7AMC5yLFTs7cN2JJJzkKQCuHEvrGC1pVgECVVJCtd8W?cluster=devnet) fails onchain with Allowances `delegationExpired` (Custom 128). See [w2-free-trial-expiry.md](evidence/w2-free-trial-expiry.md). Live demo: pre-create a "2 minutes (demo)" trial card at least 3 minutes before going on stage.
 
 ### 6. Blast radius, void and refund (3:05 to 3:30)
 

@@ -110,3 +110,10 @@ Source: [GATE0.md](../GATE0.md). These ran against a spike program and the publi
 
 - Live Privy login in the browser against the deployed origin is not recorded in the evidence files except the CP0b wallet test (V5). The UI screenshots in [evidence/w3-screenshots](evidence/w3-screenshots) were produced in **MOCK** UI mode with fake signatures and are not onchain claims ([w3-frontend.md](evidence/w3-frontend.md)).
 - No load test of Lithic or QuickNode was run; sandbox policy allows a handful of real requests.
+
+## Free-trial expiry and card kinds (2026-11-18)
+
+| # | Claim | Evidence file | Proof |
+|---|---|---|---|
+| T1 | A free-trial card expires **onchain**: a settle before expiry succeeds, and the same settle after expiry is rejected by Allowances `delegationExpired` (Custom 128). The ASA maps this to CARD_PAUSED "card expired (free trial ended)". | [w2-free-trial-expiry.md](evidence/w2-free-trial-expiry.md) | [`3BovUnii…`](https://explorer.solana.com/tx/3BovUniidkydXRQMBfFY9KMdv38hSsKyfsADmv12FtvpwdDAoy4mG1f8eJADSM2GZ2xjwwXg65rVRDKYTwuu3CDt?cluster=devnet) ok · [`42fhAuNK…`](https://explorer.solana.com/tx/42fhAuNKvytc4iR6sRaH9RTsRNNXqqaqskG2k4z7yf7JL7AMC5yLFTs7cN2JJJzkKQCuHEvrGC1pVgECVVJCtd8W?cluster=devnet) failed (128) |
+| T2 | Subscription card: an in-period pull is approved, and an over-period-cap pull is declined onchain (Allowances 400 → VELOCITY_EXCEEDED). One-time card: the first pull is approved and the second is declined (card Used, SolSend 6003). These used **MOCK** requests with real devnet settles. | [w2-free-trial-expiry.md](evidence/w2-free-trial-expiry.md) | full signatures are in that file |

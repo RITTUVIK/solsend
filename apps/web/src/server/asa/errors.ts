@@ -44,8 +44,8 @@ export function mapSettleError(err: unknown): Mapped {
     case code("CardNotActive"): return decline("CARD_PAUSED", "card_not_active");
     case code("Paused"): return decline("CARD_PAUSED", "settlements_paused");
     case code("CardIdle"): return decline("CARD_PAUSED", "card_idle");
+    case ALLOWANCES_ERR.delegationExpired: return decline("CARD_PAUSED", "card_expired"); // free trial ended (proven on devnet)
     case code("InvalidDelegation"):
-    case ALLOWANCES_ERR.delegationExpired:
     case ALLOWANCES_ERR.staleSubscriptionAuthority:
     case ANCHOR_ACCOUNT_NOT_INITIALIZED: return decline("CARD_PAUSED", "delegation_closed_or_missing");
     case code("MerchantMismatch"): return decline("UNAUTHORIZED_MERCHANT", "merchant_mismatch");
@@ -59,7 +59,7 @@ const short = (v: unknown) => { try { return JSON.stringify(v).slice(0, 60); } c
 const ONCHAIN_DETAIL: Record<string, string> = {
   card_limit_exceeded: "Allowances 300", period_limit_exceeded: "Allowances 400", wallet_balance_insufficient: "SPL Token 1",
   card_not_active: "SolSend CardNotActive", settlements_paused: "SolSend Paused", card_idle: "SolSend CardIdle",
-  merchant_mismatch: "SolSend MerchantMismatch", per_tx_limit_exceeded: "SolSend PerTxLimitExceeded",
+  per_tx_limit_exceeded: "SolSend PerTxLimitExceeded",
   delegation_closed_or_missing: "delegation revoked / Allowances owner check", duplicate_already_settled: "SettlementRecord exists",
 };
 
@@ -86,7 +86,8 @@ export function reasonText(reason: string): string {
     settlements_paused: "Settlements are paused by the admin",
     card_idle: "Card idle — unfreeze to reactivate",
     delegation_closed_or_missing: "Allowance revoked or missing",
-    merchant_mismatch: "Card is locked to a different store",
+    merchant_mismatch: "Card locked to another store (store ID reported by the card network, enforced onchain)",
+    card_expired: "card expired (free trial ended)",
     issuer_outage: "Issuer outage: all cards paused",
     unmapped_card: "Unknown card",
     lithic_card_not_open: "Card is not open at the card network",

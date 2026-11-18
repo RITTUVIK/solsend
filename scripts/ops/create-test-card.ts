@@ -44,7 +44,7 @@ function sign(txBase64: string) {
 }
 
 const kind = (opt("kind", "STORE_LOCKED") as "STORE_LOCKED" | "ONE_TIME" | "SUBSCRIPTION");
-const req = { kind, label: opt("label", "W2 test")!, merchantName: opt("merchant", "Mock Store")!, limitCents: Number(opt("limit-cents", "500")), ...(kind === "SUBSCRIPTION" ? { periodDays: Number(opt("period-days", "30")) } : {}) };
+const req = { kind, label: opt("label", "W2 test")!, merchantName: opt("merchant", "Mock Store")!, limitCents: Number(opt("limit-cents", "500")), ...(kind === "SUBSCRIPTION" ? { periodDays: Number(opt("period-days", "30")) } : {}), ...(opt("expires-minutes") ? { expiresInMinutes: Number(opt("expires-minutes")) } : {}) };
 let prepared;
 try {
   prepared = await prepareCard(deps, ownerB58, req);
