@@ -430,15 +430,11 @@ pub struct Env {
     pub destination: Pubkey,
 }
 
+/// Config overrides for `setup_with` (defaults: no per-tx cap, idle lock disabled).
+#[derive(Default)]
 pub struct Opts {
     pub per_tx_max: u64,
     pub idle_secs: i64,
-}
-
-impl Default for Opts {
-    fn default() -> Self {
-        Opts { per_tx_max: 0, idle_secs: 0 }
-    }
 }
 
 pub fn new_svm() -> LiteSVM {
