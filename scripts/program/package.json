@@ -1,0 +1,6 @@
+{
+  "name": "@solsend/program-scripts",
+  "private": true,
+  "type": "module",
+  "description": "W1 devnet scripts (run with: npx tsx scripts/program/<script>.ts). Not a workspace package; @solana/* resolve through packages/shared."
+}
