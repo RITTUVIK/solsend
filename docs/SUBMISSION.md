@@ -67,4 +67,4 @@ TODO: team members and roles (names to be filled in by the team).
 - [ ] All five answers pasted; each 150 words or fewer
 - [ ] Track, chain award and bounty selected
 - [ ] `/api/status` green and the QuickNode stream state noted (paused outside demo windows)
-- [ ] Free-trial expiry proof link checked (a direct program-level devnet test via scripts/ops/expiry-proof.ts; only the separate app-path ASA check used MOCK requests)
+- [ ] Free-trial expiry proof links checked: the live Lithic-driven decline from the 2026-11-18 rehearsal ([`3q4HQCQf…`](https://explorer.solana.com/tx/3q4HQCQfRUkiSCgrzykYLMCozJrbAtW9LzAQsXXB2kbUcwiBsc1fjBfYvTHo8UguX4DPrxSV4mcTfq2khezLw4md?cluster=devnet), [rehearsal-2026-11-18.md](evidence/rehearsal-2026-11-18.md)) and the direct program-level devnet test (scripts/ops/expiry-proof.ts)

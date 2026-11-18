@@ -60,7 +60,7 @@ Cumulative timing. "Say" is one or two plain sentences.
 - **Click:** **Demo store**, choose the **Netflix free trial** card under "Pay with", tile **Netflix**, chip **Monthly plan $15.49**, **Pay $15.49 with •••• NNNN**.
 - **Expect:** **Declined**. The explanation for an expired card reads "This card expired when your free trial ended. Your USDC didn't move." Open the card on **Wallet**: the card face is stamped **EXPIRED**.
 - **Say:** "This is a free trial I signed up for a few minutes ago. It expired on its own, onchain, so it can never quietly roll into a paid plan, and there is no cancel button to hunt for."
-- **Proof (real devnet, not a Lithic run):** after expiry the same pull fails inside the Allowances program with error 128 (`delegationExpired`): [`42fhAuNK…`](https://explorer.solana.com/tx/42fhAuNKvytc4iR6sRaH9RTsRNNXqqaqskG2k4z7yf7JL7AMC5yLFTs7cN2JJJzkKQCuHEvrGC1pVgECVVJCtd8W?cluster=devnet). That test used locally signed requests (MOCK ASA) against real devnet; see [w2-free-trial-expiry.md](evidence/w2-free-trial-expiry.md). The 2026-11-18 rehearsal then ran it **live**: a real Lithic sandbox authorization after the trial ended was declined with 128, [`3q4HQCQf…`](https://explorer.solana.com/tx/3q4HQCQfRUkiSCgrzykYLMCozJrbAtW9LzAQsXXB2kbUcwiBsc1fjBfYvTHo8UguX4DPrxSV4mcTfq2khezLw4md?cluster=devnet) ([rehearsal-2026-11-18.md](evidence/rehearsal-2026-11-18.md)). Cite that one as the live run.
+- **Proof (real devnet):** after expiry the same pull fails inside the Allowances program with error 128 (`delegationExpired`): [`42fhAuNK…`](https://explorer.solana.com/tx/42fhAuNKvytc4iR6sRaH9RTsRNNXqqaqskG2k4z7yf7JL7AMC5yLFTs7cN2JJJzkKQCuHEvrGC1pVgECVVJCtd8W?cluster=devnet). That test used locally signed requests (MOCK ASA) against real devnet; see [w2-free-trial-expiry.md](evidence/w2-free-trial-expiry.md). The 2026-11-18 rehearsal then ran it **live**: a real Lithic sandbox authorization after the trial ended was declined with 128, [`3q4HQCQf…`](https://explorer.solana.com/tx/3q4HQCQfRUkiSCgrzykYLMCozJrbAtW9LzAQsXXB2kbUcwiBsc1fjBfYvTHo8UguX4DPrxSV4mcTfq2khezLw4md?cluster=devnet) ([rehearsal-2026-11-18.md](evidence/rehearsal-2026-11-18.md)). Cite that one as the live run.
 
 ### 6. Blast radius, void and refund (3:00 to 3:30)
 
@@ -79,7 +79,7 @@ Cumulative timing. "Say" is one or two plain sentences.
 ### 8. Tech close (4:00 to 4:20)
 
 - **On screen:** the architecture diagram ([ARCHITECTURE.md](ARCHITECTURE.md)) or `/status`.
-- **Say:** "Underneath: Solana's official, audited Allowances program plus our Anchor program, with 41 tests against the real Allowances binary and two independent security reviews with every finding fixed. We approve only after a confirmed settle; a hosted cold start is 2.4 seconds against Lithic's 6-second limit; and a QuickNode Stream drives the live feed, about half a second after confirmation."
+- **Say:** "Underneath: Solana's official, audited Allowances program plus our Anchor program, with 41 tests against the real Allowances binary and two adversarial AI-assisted security reviews with every finding fixed. We approve only after a confirmed settle; a hosted cold start is 2.4 seconds against Lithic's 6-second limit; and a QuickNode Stream drives the live feed, about half a second after confirmation."
 - **After:** `pnpm qn:stream pause`, confirm `paused`.
 
 ## Fallback plan
