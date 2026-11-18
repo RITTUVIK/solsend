@@ -13,7 +13,10 @@ interface MCard {
   lastFour: string | null; cardToken: string | null; totalBase: number; remainingBase: number; periodSecs: number | null;
   settledBase: number; refundedBase: number; lockedTo: string | null; delegationLive: boolean; delegation: string;
   createdAt: string; registerSignature: string | null; confirmedAt: number | null; failIssue: boolean; idle: boolean; idleSeen?: boolean;
+  /** Onchain delegation expiry (ms epoch) for free-trial cards; null = never. */
+  expiresAt?: number | null;
 }
+const isMockExpired = (c: MCard, now = Date.now()): boolean => c.expiresAt != null && now >= c.expiresAt;
 interface MAuth { token: string; cardPda: string; amountBase: number; merchant: string; voided: boolean }
 interface MIntent { id: string; type: "setup" | "create" | "freeze" | "unfreeze" | "close" | "revoke_all"; cardPda: string | null; consumed: boolean; expires: number }
 interface MRefund { at: number; token: string }
@@ -99,7 +102,7 @@ function issue(s: State, c: MCard): void {
 function view(c: MCard): api.TCardView {
   return {
     cardPda: c.cardPda, cardId: c.cardId, label: c.label, merchantName: c.merchantName, kind: c.kind, status: c.status, issueState: c.issueState,
-    expiresAt: null, expired: false, // TODO(UI): mock free-trial expiry
+    expiresAt: c.expiresAt != null ? new Date(c.expiresAt).toISOString() : null, expired: isMockExpired(c),
     lithic: { cardToken: c.cardToken, lastFour: c.lastFour, state: c.issueState === "issued" ? (c.status === "FROZEN" ? "PAUSED" : c.status === "CLOSED" ? "CLOSED" : "OPEN") : null },
     limit: { type: c.kind === "SUBSCRIPTION" ? "per_period" : "lifetime", totalBase: String(c.totalBase), remainingBase: String(c.delegationLive ? c.remainingBase : 0), periodSecs: c.periodSecs },
     totals: { settledBase: String(c.settledBase), refundedBase: String(c.refundedBase) },
@@ -166,13 +169,14 @@ export async function mockRequest(req: MockReq): Promise<Res> {
     const b = api.PrepareCardRequest.safeParse(req.body);
     if (!b.success) return err(400, "Check the card details and try again.", "bad_request");
     if (!s.saReady) return err(409, "wallet setup required (POST /api/wallet/setup)", "setup_required");
-    const { kind, label, merchantName, limitCents, periodDays } = b.data;
+    const { kind, label, merchantName, limitCents, periodDays, expiresInMinutes } = b.data;
     const pda = fakePda();
     s.cards.push({
       cardPda: pda, cardId: String(jitter(1e9, 9e9)), label, merchantName, kind, status: "ACTIVE", issueState: "onchain_pending", lastFour: null, cardToken: null,
       totalBase: Number(centsToBase(limitCents)), remainingBase: Number(centsToBase(limitCents)), periodSecs: kind === "SUBSCRIPTION" ? (periodDays ?? 30) * 86400 : null,
       settledBase: 0, refundedBase: 0, lockedTo: isPresetStore(merchantName) ? merchantName.trim().toUpperCase() : null, delegationLive: true, delegation: fakePda(), createdAt: new Date().toISOString(), registerSignature: null,
       confirmedAt: null, failIssue: /fail/i.test(label), idle: false,
+      expiresAt: expiresInMinutes != null ? Date.now() + expiresInMinutes * 60_000 : null,
     });
     const intent = newIntent(s, "create", pda);
     save();
@@ -293,6 +297,16 @@ async function checkout(s: State, body: unknown): Promise<Res> {
   let result: string | null = null;
   let idleDecline = false;
   if (c.issueState === "issued" && c.status === "ACTIVE" && c.delegationLive && (c.idle || (/idle/i.test(c.label) && !c.idleSeen))) { c.idle = true; c.idleSeen = true; idleDecline = true; }
+  // Expired free-trial card: Lithic approves the network side, but the onchain pull fails (delegation expiry) → failed settle tx.
+  const expiredDecline = c.issueState === "issued" && c.delegationLive && c.status === "ACTIVE" && isMockExpired(c);
+  if (expiredDecline) {
+    const failedSig = fakeSig();
+    const reason = "Card expired — free trial ended";
+    pushFeed(s, { kind: "authorization_declined", source: "lithic", cardPda, amountBase: String(amountBase), lithicToken: token, merchant, reason, signature: failedSig });
+    save();
+    const latencyMs = Math.max(1, Math.round(performance.now() - t0) + jitter(40, 220));
+    return ok({ lithicToken: token, decision: "DECLINED", lithicResult: "CARD_PAUSED", reason, settleSignature: failedSig, explorer: explorerTx(failedSig), remainingBase: String(c.remainingBase), latencyMs, label: "SANDBOX" });
+  }
   if (idleDecline) result = "CARD_PAUSED";
   else if (c.issueState !== "issued" || !c.delegationLive || c.status === "FROZEN" || c.status === "CLOSED" || c.status === "USED") result = "CARD_PAUSED";
   else if (amountBase > c.totalBase * 2) result = "NETWORK_SAFETY_LIMIT"; // Lithic outer limit = 2x onchain limit: no onchain tx

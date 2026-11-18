@@ -1,83 +1,129 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "@/client/session";
+import type { CardView } from "@/client/format";
 import { Logo } from "@/components/AppShell";
-import { Icon, MockBadge } from "@/components/ui";
+import { CardVisual, StoreTile } from "@/components/CardVisual";
+import { Icon, MockBadge, OnchainGlyph, Spinner } from "@/components/ui";
+
+const DEMO_CARD: CardView = {
+  cardPda: "demo", cardId: "demo", label: "Temu card", merchantName: "Temu", kind: "STORE_LOCKED", status: "ACTIVE", issueState: "issued",
+  lithic: { cardToken: null, lastFour: "4242", state: "OPEN" },
+  limit: { type: "lifetime", totalBase: "40000000", remainingBase: "40000000", periodSecs: null },
+  totals: { settledBase: "0", refundedBase: "0" }, merchantLocked: true, delegationLive: true, delegation: "demo", createdAt: "2026-01-01T00:00:00Z",
+  registerSignature: null, expiresAt: null, expired: false,
+};
+
+/** 7 s loop built from the real card component. Captioned as an illustration (it is not live data). */
+function DemoLoop() {
+  const [step, setStep] = useState(4);
+  useEffect(() => {
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return; // static final frame
+    setStep(0);
+    const seq = [800, 1700, 1500, 2000, 1000];
+    let i = 0;
+    let t: ReturnType<typeof setTimeout>;
+    const next = () => { i = (i + 1) % seq.length; setStep(i); t = setTimeout(next, seq[i]); };
+    t = setTimeout(next, seq[0]);
+    return () => clearTimeout(t);
+  }, []);
+  const card: CardView = step >= 1 ? { ...DEMO_CARD, limit: { ...DEMO_CARD.limit, remainingBase: "28000000" } } : DEMO_CARD;
+  return (
+    <figure className="relative mx-auto w-full max-w-[360px]" aria-label="Illustration: a Temu card is approved for $12, then the same number is declined at Amazon">
+      <div className="mb-3 flex justify-center">
+        <span className="tnum inline-flex items-center gap-2 rounded-full bg-surface px-3.5 py-1.5 text-[14px] font-semibold shadow-sm ring-1 ring-line">
+          <Icon name="wallet" className="h-4 w-4 text-ink-3" />Your wallet
+          <span key={step >= 2 ? "88" : "100"} className="anim-fade">{step >= 2 ? "$88.00" : "$100.00"}</span>
+        </span>
+      </div>
+      <div className={`transition-transform duration-500 ${step === 3 ? "translate-x-3 rotate-[2deg]" : ""}`}><CardVisual card={card} showLimit /></div>
+      <div className="relative mt-3 h-[60px]" aria-hidden="true">
+        {step >= 1 && step < 3 && (
+          <div key="ok" className="anim-rise absolute inset-x-0 flex items-center gap-3 rounded-[16px] bg-surface px-3.5 py-2.5 shadow-lg ring-1 ring-line">
+            <span className="anim-pop anim-glow grid h-8 w-8 shrink-0 place-items-center rounded-full bg-ok text-white"><Icon name="check" className="h-4 w-4" strokeWidth={3} /></span>
+            <div className="min-w-0 text-[14px] leading-5"><p className="font-semibold">Approved · $12.00 at Temu</p><p className="flex items-center gap-1 text-[13px] text-ink-3"><OnchainGlyph className="h-3.5 w-3.5" />settled on Solana first · 0.7 s</p></div>
+          </div>
+        )}
+        {step >= 3 && (
+          <div key="no" className="anim-rise absolute inset-x-0 flex items-center gap-3 rounded-[16px] bg-surface px-3.5 py-2.5 shadow-lg ring-1 ring-line">
+            <StoreTile merchant="Amazon" size={32} />
+            <div className="min-w-0 text-[14px] leading-5"><p className="font-semibold text-no">Declined at Amazon</p><p className="text-[13px] text-ink-3">Locked to Temu — a leaked number is useless here</p></div>
+          </div>
+        )}
+      </div>
+      <figcaption className="mt-2 text-center text-[11px] font-medium text-ink-3">Illustration of the sandbox demo</figcaption>
+    </figure>
+  );
+}
 
 const STEPS = [
-  { icon: "drop", title: "Log in, get test USDC", body: "Sign in with just an email. We create a Solana wallet for you and drop in free devnet test USDC." },
-  { icon: "card", title: "Make a card per store", body: "“Temu, $40 total.” “Netflix, $15.49 a month.” Each card is an onchain allowance with a hard cap." },
-  { icon: "bolt", title: "Swipe: settled onchain first", body: "Your USDC stays in your wallet until a swipe. Each purchase is settled on Solana before the card network is told yes." },
+  { icon: "drop", title: "Get test USDC", body: "Sign in with an email. We create a Solana wallet and drop in free devnet dollars." },
+  { icon: "card", title: "Make a card per store", body: "“Temu, $40 total.” “Netflix free trial, $15.49 a month, expires in 7 days.” Each is an onchain allowance with a hard cap." },
+  { icon: "chain", title: "Swipe — settled onchain first", body: "Your USDC stays in your wallet until a swipe. Each purchase settles on Solana before the card network is told yes." },
 ] as const;
 
 export default function Landing() {
   const s = useSession();
   const router = useRouter();
+  const [wantLogin, setWantLogin] = useState(false);
   useEffect(() => { if (s.ready && s.authenticated) router.replace("/home"); }, [s.ready, s.authenticated, router]);
+  // Never render the CTA disabled before hydration: queue the click and open login once the session is ready.
+  useEffect(() => { if (wantLogin && s.ready && !s.authenticated) { setWantLogin(false); s.login(); } }, [wantLogin, s]);
 
   return (
-    <div className="mx-auto max-w-3xl px-4 pb-16">
+    <div className="mx-auto max-w-5xl px-4 pb-16">
       <header className="flex items-center justify-between py-4">
-        <Logo className="text-lg" />
-        <div className="flex items-center gap-3 text-sm">
-          <MockBadge />
-          <Link href="/status" className="link">Status</Link>
-        </div>
+        <div className="flex items-center gap-2"><Logo /><MockBadge /></div>
+        <Link href="/status" className="inline-flex min-h-10 items-center rounded-lg px-2 text-[14px] font-medium text-ink-3 hover:text-ink">Status</Link>
       </header>
 
-      <section className="grid items-center gap-8 pt-6 sm:grid-cols-2 sm:pt-12">
+      <section className="grid items-center gap-10 pt-4 lg:grid-cols-[1.1fr_1fr] lg:pt-14">
         <div>
-          <p className="sandbox-chip mb-3">Sandbox · Solana devnet</p>
-          <h1 className="text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-5xl">Burner cards for every store.</h1>
-          <p className="mt-4 text-lg text-zinc-600 dark:text-zinc-400">Spend straight from your Solana wallet. Each card is locked to one merchant and capped onchain, so a leaked card is worthless.</p>
-          <div className="mt-6 flex flex-col gap-2 sm:flex-row">
-            <button type="button" onClick={s.login} disabled={!s.ready || s.authenticated} className="btn-primary !min-h-12 !px-6 !text-base">
-              {s.ready ? "Log in with email" : "Loading…"}
+          <h1 className="text-[44px] font-semibold leading-[46px] tracking-[-0.045em] sm:text-[64px] sm:leading-[64px] lg:text-[72px] lg:leading-[72px]">A burner card for every store.</h1>
+          <p className="mt-5 max-w-xl text-[17px] leading-[26px] text-ink-2">Each card holds <strong className="font-semibold text-ink">$0</strong>. It can pull only what you allow, only at the store you pick — straight from your Solana wallet.</p>
+          <div className="mt-7 flex flex-col gap-2 sm:flex-row">
+            <button type="button" onClick={() => (s.ready ? s.login() : setWantLogin(true))} className="btn-primary !min-h-[52px] !px-7 !text-[17px]">
+              {wantLogin && !s.ready ? <Spinner /> : null}Try the sandbox demo
             </button>
-            <Link href="/status" className="btn-secondary !min-h-12 sm:hidden">See system status</Link>
+            <a href="#how" className="btn-ghost !min-h-[52px]">How it works<Icon name="chevron" className="h-4 w-4" /></a>
           </div>
-          <p className="mt-3 text-xs text-zinc-500">Free to try. No real money, no real merchants.</p>
+          <p className="mt-3 text-[13px] text-ink-3">Free to try · test money only · no real merchants.</p>
         </div>
-
-        <div className="relative mx-auto w-full max-w-xs" aria-hidden="true">
-          <div className="absolute inset-0 translate-x-3 translate-y-3 rotate-6 rounded-2xl bg-gradient-to-br from-zinc-700 to-black opacity-40 blur-[1px]" />
-          <div className="relative rotate-[-3deg] rounded-2xl bg-gradient-to-br from-orange-600 via-orange-700 to-rose-700 p-4 text-white shadow-xl">
-            <div className="flex items-start justify-between"><div><p className="text-lg font-bold">Temu card</p><p className="text-xs text-white/80">Temu (sandbox)</p></div><span className="chip bg-emerald-400/90 text-emerald-950">Active</span></div>
-            <p className="mt-6 font-mono tracking-[.18em]">•••• 4242</p>
-            <div className="mt-3 flex justify-between text-xs"><span><strong className="text-sm">$28.50</strong> left</span><span>of $40.00 lifetime cap</span></div>
-            <div className="mt-1.5 h-2 rounded-full bg-white/25"><div className="h-full w-[71%] rounded-full bg-white" /></div>
-            <span className="chip mt-3 bg-amber-300 text-amber-950">SANDBOX</span>
-          </div>
-        </div>
+        <DemoLoop />
       </section>
 
-      <section aria-labelledby="how" className="mt-14">
-        <h2 id="how" className="text-xl font-bold">How it works</h2>
-        <ol className="mt-4 grid gap-3 sm:grid-cols-3">
+      <p className="mt-12 text-center text-[13px] font-medium text-ink-3">Settles on <span className="text-ink-2">Solana</span> · Cards via <span className="text-ink-2">Lithic</span> sandbox · Events via <span className="text-ink-2">QuickNode</span> Streams</p>
+
+      <section aria-labelledby="how" className="mt-14 scroll-mt-12" id="how">
+        <h2 id="how-h" className="text-[22px] font-semibold tracking-[-0.02em]"><span id="how-title">How it works</span></h2>
+        <ol className="-mx-4 mt-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0">
           {STEPS.map((st, i) => (
-            <li key={st.title} className="surface">
-              <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
-                <span className="grid h-8 w-8 place-items-center rounded-lg bg-emerald-100 dark:bg-emerald-500/15"><Icon name={st.icon} /></span>
-                <span className="text-xs font-bold">STEP {i + 1}</span>
+            <li key={st.title} className="surface w-[78%] shrink-0 snap-start sm:w-auto">
+              <div className="flex items-center gap-2">
+                <span className="grid h-9 w-9 place-items-center rounded-[10px] bg-sunken text-ink"><Icon name={st.icon} /></span>
+                <span className="text-[12px] font-semibold uppercase tracking-[0.08em] text-ink-3">Step {i + 1}</span>
               </div>
-              <h3 className="mt-2 font-semibold">{st.title}</h3>
-              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{st.body}</p>
+              <h3 className="mt-3 text-[17px] font-semibold tracking-[-0.01em]">{st.title}</h3>
+              <p className="mt-1 text-[15px] leading-[22px] text-ink-2">{st.body}</p>
             </li>
           ))}
         </ol>
       </section>
 
-      <section aria-labelledby="safe" className="mt-10 grid gap-3 sm:grid-cols-2">
+      <section className="mt-10 grid gap-3 sm:grid-cols-2">
         <div className="surface">
-          <h2 id="safe" className="flex items-center gap-2 font-semibold"><Icon name="shield" className="h-5 w-5 text-emerald-600" />You stay in control</h2>
-          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Freeze or close any card, or revoke all of them in one transaction. If the card issuer goes down, your money never left your wallet.</p>
+          <h2 className="flex items-center gap-2 text-[17px] font-semibold"><Icon name="shield" className="h-5 w-5" />You stay in control</h2>
+          <p className="mt-1 text-[15px] leading-[22px] text-ink-2">Freeze or close any card, or revoke all of them in one transaction. If the card issuer goes down, your money never left your wallet.</p>
         </div>
-        <div className="surface border-amber-300 bg-amber-50 dark:border-amber-400/30 dark:bg-amber-400/10">
-          <h2 className="flex items-center gap-2 font-semibold"><Icon name="warn" className="h-5 w-5 text-amber-600" />Honest about the sandbox</h2>
-          <p className="mt-1 text-sm text-amber-950/80 dark:text-amber-100/80">Cards come from a sandbox issuer and money is devnet test USDC. No real merchant is ever charged and no real card network settles anything. The &ldquo;Demo store&rdquo; is a sandbox simulator, not a real shop.</p>
-        </div>
+        <details className="surface group">
+          <summary className="flex cursor-pointer list-none items-center justify-between text-[17px] font-semibold">
+            <span className="flex items-center gap-2"><Icon name="flask" className="h-5 w-5" />What&apos;s real here?</span>
+            <Icon name="chevron" className="h-4 w-4 transition-transform group-open:rotate-180" />
+          </summary>
+          <p className="mt-2 text-[15px] leading-[22px] text-ink-2">Cards come from a sandbox issuer and money is devnet test USDC. No real merchant is ever charged and no real card network settles anything. The &ldquo;Demo store&rdquo; is a sandbox simulator, not a real shop. The Solana transactions are real devnet transactions you can inspect.</p>
+        </details>
       </section>
     </div>
   );
