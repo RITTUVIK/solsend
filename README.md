@@ -12,15 +12,24 @@
 
 UBC 2026 entry. Track: Consumer Applications. Chain award: Best use of Solana. Bounty: QuickNode Streams.
 
+<p align="center">
+  <img src="docs/evidence/ui-v2/after-03b-pay-sheet-approved.png" width="190" alt="Approval sheet: Approved, Settled onchain first, proof row, Settlement streamed by QuickNode">
+  <img src="docs/evidence/ui-v2/after-05-decline-leaked-number.png" width="190" alt="Declined: card locked to another store, leaked number useless elsewhere">
+  <img src="docs/evidence/ui-v2/after-09-wallet-stack.png" width="190" alt="Home with the blast-radius line: Most that can ever be pulled">
+  <img src="docs/evidence/ui-v2/after-12-expired-free-trial.png" width="190" alt="Expired free-trial card">
+</p>
+
+*Approval sheet · leaked number declined · blast radius on Home · expired free trial. UI captured in mock mode (illustrative signatures); real devnet evidence is linked below ([docs/EVIDENCE.md](docs/EVIDENCE.md)).*
+
 ## Try it (30 seconds)
 
-1. Open https://solsend-ashen.vercel.app and log in with email. Privy creates an embedded wallet; **our server pays all fees**.
-2. **Wallet**: tap **Set up wallet** (one signature), then **Get test USDC**.
-3. **New card**: pick Temu, $40, **Create card** (one signature). It is capped and locked to Temu from creation.
-4. **Demo store**: Temu (sandbox), $12, **Pay with SolSend card**. APPROVED, with an Explorer link to the settle that confirmed *before* the card network was told yes.
-5. Try Amazon (sandbox) with the same card: declined onchain, with the failed transaction as proof. Try $45 on the $40 card: declined by the cap.
-6. **Activity**: the live QuickNode feed row. **Void this purchase** returns the USDC.
-7. **Revoke all cards**: one transaction, sent straight to Solana's Allowances program.
+1. Open https://solsend-ashen.vercel.app, tap **Try the sandbox demo**, log in with email. Privy creates an embedded wallet; **our server pays all fees**.
+2. **Wallet**: **Get free test USDC**, then **Set up wallet · free** (one signature).
+3. **New card**: tile **Temu** ($40), **Create Temu card · $40.00** (one signature). It is capped and locked to Temu from creation.
+4. **Demo store**: **Earbuds $12**, **Pay $12.00**. The sheet shows **Approved** and **Settled onchain first**, with an Explorer link to the settle that confirmed *before* the card network was told yes.
+5. In the same sheet tap **Try this card's number at Amazon**: **Declined**, with **Rejected onchain** and the failed transaction. Try the **Drone $45**: declined by the cap.
+6. **New card** with **Netflix** and the **2 minutes (demo)** expiry: after two minutes it is stamped **EXPIRED** and every pull fails onchain.
+7. **Activity**: the QuickNode-sourced rows; **Void (sandbox store)** returns the USDC. **Wallet** shows "Most that can ever be pulled" and **Revoke all cards…** (one transaction, straight to Solana's Allowances program).
 
 The full presenter walkthrough is in [docs/DEMO-SCRIPT.md](docs/DEMO-SCRIPT.md).
 
@@ -48,6 +57,7 @@ The full presenter walkthrough is in [docs/DEMO-SCRIPT.md](docs/DEMO-SCRIPT.md).
 - **One allowance per card.** The delegatee is the card's Card PDA, which has no private key, so only the SolSend program can pull, and only inside `settle`. Existing self-custodial cards use a single delegation per wallet; per-store allowances are the difference ([POSITIONING](docs/POSITIONING.md)).
 - **Settlement.** `settle` CPIs into Allowances, moving USDC from your wallet into the treasury PDA, and creates a `SettlementRecord` at `["settle", auth_hash]`. That record can never be closed, so an authorization pulls once in total.
 - **Policy onchain.** Merchant lock, per-transaction cap, freeze, idle lock, and refunds only to your stored source account.
+- **Free-trial expiry.** A free-trial card's Allowances delegation carries an expiry (7, 14 or 30 days, or 2 minutes for the demo). After it, every pull fails onchain inside the Allowances program (error 128, `delegationExpired`), so a trial can't quietly become a paid plan. Proof: failed devnet settle [`42fhAuNK…`](https://explorer.solana.com/tx/42fhAuNKvytc4iR6sRaH9RTsRNNXqqaqskG2k4z7yf7JL7AMC5yLFTs7cN2JJJzkKQCuHEvrGC1pVgECVVJCtd8W?cluster=devnet), after a successful settle before expiry. That test used locally signed requests (**MOCK** ASA, no Lithic) against real devnet; see [w2-free-trial-expiry.md](docs/evidence/w2-free-trial-expiry.md).
 - **Speed.** Confirmation is fast enough to approve inside a card network's deadline: hosted cold start 2.4 s and warm p50 0.84 s against Lithic's 6 s hard limit.
 - **Revocation.** Revoke-all is a transaction to the Allowances program, not ours.
 - Accounts and PDAs: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -98,6 +108,7 @@ All are tested; see [docs/TRUST.md](docs/TRUST.md).
 | Real Lithic sandbox to hosted ASA | $0.37 approved (confirmed settle before reply); $0.52 declined onchain with a failed-tx signature | [lead-hosted-asa.md](docs/evidence/lead-hosted-asa.md) |
 | Real Lithic flow on the deployed stack | approve, QuickNode delivery **+584 ms**, async void, reconciler refund | [lead-deployed-e2e.md](docs/evidence/lead-deployed-e2e.md) |
 | Hot path on QuickNode RPC, **MOCK**, n=50 (CP0b, laptop) | 50/50 approved only after `confirmed`; p50 852 ms, p99 1027 ms | [GATE0.md](GATE0.md) |
+| Free-trial expiry, **MOCK** ASA, real devnet | settle before expiry succeeds; after expiry fails `Custom 128` (`delegationExpired`) | [w2-free-trial-expiry.md](docs/evidence/w2-free-trial-expiry.md) |
 | Program tests | 41 LiteSVM tests against the **real devnet Allowances binary** | [w1-program-devnet.md](docs/evidence/w1-program-devnet.md) |
 
 Latencies are measured from Halifax; functions run in Vercel `iad1`. Every onchain claim is indexed with its devnet signature in **[docs/EVIDENCE.md](docs/EVIDENCE.md)**.
@@ -114,7 +125,7 @@ Latencies are measured from Halifax; functions run in Vercel `iad1`. Every oncha
 
 | Track | How SolSend fits |
 |---|---|
-| Consumer Applications | Blockchain interaction plus a user-facing app. Email login, no seed phrase, no fees for the user, one card per store, one-tap revoke-all. Meant for everyday use: a burner card for each new store or trial. |
+| Consumer Applications | Blockchain interaction plus a user-facing app. Email login, no seed phrase, no fees for the user, one card per store, one-tap revoke-all. Meant for everyday use: a burner card for each new store, and free-trial cards that expire on their own. |
 | Best use of Solana | Program IDs above; Allowances delegation with a program-owned Card PDA as delegatee, per-authorization settlement records, onchain refunds and policy. |
 | QuickNode Streams bounty | A real Stream with a filter and a destination (configuration above), driving the live activity feed, with measured delivery latency. |
 
@@ -160,8 +171,7 @@ Variables are documented in [`.env.example`](.env.example). Deployment and the S
 
 ## Roadmap
 
-- Freeze the program or move to a multisig upgrade authority, and re-audit, before any mainnet use.
-- Free-trial cards that expire onchain, and subscription guardrails (in progress).
-- Treasury-to-issuer settlement with a capped, refund-aware withdrawal.
-- Incremental authorizations and partial captures; an opt-in "restore limit on refund".
-- A live issuing partner and the compliance work that comes with it.
+- Freeze the program or move to a multisig upgrade authority, and get a professional audit, before any mainnet use.
+- Recurring-pull UX for subscription cards.
+- A refund-aware treasury, incremental authorizations and partial captures, and an opt-in "restore limit on refund".
+- A real issuing partner and the compliance work that comes with it.

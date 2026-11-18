@@ -8,19 +8,21 @@ State up front, once, calmly: this is Lithic sandbox cards and Solana devnet tes
 
 ## Timed outline
 
+Labels in the "On screen" column are the exact UI text (UI v2). Full click path: [DEMO-SCRIPT.md](DEMO-SCRIPT.md).
+
 | Time | Beat | On screen | Maps to criterion |
 |---|---|---|---|
-| 0:00 to 0:30 | Hook and the sandbox disclaimer | Landing page, sandbox banner | Impact |
-| 0:30 to 1:00 | The idea: cards that hold $0 | Slide or the home screen; one sentence per point | Innovation |
-| 1:00 to 1:40 | Create a $40 Temu card, one signature | New card flow | Product & UX |
-| 1:40 to 2:20 | Pay $12; settled before approved; proof row | Demo store, approval sheet, Explorer | Demo, Technical |
-| 2:20 to 3:00 | Leaked number at Amazon declined; $45 drone declined | Failed-tx link | Demo, Technical |
-| 3:00 to 3:25 | Blast radius line; free-trial card that expired | Home screen; the pre-created Netflix card | Impact, Innovation |
-| 3:25 to 3:50 | The issuer dies: revoke all in one transaction | Outage panel, Explorer | Impact |
-| 3:50 to 4:35 | How it works and why we trust it | Architecture diagram | Technical |
-| 4:35 to 5:00 | Honest limits and what is next | One slide | All |
+| 0:00 to 0:30 | Hook and the sandbox disclaimer | Landing: "A burner card for every store." and the amber sandbox banner | Impact |
+| 0:30 to 0:55 | The idea: cards that hold $0 | Wallet: "Most that can ever be pulled: $X across N live cards — even by SolSend." | Innovation |
+| 0:55 to 1:25 | Create the $40 Temu card, one signature | **New card**, **Temu** tile, **Create Temu card · $40.00**, then "Your Temu card is ready" | Product & UX |
+| 1:25 to 2:00 | Pay $12; settled before approved | **Earbuds $12**, **Pay $12.00 with ••••**, sheet: **Approved**, **Settled onchain first**, proof row, **Settlement streamed by QuickNode** | Demo, Technical |
+| 2:00 to 2:40 | Leaked number at Amazon; $45 drone | **Try this card's number at Amazon**, **Declined**, **Rejected onchain**; **Drone $45** | Demo, Technical |
+| 2:40 to 3:05 | The free trial that expired | Netflix free-trial card stamped **EXPIRED**; decline "This card expired when your free trial ended." | Innovation, Impact |
+| 3:05 to 3:30 | The issuer dies: revoke all in one transaction | **Revoke all cards…**, then "All cards revoked in one transaction." | Impact |
+| 3:30 to 4:30 | How it works and why we trust it | Architecture diagram | Technical |
+| 4:30 to 5:00 | Honest limits and what is next | One slide | All |
 
-If the free-trial expiry is not ready, drop it and give the time to the tech close. Start a stopwatch; the demo is the part to cut, not the limits slide.
+The void (**Void (sandbox store)** on an Activity row) is shown only if time allows; it is asynchronous in Lithic's sandbox. If the free-trial card is not ready, drop that beat and give the time to the tech close. Start a stopwatch; the demo is the part to cut, not the limits slide.
 
 ## Speaking lines
 
@@ -28,29 +30,30 @@ If the free-trial expiry is not ready, drop it and give the time to the tech clo
 
 **Idea (0:30).** "SolSend gives you a burner card for every store, and the card holds nothing. Each card is an allowance on Solana: capped, locked to one store, and your money stays in your wallet until the moment you pay. So the most anyone can ever pull, a hacked store, a leaked number, even our own server, is the sum of your caps."
 
-**Create (1:00).** "I am trying Temu for the first time. I create a $40 card. One signature, no gas, our server pays the fee. The card is capped and locked to Temu from the moment it exists."
+**Create (0:55).** "I am trying Temu for the first time, so I create a $40 card. One signature, no gas, our server pays the fee. The card is capped and locked to Temu from the moment it exists."
 
-**Pay (1:40).** "Earbuds, twelve dollars. Watch the order of events: the card network asks us, we pull the USDC on Solana, and only after that transaction confirms do we tell the network yes. This row is the proof, and here is the transaction on the explorer."
+**Pay (1:25).** "Earbuds, twelve dollars. Watch the order of events: the card network asks us, we pull the USDC on Solana, and only after that transaction confirms do we tell the network yes. 'Settled onchain first' is that order, this row is the proof, and the badge is our QuickNode Stream streaming the settlement."
 
-**Leak (2:20).** "Now say Temu leaks this number and someone tries it at Amazon. Declined, onchain, on its first use. Here is the failed transaction. And a $45 drone on this $40 card: declined by the cap. To be precise about the trust model: each payment must match the store ID the card network reports; our server relays that ID, and Solana enforces the lock and the cap."
+**Leak (2:00).** "Now say Temu leaks this number and someone tries it at Amazon. Declined, onchain, on its first use, and here is the failed transaction. And a $45 drone is declined by the cap. To be precise about the trust model: each payment must match the store ID the card network reports; our server relays that ID, and Solana enforces the lock and the cap."
 
-**Blast radius and trial (3:00).** "On the home screen: the most that can ever be pulled from my wallet through these cards. And this Netflix free-trial card I made two minutes ago has already expired onchain; no cancel button needed." *(Skip the second sentence if the expiry proof is not recorded.)*
+**Free trial (2:40).** "This Netflix free trial I started a few minutes ago has already expired, onchain. After expiry every pull fails inside Solana's Allowances program, so a trial can't quietly roll into a paid plan." *(The recorded proof of this failure came from a mock-signed run against real devnet, not a live card-network run; do not say otherwise.)*
 
-**Issuer dies (3:25).** "When Solflare's card issuer wound down, the card stopped but people's money stayed in their wallets. Same idea here. If our issuer disappears, my money never left my wallet, and one transaction revokes every card. It goes straight to Solana's audited Allowances program, not to us."
+**Issuer dies (3:05).** "On my home screen: the most that can ever be pulled through these cards, even by us. And when Solflare's card issuer wound down, the card stopped but people's money stayed in their wallets. Same idea here. If our issuer disappears, my money never left my wallet, and one transaction revokes every card. I tap Revoke all cards. It goes straight to Solana's audited Allowances program, not to us."
 
-**Tech (3:50).** "Two programs: Solana's official Allowances program, audited by Cantina and verified by OtterSec, and our own Anchor program on top with a card PDA as the only delegatee. 41 tests run against the real Allowances binary, two independent security reviews, every finding fixed. We approve only after a confirmed settle. Hosted, a cold start is 2.4 seconds against Lithic's 6-second limit. And a QuickNode Stream on our program drives the live activity feed, about half a second after confirmation."
+**Tech (3:30).** "Two programs: Solana's official Allowances program, audited by Cantina and verified by OtterSec, and our own Anchor program on top with a card PDA as the only delegatee. 41 tests run against the real Allowances binary, two independent security reviews, every finding fixed. We approve only after a confirmed settle. Hosted, a cold start is 2.4 seconds against Lithic's 6-second limit. And a QuickNode Stream on our program drives the live activity feed, about half a second after confirmation."
 
-**Limits and next (4:35).** "Honest limits: sandbox cards and devnet; our server is trusted to relay the card network's authorization and the merchant ID, while the chain enforces the caps and the lock; and the program is upgradeable on devnet. Next: freeze or multisig the upgrade authority and re-audit, free-trial and subscription guardrails, and a live issuing partner."
+**Limits and next (4:30).** "Honest limits: sandbox cards and devnet; our server is trusted to relay the card network's authorization and the merchant ID, while the chain enforces the caps and the lock; and the program is upgradeable on devnet. Next: freeze or multisig the upgrade authority plus a professional audit, a real issuing partner, a refund-aware treasury, and recurring-pull UX."
 
 ## Live-demo safety plan
 
-- **Pre-create** a spare Temu card and the Netflix free-trial card before walking on, so a failed signature does not end the demo. Create the trial card about 2 minutes before beat 3:00.
-- **Check status first:** open `/api/status` on the venue network; it must be green with settler SOL above threshold. Check the wallet has enough USDC (the faucet default is 5 USDC per claim).
-- **Stream:** `pnpm qn:stream activate` just before walking up, `pause` immediately after.
-- **Backup video** (the 2:45 submission video from [VIDEO-PLAN.md](VIDEO-PLAN.md)) saved locally, open in a second window, volume tested.
+- **Setup before walking on:** logged in, wallet set up and funded with about $20+ devnet USDC (the faucet default is 5 USDC per claim, so raise `FAUCET_AMOUNT_BASE` or pre-fund), a spare Temu card created.
+- **Netflix trial card:** pre-create it **at least 3 minutes before** you are on stage: **New card**, **Netflix** tile, expiry chip **2 minutes (demo)**, **Create Netflix card · $15.49**. It must read EXPIRED by beat 2:40.
+- **Status page:** open `/status` and `/api/status` on the venue network; all green, settler SOL above the 0.03 SOL pause threshold.
+- **Stream:** `pnpm qn:stream activate` just before walking up, `pnpm qn:stream pause` immediately after, then `pnpm qn:stream get` shows `paused`.
+- **Backup video** (the 2:45 submission video, [VIDEO-PLAN.md](VIDEO-PLAN.md)) saved locally, open in a second window, volume tested.
 - **Second device or browser profile** already logged in.
-- **Cut rule:** if a step stalls for more than 10 seconds, say "that is the sandbox being slow", switch to the backup video at the matching beat and continue. Do not debug on stage.
-- **CLI fallback** (`merchant-sim`) is only for rehearsal and emergencies; use sparingly because Lithic's sandbox policy allows a handful of requests.
+- **Cut rule:** if a step stalls for more than 10 seconds, say "that is the sandbox being slow", switch to the backup video at the matching beat, and continue. Do not debug on stage.
+- **CLI fallback** (`merchant-sim`) is for rehearsal and emergencies only; Lithic's sandbox policy allows a handful of requests.
 - The full click path and fallback table are in [DEMO-SCRIPT.md](DEMO-SCRIPT.md).
 
 ## Q&A (ten likely questions)
@@ -83,4 +86,4 @@ If the free-trial expiry is not ready, drop it and give the time to the tech clo
    The Allowances program we build on was audited by Cantina. Our own code had two adversarial security reviews, one of the program and one of the backend. They were AI-assisted: separate review agents with fresh context, working from the code alone. Neither found a Critical issue; every High, Medium and Low finding was fixed and pinned as a regression test. To be clear, this is not a professional audit. That comes before any mainnet use, and the program is upgradeable on devnet.
 
 10. **What is next, and is this a business?**
-    Freeze or multisig the upgrade authority and re-audit before any mainnet use; free-trial and subscription guardrails; a capped, refund-aware treasury withdrawal and real issuer settlement; a live issuing partner. The pain is real: consumers underestimate subscription spending by $133 a month and 42% pay for one they stopped using ([CNBC](https://www.cnbc.com/2022/09/06/consumers-underestimate-monthly-subscription-costs-by-at-least-100.html)). We have not validated willingness to pay.
+    Freeze or multisig the upgrade authority and get a professional audit before any mainnet use; a real issuing partner; a refund-aware treasury; recurring-pull UX. The pain is real: consumers underestimate subscription spending by $133 a month and 42% pay for one they stopped using ([CNBC](https://www.cnbc.com/2022/09/06/consumers-underestimate-monthly-subscription-costs-by-at-least-100.html)). We have not validated willingness to pay.

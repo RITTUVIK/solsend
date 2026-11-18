@@ -16,7 +16,7 @@ A burner card for every store — your money stays in your wallet until the mome
 
 ## What did you build?
 
-SolSend is a burner-card app on Solana. You log in with email, create a card for a store, and pay with it like any card. Each card is an allowance in Solana's official Subscriptions & Allowances program, capped and locked to one store from creation; it holds $0 and your USDC stays in your wallet until the moment you pay. When a card is swiped, our server settles USDC onchain through our Anchor program and approves only after the transaction confirms. You can freeze, close or revoke every card in one transaction. It is a demo: Lithic sandbox cards and Solana devnet test USDC, no real merchant is charged.
+SolSend is a burner-card app on Solana. You log in with email, create a card for a store, and pay with it like any card. Each card is an allowance in Solana's official Subscriptions & Allowances program, capped and locked to one store from creation; it holds $0 and your USDC stays in your wallet until the moment you pay. When a card is swiped, our server settles USDC onchain through our Anchor program and approves only after the transaction confirms. Free-trial cards expire onchain on their own. You can freeze, close or revoke every card in one transaction. It is a demo: Lithic sandbox cards and Solana devnet test USDC, no real merchant is charged.
 
 ## What problem does it solve?
 
@@ -28,11 +28,11 @@ Creating a card is one owner signature: an Allowances delegation whose only dele
 
 ## What makes it unique?
 
-One allowance per card, not one delegation per wallet, so caps and store locks are enforced by a Solana program rather than a company's database. The card holds $0, so there is nothing to pre-fund and nothing for an issuer to lose: revoke-all is a single transaction sent straight to Solana's audited Allowances program, not ours. We approve only after a confirmed onchain settle, with a permanent replay guard per authorization and refunds that can only go back to your wallet. The build is tested (41 LiteSVM tests against the real Allowances binary) and went through two independent security reviews with all findings fixed. Honest limits: sandbox and devnet, a trusted server relay of the network's authorization, and an upgradeable devnet program.
+One allowance per card, not one delegation per wallet, so caps and store locks are enforced by a Solana program rather than a company's database. The card holds $0: nothing to pre-fund, nothing for an issuer to lose, and revoke-all is one transaction sent straight to Solana's audited Allowances program, not ours. Free-trial cards expire onchain: after expiry every pull fails inside the Allowances program ([failed devnet settle `42fhAuNK…`](https://explorer.solana.com/tx/42fhAuNKvytc4iR6sRaH9RTsRNNXqqaqskG2k4z7yf7JL7AMC5yLFTs7cN2JJJzkKQCuHEvrGC1pVgECVVJCtd8W?cluster=devnet); the test used locally signed requests against real devnet). We approve only after a confirmed settle, with a permanent replay guard per authorization. 41 LiteSVM tests and two independent security reviews, all findings fixed. Limits: sandbox, devnet, a trusted server relay, an upgradeable devnet program.
 
 ## What would you build next?
 
-First, freeze the program or move to a multisig upgrade authority and get a full audit before any mainnet use. Then free-trial cards that expire onchain on their own, and subscription guardrails so a card cannot quietly renew past what you intended. After that, real treasury-to-issuer settlement with a capped, refund-aware withdrawal, incremental authorizations and partial captures, and an opt-in setting to restore a limit after a refund. Finally, partner with a live card issuer, which brings compliance work, so SolSend can move from a sandbox to cards people use every day at real stores.
+First, freeze the program or move to a multisig upgrade authority and commission a professional audit before any mainnet use. Second, partner with a real card issuer, which brings compliance work, so SolSend can move from a sandbox to cards people use every day at real stores. Third, a refund-aware treasury with capped withdrawal and real treasury-to-issuer settlement, plus incremental authorizations and partial captures. Fourth, recurring-pull UX: clear previews of each upcoming subscription charge, so a subscription card shows what it will pull and when. Finally, an opt-in setting to restore a limit after a refund.
 
 ## Track, chain award, bounty
 
@@ -67,4 +67,4 @@ TODO: team members and roles (names to be filled in by the team).
 - [ ] All five answers pasted; each 150 words or fewer
 - [ ] Track, chain award and bounty selected
 - [ ] `/api/status` green and the QuickNode stream state noted (paused outside demo windows)
-- [ ] Free-trial expiry claims removed from the answers if the feature is not live (the answers above only mention it as "next")
+- [ ] Free-trial expiry proof link checked (it is a MOCK-ASA run against real devnet, stated as such)
