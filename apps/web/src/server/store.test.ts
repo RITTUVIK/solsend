@@ -14,6 +14,13 @@ describe("MemoryStore contract", () => {
     const ev = { owner_wallet: "w", card_pda: "c", kind: "settled", amount_base: "1", remaining_base: "0", signature: "s", lithic_token: null, merchant: null, reason: null, source: "quicknode" as const, slot: 1 };
     expect(await s.insertFeedEvent(ev)).toBe(true);
     expect(await s.insertFeedEvent(ev)).toBe(false);
+    const rec = { ...ev, kind: "refunded", source: "reconciler" as const, signature: "r1", remaining_base: null, slot: null };
+    expect(await s.insertFeedEvent(rec)).toBe(true);
+    expect(await s.insertFeedEvent({ ...rec, source: "quicknode", slot: 99, remaining_base: "5" })).toBe(false); // enrich, no dup
+    const enriched = (await s.listFeed({ cardPda: "c" })).filter((f) => f.signature === "r1");
+    expect(enriched.length).toBe(1);
+    expect(enriched[0]!.source).toBe("quicknode");
+    expect(enriched[0]!.slot).toBe(99);
     expect(await s.recordReceipt("quicknode", "n1")).toBe(true);
     expect(await s.recordReceipt("quicknode", "n1")).toBe(false);
     expect(await s.rateLimit("b", 60, 1)).toBe(true);

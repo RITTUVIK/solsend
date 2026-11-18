@@ -33,7 +33,9 @@ export interface Store {
   getAuthorizationByAuthHash(authHashHex: string): Promise<AuthorizationRow | null>;
   listUnreconciled(olderThanSecs: number, limit: number): Promise<AuthorizationRow[]>;
 
-  /** Idempotent: returns false if an identical (signature, kind, card_pda, lithic_token) row exists. */
+  /** Idempotent: returns false if an identical (signature, kind, card_pda, lithic_token) row exists. A QuickNode
+   *  delivery for an existing row ENRICHES it (source='quicknode', slot, remaining_base) — the onchain confirmation
+   *  shows in the feed without a duplicate row. */
   insertFeedEvent(ev: NewFeedEvent): Promise<boolean>;
   listFeed(q: FeedQuery): Promise<FeedEventRow[]>;
 
@@ -97,7 +99,11 @@ export class MemoryStore implements Store {
   }
   async insertFeedEvent(ev: NewFeedEvent) {
     const key = (e: Pick<FeedEventRow, "signature" | "kind" | "card_pda" | "lithic_token">) => [e.signature ?? "", e.kind, e.card_pda ?? "", e.lithic_token ?? ""].join("|");
-    if (this.feed.some((f) => key(f) === key(ev))) return false;
+    const existing = this.feed.find((f) => key(f) === key(ev));
+    if (existing) {
+      if (ev.source === "quicknode") Object.assign(existing, { source: "quicknode", slot: ev.slot ?? existing.slot, remaining_base: ev.remaining_base ?? existing.remaining_base });
+      return false;
+    }
     this.feed.push({ ...ev, id: crypto.randomUUID(), at: ev.at ?? now() }); return true;
   }
   async listFeed(q: FeedQuery) {
@@ -162,7 +168,19 @@ export class SupabaseStore implements Store {
   }
   async insertFeedEvent(ev: NewFeedEvent) {
     const r = await this.sb.from("feed_events").insert(ev);
-    if (r.error?.code === UNIQUE_VIOLATION) return false;
+    if (r.error?.code === UNIQUE_VIOLATION) {
+      if (ev.source === "quicknode") {
+        const patch: Record<string, unknown> = { source: "quicknode" };
+        if (ev.slot != null) patch.slot = ev.slot;
+        if (ev.remaining_base != null) patch.remaining_base = ev.remaining_base;
+        let q = this.sb.from("feed_events").update(patch).eq("kind", ev.kind);
+        q = ev.signature ? q.eq("signature", ev.signature) : q.is("signature", null);
+        q = ev.card_pda ? q.eq("card_pda", ev.card_pda) : q.is("card_pda", null);
+        q = ev.lithic_token ? q.eq("lithic_token", ev.lithic_token) : q.is("lithic_token", null);
+        this.ok(await q, "insertFeedEvent.enrich");
+      }
+      return false;
+    }
     this.ok(r, "insertFeedEvent"); return true;
   }
   async listFeed(q: FeedQuery) {

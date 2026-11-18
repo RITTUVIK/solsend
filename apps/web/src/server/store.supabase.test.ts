@@ -47,6 +47,11 @@ describe.runIf(run)("SupabaseStore (live, sb_secret_ key)", () => {
     expect(await s.insertFeedEvent(ev)).toBe(true);
     expect(await s.insertFeedEvent(ev)).toBe(false);                    // unique index dedupe
     expect((await s.listFeed({ ownerWallet: tag })).length).toBe(1);
+    const rec = { ...ev, kind: "refunded", source: "reconciler" as const, signature: `${tag}-rsig`, remaining_base: null, slot: null };
+    expect(await s.insertFeedEvent(rec)).toBe(true);
+    expect(await s.insertFeedEvent({ ...rec, source: "quicknode", slot: 42, remaining_base: "7" })).toBe(false);
+    const e = (await s.listFeed({ ownerWallet: tag })).filter((f) => f.signature === `${tag}-rsig`);
+    expect(e.length).toBe(1); expect(e[0]!.source).toBe("quicknode"); expect(e[0]!.slot).toBe(42);
 
     expect(await s.recordReceipt("quicknode", `${tag}-n1`)).toBe(true);
     expect(await s.recordReceipt("quicknode", `${tag}-n1`)).toBe(false); // replay guard
