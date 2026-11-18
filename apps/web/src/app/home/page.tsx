@@ -7,6 +7,7 @@ import { shortId, usd } from "@/client/format";
 import { AppShell, useAppData } from "@/components/AppShell";
 import { CardVisual } from "@/components/CardVisual";
 import { OutagePanel } from "@/components/OutagePanel";
+import { WalletSetup } from "@/components/WalletSetup";
 import { ErrorNote, Icon, SigLink, Skeleton, Spinner } from "@/components/ui";
 
 function Faucet() {
@@ -60,6 +61,8 @@ function Content() {
         {wallet.error && !wallet.data && <div className="mt-3"><ErrorNote onRetry={() => void wallet.refresh()}>{wallet.error}</ErrorNote></div>}
         <div className="mt-4"><Faucet /></div>
       </section>
+
+      {wallet.data?.subscriptionAuthorityReady === false && <WalletSetup />}
 
       <section aria-labelledby="cards-h">
         <div className="mb-3 flex items-center justify-between">

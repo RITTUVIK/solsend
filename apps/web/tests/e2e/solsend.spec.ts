@@ -22,9 +22,20 @@ async function login(page: Page) {
   await expect(page.getByTestId("balance")).toBeVisible();
 }
 
-async function createCard(page: Page, opts: { label?: string; dollars?: string } = {}) {
+/** A fresh wallet has no SubscriptionAuthority: the one-time setup (one signature) must confirm before the first card. */
+async function setupWallet(page: Page) {
+  await expect(page.getByTestId("wallet-setup")).toBeVisible();
+  await expect(page.getByTestId("create-card")).toBeDisabled();
+  await page.getByTestId("setup-btn").click();
+  await expect(page.getByTestId("setup-done")).toContainText("Wallet ready for cards");
+  await expect(page.getByTestId("setup-done").getByRole("link", { name: /View on Solana Explorer/ })).toHaveAttribute("href", /cluster=devnet/);
+}
+
+async function createCard(page: Page, opts: { label?: string; dollars?: string; store?: string } = {}) {
   await page.getByTestId("new-card").click();
   await expect(page.getByTestId("explain")).toContainText("Your USDC stays in your wallet");
+  await setupWallet(page);
+  if (opts.store) await page.getByRole("radio", { name: opts.store }).click();
   if (opts.dollars) await page.getByLabel(/Lifetime limit/).fill(opts.dollars);
   if (opts.label) await page.getByLabel("Card name").fill(opts.label);
 }
@@ -41,8 +52,16 @@ test("judge journey: login → faucet → card → approve → void → decline 
   await shot(page, "02-home-funded");
 
   // Create a Temu card ($40 lifetime)
-  await createCard(page);
+  // Home nudges the one-time setup before any card exists
+  await expect(page.getByTestId("wallet-setup")).toBeVisible();
+  await shot(page, "02b-setup-needed");
+  await page.getByTestId("new-card").click();
+  await expect(page.getByTestId("wallet-setup")).toBeVisible();
+  await page.getByTestId("setup-btn").click();
+  await expect(page.getByTestId("setup-done")).toContainText("Wallet ready for cards");
+  await expect(page.getByTestId("setup-done").getByRole("link", { name: /View on Solana Explorer/ })).toHaveAttribute("href", /cluster=devnet/);
   await expect(page.getByTestId("explain")).toContainText("at most $40.00");
+  await expect(page.getByTestId("explain")).toContainText("Temu (sandbox)");
   await shot(page, "03-new-card");
   await page.getByTestId("create-card").click();
   await expect(page.getByTestId("step-2")).toHaveAttribute("data-state", /active|done/);
@@ -55,13 +74,22 @@ test("judge journey: login → faucet → card → approve → void → decline 
   await page.getByTestId("open-card").click();
 
   // Card detail: lock badge + hosted iframe (mock stand-in)
-  await expect(page.getByTestId("lock-badge")).toContainText("Locked to the first store that charges it");
+  await expect(page.getByTestId("lock-badge")).toContainText("Locked to Temu (sandbox) — a leaked number is useless anywhere else, even before first use");
   await page.getByTestId("show-details").click();
-  await expect(page.getByTestId("embed-frame")).toBeVisible();
+  await expect(page.getByTestId("embed-pan")).toBeVisible();
+  await expect(page.getByTestId("embed-cvv")).toBeVisible();
   await shot(page, "05-card-detail");
 
-  // Demo store: approve $12 at Temu
+  // Demo store: a Temu card is pre-locked onchain, so a FIRST use at Amazon is declined
   await page.getByTestId("spend").click();
+  await page.getByTestId("store-AMAZON").click();
+  await page.getByLabel(/Amount/).fill("5");
+  await page.getByTestId("pay").click();
+  await expect(page.getByTestId("result")).toHaveAttribute("data-decision", "DECLINED");
+  await expect(page.getByTestId("reason")).toContainText("Card locked to another store");
+  await shot(page, "05b-prelock-decline");
+
+  // ...then approve $12 at Temu
   await page.getByTestId("store-TEMU").click();
   await page.getByLabel(/Amount/).fill("12");
   await page.getByTestId("pay").click();
@@ -87,12 +115,6 @@ test("judge journey: login → faucet → card → approve → void → decline 
   await expect(page.getByTestId("reason")).toContainText("Over this card's limit");
   await expect(page.getByTestId("result").getByRole("link", { name: /failed tx/ })).toHaveAttribute("href", /cluster=devnet/);
   await shot(page, "08-declined");
-
-  // Different store → locked to the first store that charged it
-  await page.getByTestId("store-AMAZON").click();
-  await page.getByLabel(/Amount/).fill("5");
-  await page.getByTestId("pay").click();
-  await expect(page.getByTestId("reason")).toContainText("Card locked to another store");
 
   // Activity feed shows sandbox merchant + source badge
   await page.goto("/activity");
@@ -144,6 +166,51 @@ test("card-network safety limit decline has no onchain transaction", async ({ pa
   await page.getByTestId("pay").click();
   await expect(page.getByTestId("reason")).toContainText("Declined by card-network safety limit (sandbox)");
   await expect(page.getByTestId("no-onchain")).toContainText("No onchain transaction");
+});
+
+test("idle card: decline reason + Reactivate (unfreeze action)", async ({ page }) => {
+  await login(page);
+  await page.getByTestId("faucet-btn").click();
+  await expect(page.getByTestId("faucet-done")).toBeVisible();
+  await createCard(page, { label: "idle me" });
+  await page.getByTestId("create-card").click();
+  await expect(page.getByTestId("step-3")).toHaveAttribute("data-state", "done", { timeout: 20_000 });
+  await page.getByTestId("open-card").click();
+  await page.getByTestId("spend").click();
+  await page.getByLabel(/Amount/).fill("5");
+  await page.getByTestId("pay").click();
+  await expect(page.getByTestId("reason")).toContainText("Card idle — unfreeze to reactivate");
+  await page.goto("/home");
+  await page.getByTestId("card-tile").first().click();
+  await expect(page.getByTestId("reactivate")).toBeVisible({ timeout: 15_000 });
+  await shot(page, "12b-idle-reactivate");
+  await page.getByTestId("reactivate").click();
+  await expect(page.getByTestId("action-done")).toContainText("Card unfrozen");
+  await page.getByTestId("spend").click();
+  await page.getByLabel(/Amount/).fill("5");
+  await page.getByTestId("pay").click();
+  await expect(page.getByTestId("result")).toHaveAttribute("data-decision", "APPROVED");
+});
+
+test("other-store card locks to the first store that charges it", async ({ page }) => {
+  await login(page);
+  await page.getByTestId("faucet-btn").click();
+  await expect(page.getByTestId("faucet-done")).toBeVisible();
+  await createCard(page, { store: "Other" });
+  await page.getByLabel("Store name").fill("Corner Cafe");
+  await expect(page.getByTestId("explain")).toContainText("first store that charges it");
+  await page.getByTestId("create-card").click();
+  await expect(page.getByTestId("step-3")).toHaveAttribute("data-state", "done", { timeout: 20_000 });
+  await page.getByTestId("open-card").click();
+  await expect(page.getByTestId("lock-badge")).toContainText("Locks to the first store that charges it");
+  await page.getByTestId("spend").click();
+  await page.getByTestId("store-OTHER_STORE").click();
+  await page.getByLabel(/Amount/).fill("5");
+  await page.getByTestId("pay").click();
+  await expect(page.getByTestId("result")).toHaveAttribute("data-decision", "APPROVED");
+  await page.getByTestId("store-NETFLIX").click();
+  await page.getByTestId("pay").click();
+  await expect(page.getByTestId("reason")).toContainText("Card locked to another store");
 });
 
 test("status page renders health checks", async ({ page }) => {

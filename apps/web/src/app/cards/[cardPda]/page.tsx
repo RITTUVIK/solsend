@@ -3,7 +3,10 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { client, humanError, signAndSubmit } from "@/client/api";
-import { displayStatus, isUsable, usd } from "@/client/format";
+import { displayStatus, isPresetStore, isUsable, usd } from "@/client/format";
+import { usePoll } from "@/client/hooks";
+import type { z } from "zod";
+import type { api } from "@solsend/shared";
 import { AppShell, useAppData } from "@/components/AppShell";
 import { CardVisual, LimitBar } from "@/components/CardVisual";
 import { FeedList, LiveDot } from "@/components/FeedList";
@@ -11,10 +14,12 @@ import { Stepper } from "@/components/Stepper";
 import { ErrorNote, Icon, SigLink, Skeleton, Spinner } from "@/components/ui";
 
 type Act = "freeze" | "unfreeze" | "close";
-const ACT_DONE: Record<Act, string> = { freeze: "Card frozen. Nothing can be charged until you unfreeze it.", unfreeze: "Card unfrozen.", close: "Card closed. Its allowance was revoked onchain." };
+const ACT_DONE: Record<Act, string> = { freeze: "Card frozen. Nothing can be charged until you unfreeze it.", unfreeze: "Card unfrozen and ready to use.", close: "Card closed. Its allowance was revoked onchain." };
 
 function Embed({ cardPda }: { cardPda: string }) {
-  const [url, setUrl] = useState<string | null>(null);
+  const [session, setSession] = useState<z.infer<typeof api.EmbedSessionResponse> | null>(null);
+  const url = session?.iframeUrl ?? null;
+  const setUrl = (u: null) => setSession(u);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
@@ -24,16 +29,32 @@ function Embed({ cardPda }: { cardPda: string }) {
   }, [url]);
   async function show() {
     setBusy(true); setErr(null);
-    try { setUrl((await client.embed(cardPda)).iframeUrl); } catch (e) { setErr(humanError(e)); } finally { setBusy(false); }
+    try { setSession(await client.embed(cardPda)); } catch (e) { setErr(humanError(e)); } finally { setBusy(false); }
   }
   return (
     <section className="surface" aria-labelledby="details-h">
       <h2 id="details-h" className="font-semibold">Card details</h2>
       <p className="mt-0.5 text-sm text-zinc-600 dark:text-zinc-400">The number, expiry and CVV are shown inside the card issuer&apos;s secure frame. SolSend never sees them.</p>
-      {url ? (
+      {session ? (
         <div className="mt-3">
-          <iframe src={url} title="Card details, hosted by Lithic (sandbox)" className="h-56 w-full rounded-xl border border-zinc-200 bg-zinc-900 dark:border-zinc-700"
-            sandbox="allow-scripts allow-same-origin allow-forms" referrerPolicy="no-referrer" data-testid="embed-frame" />
+          {session.iframes && Object.keys(session.iframes).length > 0 ? (
+            // Per-field Lithic-hosted frames (sandbox). Values render inside Lithic's origin; we only hold the URLs.
+            <div className="grid grid-cols-2 gap-2" data-testid="embed-fields">
+              {([["pan", "Card number", "col-span-2"], ["expMonth", "Exp. month", ""], ["expYear", "Exp. year", ""], ["cvv", "CVV", "col-span-2"]] as const).map(([k, label, span]) => {
+                const src = session.iframes?.[k];
+                return src ? (
+                  <div key={k} className={span}>
+                    <p className="mb-1 text-xs font-medium text-zinc-500">{label}</p>
+                    <iframe src={src} title={`${label}, hosted by Lithic (sandbox)`} className="h-14 w-full rounded-xl border border-zinc-200 bg-zinc-900 dark:border-zinc-700"
+                      sandbox="allow-scripts allow-same-origin" referrerPolicy="no-referrer" data-testid={`embed-${k}`} />
+                  </div>
+                ) : null;
+              })}
+            </div>
+          ) : (
+            <iframe src={session.iframeUrl} title="Card details, hosted by Lithic (sandbox)" className="h-56 w-full rounded-xl border border-zinc-200 bg-zinc-900 dark:border-zinc-700"
+              sandbox="allow-scripts allow-same-origin allow-forms" referrerPolicy="no-referrer" data-testid="embed-frame" />
+          )}
           <button type="button" onClick={() => setUrl(null)} className="btn-ghost mt-2 !min-h-9">Hide card details</button>
         </div>
       ) : (
@@ -55,6 +76,16 @@ function Content() {
   const [err, setErr] = useState<string | null>(null);
   const [done, setDone] = useState<{ act: Act; sig: string } | null>(null);
   const [retrying, setRetrying] = useState(false);
+
+  // Idle detection: the newest relevant feed row decides (a decline with an "idle" reason, until an unfreeze/approval follows).
+  const feed = usePoll(() => client.feed(cardPda), 3000, !!card);
+  const idle = (() => {
+    for (const r of feed.data ?? []) {
+      if (r.kind === "unfrozen" || r.kind === "frozen" || r.kind === "settled" || r.kind === "closed") return false;
+      if (r.kind === "authorization_declined") return /idle/i.test(r.reason ?? "");
+    }
+    return false;
+  })();
 
   async function act(a: Act) {
     setBusy(a); setErr(null); setDone(null); setConfirmClose(false);
@@ -82,6 +113,7 @@ function Content() {
   const usable = isUsable(card);
   const ready = card.issueState === "issued";
   const busyAny = busy !== null;
+  const preset = isPresetStore(card.merchantName);
 
   return (
     <div className="space-y-4">
@@ -100,9 +132,9 @@ function Content() {
         <div className="mt-2"><LimitBar card={card} tone="plain" /></div>
         <p className="mt-2 text-xs text-zinc-500">Spent {usd(card.totals.settledBase)} · refunded {usd(card.totals.refundedBase)}. Refunds return USDC to your wallet but never restore the limit.</p>
         <p className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-zinc-100 px-2.5 py-1.5 text-sm dark:bg-zinc-800" data-testid="lock-badge">
-          <Icon name="lock" className="h-4 w-4 text-emerald-600" />
-          <span>Locked to the first store that charges it</span>
-          <span className={`chip ${card.merchantLocked ? "bg-emerald-200 text-emerald-900" : "bg-zinc-300 text-zinc-800"}`}>{card.merchantLocked ? "Locked" : "Not yet"}</span>
+          <Icon name="lock" className="h-4 w-4 shrink-0 text-emerald-600" />
+          <span>{preset ? `Locked to ${card.merchantName} (sandbox) — a leaked number is useless anywhere else, even before first use` : card.merchantLocked ? "Locked to the first store that charged it" : "Locks to the first store that charges it"}</span>
+          <span className={`chip ${preset || card.merchantLocked ? "bg-emerald-200 text-emerald-900" : "bg-zinc-300 text-zinc-800"}`}>{preset || card.merchantLocked ? "Locked" : "Not yet"}</span>
         </p>
       </section>
 
@@ -112,8 +144,10 @@ function Content() {
         <section className="surface" aria-labelledby="ctl-h">
           <h2 id="ctl-h" className="font-semibold">Controls</h2>
           <p className="mt-0.5 text-sm text-zinc-600 dark:text-zinc-400">Each action is signed by your wallet and recorded on Solana devnet.</p>
+          {card.status === "ACTIVE" && idle && <p className="mt-2 rounded-lg bg-amber-50 p-2 text-sm text-amber-950 dark:bg-amber-400/10 dark:text-amber-100" data-testid="idle-note">This card went idle: the last charge was declined. Unfreeze to reactivate it.</p>}
           <div className="mt-3 flex flex-wrap gap-2">
             {card.status === "ACTIVE" && <button type="button" className="btn-secondary" disabled={busyAny} onClick={() => void act("freeze")} data-testid="freeze">{busy === "freeze" ? <><Spinner />Freezing…</> : <><Icon name="snow" className="h-4 w-4" />Freeze</>}</button>}
+            {card.status === "ACTIVE" && idle && <button type="button" className="btn-primary" disabled={busyAny} onClick={() => void act("unfreeze")} data-testid="reactivate">{busy === "unfreeze" ? <><Spinner />Reactivating…</> : "Reactivate"}</button>}
             {card.status === "FROZEN" && <button type="button" className="btn-secondary" disabled={busyAny} onClick={() => void act("unfreeze")} data-testid="unfreeze">{busy === "unfreeze" ? <><Spinner />Unfreezing…</> : "Unfreeze"}</button>}
             {!confirmClose
               ? <button type="button" className="btn-ghost text-rose-700 dark:text-rose-400" disabled={busyAny} onClick={() => setConfirmClose(true)} data-testid="close">Close card</button>
