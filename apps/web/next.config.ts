@@ -1,7 +1,10 @@
 import type { NextConfig } from "next";
+import path from "node:path";
 
 const nextConfig: NextConfig = {
   transpilePackages: ["@solsend/shared"],
+  // Monorepo: trace files from the repo root (silences the multiple-lockfiles warning; correct for Vercel).
+  outputFileTracingRoot: path.join(__dirname, "../.."),
   poweredByHeader: false,
   serverExternalPackages: [],
   // packages/shared is TS-source ESM with ".js" specifiers (NodeNext style) — map them to .ts for webpack.

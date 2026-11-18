@@ -58,7 +58,9 @@ export async function demoCheckout(input: unknown, d: DemoDeps): Promise<api.TDe
     decision = tx?.result === "APPROVED" ? "APPROVED" : "DECLINED";
     reason = decision === "APPROVED" ? null : (tx?.events?.[0]?.detailed_results?.find((r) => r !== "APPROVED") ?? (lithicResult && lithicResult !== "APPROVED" ? lithicResult : "Declined by card-network safety limit (sandbox)"));
   } else {
-    lithicResult = decision === "APPROVED" ? "APPROVED" : "DECLINED";
+    // authorizations.decision is the ASA result code we replied with (APPROVED | INSUFFICIENT_FUNDS | VELOCITY_EXCEEDED |
+    // CARD_PAUSED | UNAUTHORIZED_MERCHANT | SUSPECTED_FRAUD); the UI maps these codes to human copy.
+    lithicResult = row.decision;
   }
 
   let remaining: string | null = null;

@@ -59,7 +59,7 @@ export const FeedRow = z.object({
   lithicToken: z.string().nullable(), merchant: z.string().nullable(), reason: z.string().nullable(), sandbox: z.literal(true),
 });
 /** GET /api/feed?cardPda=&since=<iso> — UI polls every ~1.5 s (no direct browser→Supabase access). */
-export const FeedResponse = z.object({ rows: z.array(FeedRow), cursor: z.string().nullable() });
+export const FeedResponse = z.object({ rows: z.array(FeedRow), cursor: z.string().nullable() }); // rows newest-first; cursor = newest `at` (pass as since=)
 
 // ── Demo Merchant (sandbox only; PAN fetched in server memory, never returned/logged/stored) ─
 export const DemoCheckoutRequest = z.object({ cardPda: Pubkey, merchant: DemoMerchantZ, amountCents: z.number().int().min(1).max(5_000) });
@@ -99,7 +99,7 @@ export const ROUTES = {
   retryIssue: { method: "POST", path: "/api/cards/[cardPda]/retry-issue" },
   embed: { method: "POST", path: "/api/cards/[cardPda]/embed" },
   submitTx: { method: "POST", path: "/api/tx/submit" },
-  feed: { method: "GET", path: "/api/feed" }, // ?cardPda=&cursor=
+  feed: { method: "GET", path: "/api/feed" }, // ?cardPda=&since=<iso> — newest first, max 50 rows; both params optional
   demoCheckout: { method: "POST", path: "/api/demo-merchant/checkout" },
   demoVoid: { method: "POST", path: "/api/demo-merchant/void" },
   issuerOutage: { method: "POST", path: "/api/admin/issuer-outage" },
