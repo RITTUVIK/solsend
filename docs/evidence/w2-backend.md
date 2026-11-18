@@ -116,3 +116,35 @@ Lithic state after the tests:
 - the intent byte-identity / owner-signature / expiry / atomic-consume gate;
 - the card recovery state machine (≤ 5 keys per `getMultipleAccounts`);
 - the Lithic card config.
+
+## Backend audit fix batch (2026-11-18, after merging feat/solsend-mvp @ fdaa8a8)
+
+The regression tests ported from the independent audit live in `apps/web/src/server/__test__/audit.regression.test.ts`.
+7 of them failed on the pre-fix code; all pass now. Full suite: 107 passed, 1 skipped (the live Supabase test, opt-in).
+
+- **H1.** An in-flight hit must match the request fingerprint: status, amount, currency, card token and state, and
+  merchant identity. Otherwise it declines `inflight_mismatch`; it never inherits a cached APPROVED.
+- **M1.** A duplicate approves only an exact, **unrefunded** record. Otherwise `duplicate_amount_mismatch` / `duplicate_refunded`.
+- **M2/M3. Reconcile failures take a retry path:**
+  - `reconcile_action` NULL, `reconcile_attempts` + 1, `next_attempt_at` = min(2^(n−1) × 15 s, 30 min), and a `last_error`.
+  - After 8 attempts the row is tagged `anomaly_refund_failing`, which /api/status counts.
+  - The sweep is due-ordered (`coalesce(next_attempt_at, created_at)`), and wait outcomes are re-checked later instead of blocking the queue head.
+  - The events path still processes `approved_pending_settlement` rows and falls back to the retry path.
+  - The refund tx restores a closed owner USDC ATA (`createAssociatedTokenAccountIdempotent`, paid by the fee payer), only when the destination equals `usdcAta(owner)`.
+  - Migration: `supabase/migrations/0003_reconcile_backoff.sql`, **not applied**. Until it is, the SupabaseStore falls back to pre-0003 behavior (oldest-first sweep; backoff columns dropped from writes).
+- **M4.**
+  - Demo minimum is 100 cents.
+  - Limits: 30/day + 10/min per wallet, 120/h + 60/min globally.
+  - Below 0.03 SOL on the settlement authority (30 s cached balance), checkout returns 503 `demo_paused_low_sol`.
+  - /api/status shows a "settler SOL runway" line.
+- **M5.**
+  - /api/status is computed at most once per 30 s and sent with `Cache-Control: public, s-maxage=30, stale-while-revalidate=60`.
+  - Per-wallet limits (fail closed → 429): GET /api/cards and /api/wallet at 30/min, /api/feed at 120/min.
+- **L1.** The reconciler, events path and after-hook write only the changed fields.
+- **L2.** A webhook-id replay guard (10 min, 5k-entry LRU) declines `replay`; `lithic_asa` receipts are recorded in the after-hook.
+- **L3.** Global caps: wallet setup 200/day, faucet 150/day. tx/submit is limited to 30/h per wallet.
+- **Info.**
+  - jwtVerify pins `algorithms: ["ES256"]` and `requiredClaims: ["exp"]`.
+  - /api/reconcile returns 400 on a bad body.
+  - errorResponse logs only `safeErr` text.
+  - `import "server-only"` is in the engine, reconcile, cards/service, demo, qn and status modules.
