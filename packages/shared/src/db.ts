@@ -11,12 +11,12 @@ export type CardRow = {
 };
 export type TxIntentRow = { id: string; owner_wallet: string; kind: string; card_pda: string | null; message_sha256: string; expires_at: string; consumed_at: string | null; signature: string | null; created_at: string };
 export type AuthorizationRow = {
-  lithic_token: string; card_pda: string | null; amount_cents: number; merchant_descriptor: string | null; acceptor_id: string | null;
+  lithic_token: string; auth_hash: string; card_pda: string | null; amount_cents: number; merchant_descriptor: string | null; acceptor_id: string | null;
   decision: string; reason: string; settle_signature: string | null; confirmed_at: string | null; replied_at: string | null; timings: Record<string, number>;
   lithic_final_status: string | null; reconcile_action: string | null; refund_signature: string | null; created_at: string; updated_at: string;
 };
 export type FeedEventRow = {
-  id: string; card_pda: string | null; kind: string; amount_base: string | null; remaining_base: string | null; signature: string | null;
+  id: string; owner_wallet: string | null; card_pda: string | null; kind: string; amount_base: string | null; remaining_base: string | null; signature: string | null;
   lithic_token: string | null; merchant: string | null; reason: string | null; source: "quicknode" | "lithic" | "reconciler" | "app"; slot: number | null; at: string;
 };
 export type WebhookReceiptRow = { provider: "lithic_asa" | "lithic_events" | "quicknode"; receipt_id: string; received_at: string };

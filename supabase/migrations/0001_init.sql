@@ -76,6 +76,7 @@ create index if not exists authorizations_reconcile_idx on authorizations (recon
 -- unique (signature, kind, card_pda) makes webhook re-deliveries idempotent.
 create table if not exists feed_events (
   id uuid primary key default gen_random_uuid(),
+  owner_wallet text,
   card_pda text,
   kind text not null,
   amount_base text,
@@ -90,6 +91,7 @@ create table if not exists feed_events (
 );
 create unique index if not exists feed_events_dedupe on feed_events (coalesce(signature,''), kind, coalesce(card_pda,''), coalesce(lithic_token,''));
 create index if not exists feed_events_card_idx on feed_events (card_pda, at desc);
+create index if not exists feed_events_owner_idx on feed_events (owner_wallet, at desc);
 
 -- Webhook replay protection across serverless instances (Lithic webhook-id, QuickNode nonce).
 create table if not exists webhook_receipts (

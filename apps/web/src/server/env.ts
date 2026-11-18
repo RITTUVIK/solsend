@@ -14,8 +14,9 @@ const Env = z.object({
   LITHIC_EVENTS_SECRET: z.string().startsWith("whsec_").optional(),
   ASA_BUDGET_MS: z.coerce.number().int().min(500).max(5500).default(4500),
   PRIVY_APP_ID: z.string().min(5),
-  SUPABASE_URL: z.string().url(),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(20),
+  // Optional only for local dev (MemoryStore); getStore() refuses to run on Vercel without them.
+  SUPABASE_URL: z.string().url().optional(),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(20).optional(),
   QN_STREAM_SECURITY_TOKEN: z.string().min(8).optional(),
   RECONCILE_CRON_SECRET: z.string().min(16).optional(),
   ADMIN_API_TOKEN: z.string().min(16).optional(),

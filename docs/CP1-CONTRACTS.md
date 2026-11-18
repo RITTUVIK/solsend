@@ -169,7 +169,10 @@ Owns:
 
 ### Lead
 Owns root config, `packages/shared/src/**`, `docs/**` (except `docs/research/`, which is never committed),
-`apps/web/{package.json,next.config.ts,tsconfig.json}`, and `apps/web/src/server/{env,keys,db}.ts`.
+`apps/web/{package.json,next.config.ts,tsconfig.json}`, and the shared server contracts `apps/web/src/server/{env,keys,store,auth}.ts`:
+- `store.ts` is the persistence interface: `getStore()` returns Supabase, or `MemoryStore` for local dev only.
+- `auth.ts` provides `requireUser(req)`, `verifyBindSignature`, `HttpError` and `errorResponse`.
+- W2 may harden their internals without changing the signatures. W4 imports them and must not edit them.
 
 ### Shared rules
 - **Need a new dependency or a contract change?** Put it in your final report under "REQUESTS". Don't edit
