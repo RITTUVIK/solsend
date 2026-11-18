@@ -1,6 +1,6 @@
 # GATE 0 — Validation Report (Checkpoint 0)
 
-**Status: CP0b IN PROGRESS (approved direction: Consumer SolSend on Solana Subscriptions & Allowances, Lithic sandbox card rail). S1, S2 (real Lithic sandbox), S3 (mock callbacks) and S4 pass; the S3 production-RPC run and S5 are waiting on QuickNode and Privy keys. Tier 1 (Stripe + Bridge) remains BLOCKED on provider provisioning.**
+**Status: CP0b COMPLETE, all validation items PASS** (approved direction: Consumer SolSend on Solana Subscriptions & Allowances, Lithic sandbox card rail). S1, S2 (real Lithic sandbox), S3 and S4 (public and QuickNode RPC), G0.7 (live QuickNode Stream) and G0.8 (Privy sponsored transaction) pass. Awaiting CP1 approval. Tier 1 (Stripe + Bridge) remains BLOCKED on provider provisioning.
 Branch `feat/gate0-validation` · last updated 2026-11-17 · all onchain activity is **Solana devnet**, and all provider activity is **sandbox**.
 
 Raw evidence: `spikes/evidence/<step>.jsonl` (timestamped, scrubbed of PAN/CVC and link tokens). Run guide: [`spikes/README.md`](spikes/README.md).
@@ -18,9 +18,19 @@ Raw evidence: `spikes/evidence/<step>.jsonl` (timestamped, scrubbed of PAN/CVC a
 | **S1f** live on devnet (REAL devnet) | **PASS** | See S1f notes below. |
 | **S2 Lithic** access + real ASA callbacks + end-to-end (REAL Lithic + REAL devnet) | **PASS** (after 3 fixed issues) | See S2 notes below. 31 real sandbox calls in total; 3 simulated authorizations plus 1 void went through. |
 | **S3 latency**, MOCK callbacks → REAL devnet confirmed settles, public devnet RPC | **PASS** | See S3 notes below. |
-| **S3 production path** (QuickNode RPC; Vercel `iad1`) | **WAITING** (QuickNode key / deploy) | — |
+| **S3 production RPC**: MOCK callbacks → REAL devnet confirmed settles via the **QuickNode** devnet RPC | **PASS** | 50/50 APPROVED only after `confirmed`. Request→reply p50 **852 ms**, p95 **998 ms**, p99 **1,027 ms**, max 1,027. S4 safety re-run on QuickNode: **PASS**. Vercel-hosted latency moves to CP4 (deploy). See QuickNode notes below. |
 | **S4 safety**, MOCK callbacks → REAL devnet | **PASS** | See S4 notes below. |
-| **S5** G0.8 Privy co-sign / G0.7 live QuickNode Stream | **WAITING** (keys) | Ready from Gate 0. |
+| **G0.7 live QuickNode Stream** (REAL devnet → REAL Stream → authenticated webhook) | **PASS** | Stream `d2788080-…`, `solana-devnet` / `programs_with_logs`. 5 real product transactions delivered and HMAC-verified, with events decoded and matching the chain. Confirmed→webhook p50 **373 ms**. Replay → 409; tampered/forged → 401. Stream left **paused**. |
+| **G0.8 Privy** embedded wallet signs; our server key pays the fee (REAL devnet) | **PASS** | [`2bVQYHz8…`](https://explorer.solana.com/tx/2bVQYHz8AaqMniLLPHZC3CMerfdrVGjESC4tJT8i9QBRmnqSJ1wczBucAWzSfJm4EwxX6YroQe15RHiMA8Jcs1F4?cluster=devnet), **finalized**. Fee payer = our key; user wallet SOL 0 → 0. Privy `signTransaction` partially signs with a foreign fee payer, so no fallback is needed. See G0.8 notes. |
+
+**Remaining risks after CP0b (consolidated):**
+1. **Trusted settlement authority.** It can pull any live card up to its onchain cap into the program treasury, and no further. Merchant identity and authorization legitimacy are attested off-chain by our ASA handler. This is documented, not eliminated.
+2. **Hosted latency.** Approval waits for `confirmed`. Laptop + QuickNode gives p99 1.03 s against Lithic's 6 s hard limit (3 s recommended), but Vercel-hosted latency (cold starts) is unmeasured until CP4.
+3. **QuickNode trial credits.** The Solana per-block Streams cost isn't readable with our key. The stream must stay paused except during recording and judging. There's no reorg handling on the free tier, so the reconciler keeps relying on RPC reads.
+4. **Lithic asynchronous state.** Voids and reversals appear several seconds later, and `result` stays `APPROVED` on void. The reconciler must be event- and status-driven. Card-limit restoration after a void is a CP1 product decision.
+5. **Demo availability.** The webhook endpoints (Lithic ASA, QuickNode) must be reachable during judging; laptop tunnels are acceptable only as a fallback.
+6. **The spike program is upgradeable.** The devnet upgrade authority is the project deployer, which the README will state.
+7. **Repo visibility (hard rule 1).** `RITTUVIK/solsend` is still private and must be public before submission.
 
 ### S1 notes
 - **Test setup:** program `De1egAFM…` dumped from devnet (sha256 `2675ad1d…ddbf`; the devnet build differs from mainnet's `af3cefa5…`). IDL pinned at `solana-foundation/subscriptions@57290f41`. Instructions are hand-built from the Codama IDL.
@@ -101,6 +111,82 @@ Raw evidence: `spikes/evidence/<step>.jsonl` (timestamped, scrubbed of PAN/CVC a
 - **T4:** 1 settle and 1 refund, fully refunded.
 - **S4 duplicates:** each record has **exactly 1 successful settle**. In each cross-process pair the losing duplicate's transaction **failed onchain** ("already in use"). Same-process pairs never sent a second transaction (in-process dedupe).
 - **Simulation-only re-checks on devnet (nothing landed):** a duplicate settle of T1 → `Custom(0)`, already in use; an over-refund of T1 by 1 base unit → `RefundExceedsSettled` (6008).
+
+### G0.8 notes (Tue 2026-11-17 22:25 CST; human-in-the-loop browser test, independent verification by `spikes/src/g08-verify.ts`)
+**Flow:**
+1. You logged in at `localhost:5173` with email; Privy created the embedded Solana wallet `FB5ovrafjpVcnEfDkPckDTwu6pxnn8eUzU7SuguLQH6P`.
+2. Our server built a Memo transaction with **fee payer = our server key** and the user as required signer.
+3. **Privy `useSignTransaction`** (button 1) signed it. Privy showed "Transaction signed!".
+4. The server checked the message was **byte-identical** to the one it built, added the fee-payer signature, and sent it.
+
+**Independent onchain verification** (QuickNode RPC):
+
+| Check | Result |
+|---|---|
+| Signature | [`2bVQYHz8AaqMniLLPHZC3CMerfdrVGjESC4tJT8i9QBRmnqSJ1wczBucAWzSfJm4EwxX6YroQe15RHiMA8Jcs1F4`](https://explorer.solana.com/tx/2bVQYHz8AaqMniLLPHZC3CMerfdrVGjESC4tJT8i9QBRmnqSJ1wczBucAWzSfJm4EwxX6YroQe15RHiMA8Jcs1F4?cluster=devnet) |
+| Confirmation | **finalized**, slot 523508944, block time 04:25:30Z, `err` null |
+| Fee payer (account 0) | `3dQxfxtUXJrNXXApsByeRy8pB7gHQpZfHxVruy2S3r7m` = our devnet fee-payer key |
+| Fee | **10,000 lamports** (2 signatures); fee payer balance 50,000,000 → 49,990,000 |
+| Signers | exactly 2 (fee payer + Privy wallet); **both ed25519 signatures verify** over the message bytes |
+| User SOL | **0 before, 0 after, 0 now**; the user paid nothing |
+| Programs | Memo only. Memo text: "SolSend G0.8 sponsored tx (devnet) 2026-11-18T04:25:21.188Z" |
+
+**This resolves Finding F8.** Privy's sign-only API partially signs when another account is the fee payer, so our own fee payer (free on devnet) works without Privy's paid sponsorship.
+
+### QuickNode notes (Tue 2026-11-17 22:05–22:20 CST)
+**Credentials verified without displaying them.** The RPC label is `quicknode devnet (endpoint redacted)`, its genesis hash equals devnet's, and the slot was 523504340. The Streams REST API returned HTTP 200 with 0 existing streams.
+
+**S3 on the QuickNode RPC** (MOCK callbacks → REAL devnet):
+
+| Measurement | Result | Public RPC, for comparison |
+|---|---|---|
+| Confirm diagnostic (n=10, websocket): `processed` p50 | **286 ms** | 437 ms |
+| Confirm diagnostic: `confirmed` p50 / max | **854 / 1,002 ms** | 767 ms |
+| Harness: request→reply p50 / p95 / **p99** / max | **852 / 998 / 1,027 / 1,027 ms** | 873 / 1,021 / **2,394** ms |
+| Harness: server send→confirmed p50 / p95 / max | 801 / 926 / 970 ms | 753 / 887 / 2,272 ms |
+
+- Faster landing; the same network-bound confirmation time; a much tighter tail.
+- **S4 re-run on QuickNode: PASS.** Bad signature → 401; 4 duplicate pairs consistent; forced timeout → fail-closed, landed late, refunded; over-cap / frozen / revoked → correct declines. Invariant: 4 approved, 1 late settle refunded, 0 anomalies, 0 violations.
+- **Backlog sweep: PASS.** 51 queued fail-closed declines: 10 landed late (all refunded, 1 of them in this sweep) and 41 never landed.
+
+**G0.7 live Stream** (stream `d2788080-aa83-4b2e-beda-9f5d104427e6`):
+
+- **Configuration:**
+
+  | Setting | Value |
+  |---|---|
+  | Network / dataset | `solana-devnet` / `programs_with_logs` |
+  | Batch size | **1** (accepted) |
+  | Destination | webhook through the tunnel; HMAC `x-qn-signature` = hex(HMAC-SHA256(token, nonce+timestamp+body)) |
+  | Filter | `spikes/quicknode/filter.js`: matches transactions that invoke our policy program `8uSY…` and decodes our Anchor events from `Program data:` logs, tracking the invoke stack so other programs' data lines are ignored |
+  | Window processed | slots 523506707 → 523506829 (**123 blocks**, about 30 s), then **paused** |
+
+- **Five real product transactions,** all delivered, HMAC-verified and decoded correctly:
+
+  | Action | Decoded | Confirmed → webhook |
+  |---|---|---|
+  | register_card (1.00 USDC allowance) | `RegisterCard` | 373 ms |
+  | settle #1 0.01 | `CardSettled` amount 10,000, **remaining 990,000** | 93 ms |
+  | settle #2 0.01 | `CardSettled` amount 10,000, **remaining 980,000** | 159 ms |
+  | settle #3 0.01 | `CardSettled` amount 10,000, **remaining 970,000** (chain: 970,000) | 456 ms |
+  | refund of #1 0.01 | `CardRefunded`, destination **`HcgWsXyj…` = owner's ATA** | 425 ms |
+
+- **Latency:** p50 373 ms (n=5). Block time → webhook was 1.3–1.7 s, but devnet block time only has 1 s granularity.
+- **Webhook authentication:** a replay of a real delivery → **409** (nonce reused); the same delivery with one byte tampered → **401**; a forged signature → **401**.
+
+**Provider limitations found and how each was handled:**
+
+| Limitation | Effect | Resolution |
+|---|---|---|
+| Free ("discover") plan caps `getMultipleAccounts` at **5 accounts** per call (error -32615) | The first S4 run on QuickNode crashed in reconciliation | Batched reads chunked to 5 with pacing; the backlog sweep refunded that run's late settle |
+| `programs_with_logs` lists only **top-level** instructions (no inner CPIs), so the Allowances self-CPI `FixedTransferEvent` is invisible | Can't read card limits from Allowances events through the Stream | Our policy program now **emits its own Anchor events** (`CardSettled` with the remaining allowance read from the delegation after the CPI; `CardRefunded` with the destination). They appear in the complete `logs` and the filter decodes them. Program upgraded on devnet in slot 523505914; 7/7 LiteSVM tests still pass. |
+| Streams are billed **per processed block, filter or not**. Trial = 10M credits, 1 Solana stream, webhook only, no compression, no reorg handling. The Solana per-block multiplier isn't published, and the Streams-scoped key can't read usage (console API **403**). | A continuously active stream could exhaust the trial | Stream lifecycle is managed (`g07-live.ts` pauses on exit; `g07-stream-ctl.ts get\|pause\|activate\|delete`). Paused streams consume nothing. **The stream is paused now.** |
+
+**Remaining risks:**
+1. **Credit budget for the demo window.** Read the credits consumed for these 123 blocks from the QuickNode dashboard to get the multiplier. Then activate the stream only for recording and judging (devnet produces about 360k blocks/day).
+2. **No reorg handling on the free trial**, and Streams deliveries are notifications. The reconciler must keep relying on RPC reads at `confirmed`, never on Stream payloads alone.
+3. **The webhook must stay reachable while the stream is active.** QuickNode pauses a stream after repeated delivery failures. Production uses the Vercel route (CP4) instead of the laptop tunnel.
+4. **`dataset_batch_size` 1 was accepted** despite the docs' "≥ 5 for sub-second chains". Re-check this if QuickNode changes enforcement.
 
 ### S3 notes (MOCK callbacks → REAL devnet confirmed settles)
 - **Result:** n=50; **50/50 APPROVED only after `confirmed`**.

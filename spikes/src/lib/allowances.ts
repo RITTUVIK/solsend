@@ -141,11 +141,15 @@ export async function readSettlementRecord(conn: Connection, card: PublicKey, ha
   return { amount: acc.data.readBigUInt64LE(72), refunded: acc.data.readBigUInt64LE(80) };
 }
 
-/** Batched SettlementRecord reads (one RPC call per 100 records) — avoids per-record RPC fan-out. */
+/** Batched SettlementRecord reads (chunked getMultipleAccounts) — avoids per-record RPC fan-out. */
 export async function readSettlementRecords(conn: Connection, items: { card: PublicKey; hash: Buffer }[]) {
   const out: ({ amount: bigint; refunded: bigint } | null)[] = [];
-  for (let i = 0; i < items.length; i += 100) {
-    const chunk = items.slice(i, i + 100);
+  // QuickNode's free ("discover") plan limits getMultipleAccounts to 5 accounts per call
+  // (error -32615); 5 also works on the public RPC. Small pause keeps us under 15 req/s.
+  const CHUNK = Number(process.env.RPC_MULTI_ACCOUNTS_MAX ?? 5);
+  for (let i = 0; i < items.length; i += CHUNK) {
+    if (i > 0) await new Promise((r) => setTimeout(r, 120));
+    const chunk = items.slice(i, i + CHUNK);
     const accs = await conn.getMultipleAccountsInfo(chunk.map((c) => settleRecordPda(c.card, c.hash)), "confirmed");
     for (const a of accs) out.push(a ? { amount: a.data.readBigUInt64LE(72), refunded: a.data.readBigUInt64LE(80) } : null);
   }

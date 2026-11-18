@@ -5,13 +5,16 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { createServer } from "node:http";
 import { gunzipSync } from "node:zlib";
-import { env } from "./lib/env.js";
+import { appendFileSync } from "node:fs";
+import { join } from "node:path";
+import { SPIKES_DIR, env } from "./lib/env.js";
 import { record } from "./lib/evidence.js";
 
 const PORT = Number(process.env.G07_PORT ?? 8787);
 const TOKEN = env("QN_STREAM_SECURITY_TOKEN");
 const seenNonces = new Map<string, number>();
-const arrivals = new Map<string, { receivedAt: string; slot: number | null; blockTime: number | null }>();
+const arrivals = new Map<string, { receivedAt: string; slot: number | null; blockTime: number | null; match: unknown }>();
+let captured = 0;
 
 export function verifyQuickNode(token: string, nonce: string, timestamp: string, body: string, signature: string): boolean {
   const expected = createHmac("sha256", Buffer.from(token)).update(Buffer.from(nonce + timestamp + body)).digest();
@@ -57,19 +60,22 @@ createServer(async (req, res) => {
   for (const [n, t] of seenNonces) if (Date.now() - t > 10 * 60_000) seenNonces.delete(n);
 
   res.writeHead(200).end("ok"); // ack fast; QuickNode pauses streams after repeated failures
+  if (captured < 3) { // gitignored; used once to prove a replayed real delivery is rejected
+    captured++;
+    appendFileSync(join(SPIKES_DIR, ".raw", "qn-captures.jsonl"), JSON.stringify({ headers: { "x-qn-nonce": nonce, "x-qn-timestamp": ts, "x-qn-signature": sig }, body }) + "\n");
+  }
 
   let payload: any;
   try { payload = JSON.parse(body); } catch { record("g07", "webhook_non_json", { bytes: body.length }); return; }
   const matches: any[] = payload?.matches ?? (Array.isArray(payload) ? payload.flatMap((p: any) => p?.matches ?? []) : []);
   for (const m of matches) {
-    arrivals.set(m.signature, { receivedAt: receivedAt.toISOString(), slot: m.slot ?? null, blockTime: m.blockTime ?? null });
+    arrivals.set(m.signature, { receivedAt: receivedAt.toISOString(), slot: m.slot ?? null, blockTime: m.blockTime ?? null, match: m });
     record("g07", "webhook_match", {
-      signature: m.signature, slot: m.slot ?? null, success: m.success,
-      watched_accounts: m.watchedAccounts, our_programs: m.ourPrograms, issuer_program: m.issuerProgram,
-      spl_ops: m.splOps ?? [], anchor_event_count: (m.anchorEvents ?? []).length,
+      signature: m.signature, slot: m.slot ?? null, success: m.success, instruction: m.instruction ?? null,
+      events: m.events ?? [], allowances_invoked: m.allowancesInvoked ?? null, post_usdc_balances: m.postUsdcBalances ?? [],
       received_at: receivedAt.toISOString(),
       latency_vs_block_time_ms: m.blockTime ? receivedAt.getTime() - m.blockTime * 1000 : null,
-      stream_id: req.headers["stream-id"] ?? null, batch_start: req.headers["batch-start-range"] ?? null,
+      stream_id: req.headers["stream-id"] ?? null, batch: payload?.batch ?? null, hmac_verified: true,
     });
   }
 }).listen(PORT, () => console.log(`G0.7 webhook receiver on http://localhost:${PORT}/webhooks/quicknode`));

@@ -1,12 +1,13 @@
 // G0.7 — create a QuickNode Stream on Solana devnet with our filter → webhook.
 // Usage: pnpm g07:stream [--test-slot <slot>] [--dataset programs_with_logs|block] [--dry-run]
+// Free trial: 1 Solana stream, webhook only, billed per block processed — pause when not testing (g07-stream-ctl.ts).
 // Webhook URL: QN_WEBHOOK_PUBLIC_URL, or auto-discovered from a local ngrok agent.
 import { randomBytes } from "node:crypto";
 import { appendFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { SPIKES_DIR, SPIKE_PROGRAM_ID, env, optEnv } from "./lib/env.js";
-import { record, saveState, stateStr } from "./lib/evidence.js";
-import { loadKeypair, usdcAta } from "./lib/solana.js";
+import { SPIKES_DIR, env, optEnv } from "./lib/env.js";
+import { record, saveState } from "./lib/evidence.js";
+import { POLICY } from "./lib/allowances.js";
 
 const arg = (k: string) => (process.argv.includes(k) ? process.argv[process.argv.indexOf(k) + 1] : undefined);
 const dataset = arg("--dataset") ?? optEnv("QN_DATASET") ?? "programs_with_logs";
@@ -30,12 +31,7 @@ if (!webhookBase) {
 if (!webhookBase) throw new Error("No webhook URL: set QN_WEBHOOK_PUBLIC_URL or run `ngrok http 8787`.");
 const webhookUrl = `${webhookBase.replace(/\/$/, "")}/webhooks/quicknode`;
 
-const owner = loadKeypair("card-a-owner").publicKey;
-const watch = [usdcAta(owner).toBase58(), owner.toBase58(), stateStr("cardBVault"), stateStr("cardBPda")].filter(Boolean) as string[];
-const filterSrc = readFileSync(join(SPIKES_DIR, "quicknode/filter.js"), "utf8")
-  .replaceAll("__WATCH_ACCOUNTS__", JSON.stringify(watch))
-  .replaceAll("__OUR_PROGRAMS__", JSON.stringify([SPIKE_PROGRAM_ID]))
-  .replaceAll("__KV_LIST__", JSON.stringify(optEnv("QN_KV_LIST") ?? null));
+const filterSrc = readFileSync(join(SPIKES_DIR, "quicknode/filter.js"), "utf8").replaceAll("__OUR_PROGRAM__", JSON.stringify(POLICY.toBase58()));
 const filterB64 = Buffer.from(filterSrc).toString("base64");
 
 async function qn(method: string, path: string, body?: unknown) {
@@ -58,13 +54,15 @@ if (testSlot) {
 if (process.argv.includes("--dry-run")) process.exit(0);
 
 const body = (batch: number) => ({
-  name: "solsend-g0-devnet",
+  name: "solsend-cp0b-devnet",
   network: "solana-devnet",
   dataset,
   filter_function: filterB64,
   filter_language: "javascript",
   region: "usa_east",
   dataset_batch_size: batch,
+  elastic_batch_enabled: false,
+  external_id: "solsend-cp0b-g07-devnet",
   keep_distance_from_tip: 0,
   fix_block_reorgs: 0,
   destination: "webhook",
@@ -76,7 +74,7 @@ const body = (batch: number) => ({
 let r = await qn("POST", "/streams", body(Number(optEnv("QN_BATCH_SIZE") ?? 1)));
 if (r.status === 422) r = await qn("POST", "/streams", body(5)); // sub-second chains may require batch >= 5
 record("g07", r.status < 300 ? "stream_created" : "stream_create_error", {
-  status: r.status, stream_id: r.json?.id ?? null, dataset, webhook_host: new URL(webhookUrl).host,
-  watched_accounts: watch, batch_size: r.json?.dataset_batch_size ?? null, error: r.status >= 300 ? r.json : undefined,
+  status: r.status, stream_id: r.json?.id ?? null, dataset, network: "solana-devnet", webhook: "ngrok free domain (redacted)",
+  filter_program: POLICY.toBase58(), batch_size: r.json?.dataset_batch_size ?? null, error: r.status >= 300 ? r.json : undefined,
 });
 if (r.json?.id) saveState({ qnStreamId: r.json.id });

@@ -43,4 +43,6 @@ regexes = [
   '''token"?\s*[:=]\s*"?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"?''',
   # Solana PUBLIC addresses (32–44 base58 chars, quoted) in token-account fields. Private keys (~88 chars) never match.
   '''[Tt]oken[A-Za-z_]*"\s*:\s*"[1-9A-HJ-NP-Za-km-z]{32,44}"''',
+  # SHA-256 authorization hashes emitted publicly onchain (CardSettled/CardRefunded), ONLY under these field names.
+  '''auth_?[Hh]ash"\s*:\s*"[0-9a-f]{64}"''',
 ]

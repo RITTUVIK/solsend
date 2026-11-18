@@ -1,114 +1,98 @@
-// QuickNode Streams filter (Solana devnet) — GATE 0 / G0.7 spike.
-// Runs inside QuickNode's sandbox: no require/import/network. Must be named `main`.
-// Supports both Solana datasets:
-//   programs_with_logs : stream.data = [[{signature, slot, blockTime, success, logs, programInvocations[]}]]
-//   block              : stream.data = [{blockTime, transactions:[{meta, transaction:{signatures, message}}]}]
+// QuickNode Streams filter — Solana DEVNET, dataset "programs_with_logs" (CP0b / G0.7).
+// Runs in QuickNode's sandbox: no require/import/network. Must be named `main`.
 //
-// Match rule: keep a transaction iff it touches a watched account (card vault ATAs,
-// card wallet owners) OR invokes the SolSend program. We do NOT match on the SPL Token
-// program or Bridge's issuer program alone — that would deliver every token transfer /
-// every Bridge card pull on devnet. Bridge pulls from OUR vaults still match because
-// the vault ATA is an account in the transaction.
+// Verified payload shape (test_filter on a real settle, slot 523505277):
+//   stream.data = [[ { signature, slot, blockTime, success, logs[], programInvocations[] } ]]
+//   programInvocations lists TOP-LEVEL instructions only (no inner CPIs); instruction.data is base58;
+//   instruction.tokenBalances are post-balances { accountIndex, mint, owner, uiTokenAmount }.
+//   logs are complete, including nested CPIs.
+// So: we match transactions that invoke OUR policy program and decode OUR Anchor events from the
+// `Program data:` lines emitted while our program is executing (tracked with an invoke stack).
 //
-// The three double-underscore placeholders below are substituted by g07-create-stream.ts.
+// __OUR_PROGRAM__ is substituted by g07-create-stream.ts / g07-selftest.ts.
 
-const WATCH_ACCOUNTS = __WATCH_ACCOUNTS__;
-const OUR_PROGRAMS = __OUR_PROGRAMS__;
-const KV_LIST = __KV_LIST__; // null → use WATCH_ACCOUNTS only
-const ISSUER_PROGRAM = "cardWArqhdV5jeRXXjUti7cHAa4mj41Nj3Apc6RPZH2";
-const TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
-const SPL_IX = { 3: "Transfer", 4: "Approve", 5: "Revoke", 9: "CloseAccount", 12: "TransferChecked", 13: "ApproveChecked" };
+const OUR_PROGRAM = __OUR_PROGRAM__;
+const ALLOWANCES = "De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44";
+const USDC_MINT = "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU";
+const EVENTS = { "34,206,169,204,178,170,227,94": "CardSettled", "212,19,183,194,172,112,247,175": "CardRefunded" };
+
+const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+function b64decode(s) {
+  const clean = s.replace(/[^A-Za-z0-9+/]/g, "");
+  const out = [];
+  let buf = 0, bits = 0;
+  for (const ch of clean) {
+    buf = (buf << 6) | B64.indexOf(ch);
+    bits += 6;
+    if (bits >= 8) { bits -= 8; out.push((buf >> bits) & 0xff); }
+  }
+  return out;
+}
 
 const B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-function b58FirstByte(s) {
-  if (typeof s !== "string" || s.length === 0) return null;
-  const bytes = [0];
-  for (const ch of s) {
-    let carry = B58.indexOf(ch);
-    if (carry < 0) return null;
-    for (let i = 0; i < bytes.length; i++) {
-      carry += bytes[i] * 58;
-      bytes[i] = carry & 0xff;
-      carry >>= 8;
-    }
-    while (carry > 0) { bytes.push(carry & 0xff); carry >>= 8; }
+function b58encode(bytes) {
+  const digits = [0];
+  for (const byte of bytes) {
+    let carry = byte;
+    for (let i = 0; i < digits.length; i++) { carry += digits[i] << 8; digits[i] = carry % 58; carry = (carry / 58) | 0; }
+    while (carry > 0) { digits.push(carry % 58); carry = (carry / 58) | 0; }
   }
-  let zeros = 0;
-  while (zeros < s.length && s[zeros] === "1") zeros++;
-  if (zeros > 0) return 0;
-  return bytes[bytes.length - 1];
+  let s = "";
+  for (let k = 0; k < bytes.length && bytes[k] === 0; k++) s += "1";
+  for (let i = digits.length - 1; i >= 0; i--) s += B58[digits[i]];
+  return s;
 }
 
-function keyOf(k) { return typeof k === "string" ? k : (k && k.pubkey) || null; }
+function u64(b, o) {
+  let v = 0n;
+  for (let i = 7; i >= 0; i--) v = (v << 8n) | BigInt(b[o + i]);
+  return v.toString();
+}
+const hex = (b) => b.map((x) => x.toString(16).padStart(2, "0")).join("");
 
-async function watched(keys) {
-  const set = new Set(WATCH_ACCOUNTS);
-  const hits = keys.filter((k) => set.has(k));
-  if (KV_LIST && hits.length === 0 && keys.length) {
-    const flags = await qnLib.qnContainsListItems(KV_LIST, keys);
-    keys.forEach((k, i) => { if (flags[i]) hits.push(k); });
-  }
-  return hits;
+function decodeEvent(bytes) {
+  const name = EVENTS[bytes.slice(0, 8).join(",")];
+  if (!name) return null;
+  let o = 8;
+  const pk = () => { const v = b58encode(bytes.slice(o, o + 32)); o += 32; return v; };
+  const n = () => { const v = u64(bytes, o); o += 8; return v; };
+  const h = () => { const v = hex(bytes.slice(o, o + 32)); o += 32; return v; };
+  if (name === "CardSettled") return { name, card: pk(), owner: pk(), amount: n(), remainingAllowance: n(), authHash: h(), totalSettled: n() };
+  return { name, card: pk(), owner: pk(), amount: n(), authHash: h(), recordRefunded: n(), destination: pk() };
 }
 
-function anchorEvents(logs) {
-  return (logs || []).filter((l) => l.startsWith("Program data: ")).map((l) => l.slice(14));
-}
-
-async function fromProgramsWithLogs(tx) {
-  const invocations = tx.programInvocations || [];
-  const keys = [];
-  const programs = new Set();
-  const splOps = [];
-  for (const inv of invocations) {
-    programs.add(inv.programId);
-    const accts = ((inv.instruction && inv.instruction.accounts) || []).map(keyOf).filter(Boolean);
-    keys.push(...accts);
-    if (inv.programId === TOKEN_PROGRAM) {
-      const op = SPL_IX[b58FirstByte(inv.instruction && inv.instruction.data)];
-      if (op) splOps.push({ op, accounts: accts.slice(0, 3) });
-    }
+function decodeTx(tx) {
+  const logs = tx.logs || [];
+  const stack = [];
+  const events = [];
+  let instruction = null;
+  for (const line of logs) {
+    const inv = /^Program (\w+) invoke \[\d+\]/.exec(line);
+    if (inv) { stack.push(inv[1]); continue; }
+    if (/^Program \w+ (success|failed)/.test(line)) { stack.pop(); continue; }
+    const top = stack[stack.length - 1];
+    if (top !== OUR_PROGRAM) continue;
+    if (!instruction && line.startsWith("Program log: Instruction: ")) instruction = line.slice(26);
+    if (line.startsWith("Program data: ")) { const ev = decodeEvent(b64decode(line.slice(14))); if (ev) events.push(ev); }
   }
-  const uniq = [...new Set(keys)];
-  const hits = await watched(uniq);
-  const ours = [...programs].filter((p) => OUR_PROGRAMS.includes(p));
-  if (!hits.length && !ours.length) return null;
+  const ours = (tx.programInvocations || []).find((i) => i.programId === OUR_PROGRAM);
+  const balances = ((ours && ours.instruction && ours.instruction.tokenBalances) || [])
+    .filter((t) => t.mint === USDC_MINT)
+    .map((t) => ({ owner: t.owner, amount: t.uiTokenAmount && t.uiTokenAmount.amount }));
   return {
     signature: tx.signature, slot: tx.slot, blockTime: tx.blockTime, success: tx.success,
-    watchedAccounts: hits, ourPrograms: ours, issuerProgram: programs.has(ISSUER_PROGRAM),
-    splOps, anchorEvents: anchorEvents(tx.logs),
+    instruction, events, postUsdcBalances: balances,
+    allowancesInvoked: logs.some((l) => l.startsWith("Program " + ALLOWANCES + " invoke")),
   };
 }
 
-async function fromBlockTx(tx, blockTime, slot) {
-  const msg = (tx.transaction && tx.transaction.message) || {};
-  const keys = (msg.accountKeys || []).map(keyOf).filter(Boolean);
-  const progs = new Set((msg.instructions || []).map((ix) => ix.programId).filter(Boolean));
-  const logs = (tx.meta && tx.meta.logMessages) || [];
-  for (const l of logs) { const m = /^Program (\w+) invoke/.exec(l); if (m) progs.add(m[1]); }
-  const hits = await watched(keys);
-  const ours = [...progs].filter((p) => OUR_PROGRAMS.includes(p));
-  if (!hits.length && !ours.length) return null;
-  return {
-    signature: (tx.transaction.signatures || [])[0], slot, blockTime, success: !(tx.meta && tx.meta.err),
-    watchedAccounts: hits, ourPrograms: ours, issuerProgram: progs.has(ISSUER_PROGRAM),
-    anchorEvents: anchorEvents(logs),
-  };
-}
-
-async function main(stream) {
-  const out = [];
-  const data = stream.data || [];
-  const slot0 = stream.metadata && stream.metadata.batch_start_range;
-  for (let i = 0; i < data.length; i++) {
-    const item = data[i];
-    if (Array.isArray(item)) {
-      for (const tx of item) { const m = await fromProgramsWithLogs(tx); if (m) out.push(m); }
-    } else if (item && Array.isArray(item.transactions)) {
-      const slot = typeof slot0 === "number" ? slot0 + i : null;
-      for (const tx of item.transactions) { const m = await fromBlockTx(tx, item.blockTime, slot); if (m) out.push(m); }
+function main(stream) {
+  const matches = [];
+  for (const item of stream.data || []) {
+    for (const tx of Array.isArray(item) ? item : []) {
+      if ((tx.programInvocations || []).some((i) => i.programId === OUR_PROGRAM)) matches.push(decodeTx(tx));
     }
   }
-  if (!out.length) return null;
-  return { solsend: "g0.7", dataset: stream.metadata && stream.metadata.dataset, matches: out };
+  if (!matches.length) return null;
+  return { solsend: "cp0b-g07", batch: [stream.metadata && stream.metadata.batch_start_range, stream.metadata && stream.metadata.batch_end_range], matches };
 }

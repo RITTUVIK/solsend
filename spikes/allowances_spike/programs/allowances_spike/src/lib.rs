@@ -144,6 +144,21 @@ pub mod allowances_spike {
             &[seeds],
         )?;
 
+        // Remaining spending power, read from the Allowances delegation account AFTER the CPI
+        // (fixed: `amount` at 171; recurring: amount_per_period@195 - amount_pulled_in_period@203).
+        let remaining = {
+            let d = ctx.accounts.delegation.try_borrow_data()?;
+            if card.kind == KIND_FIXED && d.len() >= 179 {
+                u64::from_le_bytes(d[171..179].try_into().unwrap())
+            } else if d.len() >= 211 {
+                let per = u64::from_le_bytes(d[195..203].try_into().unwrap());
+                let pulled = u64::from_le_bytes(d[203..211].try_into().unwrap());
+                per.saturating_sub(pulled)
+            } else {
+                0
+            }
+        };
+
         let record = &mut ctx.accounts.settlement_record;
         record.card = ctx.accounts.card.key();
         record.auth_hash = auth_hash;
@@ -152,6 +167,10 @@ pub mod allowances_spike {
         record.bump = ctx.bumps.settlement_record;
         let card = &mut ctx.accounts.card;
         card.total_settled = card.total_settled.checked_add(amount).ok_or(SpikeError::Overflow)?;
+        emit!(CardSettled {
+            card: card.key(), owner: card.owner, amount, remaining_allowance: remaining,
+            auth_hash, total_settled: card.total_settled,
+        });
         Ok(())
     }
 
@@ -187,8 +206,33 @@ pub mod allowances_spike {
         record.refunded = new_refunded;
         let card = &mut ctx.accounts.card;
         card.total_refunded = card.total_refunded.checked_add(amount).ok_or(SpikeError::Overflow)?;
+        emit!(CardRefunded {
+            card: card.key(), owner: card.owner, amount, auth_hash: _auth_hash,
+            record_refunded: new_refunded, destination: ctx.accounts.source_token_account.key(),
+        });
         Ok(())
     }
+}
+
+/// Emitted after a confirmed-path pull; decoded from `Program data:` logs by the QuickNode Stream filter.
+#[event]
+pub struct CardSettled {
+    pub card: Pubkey,
+    pub owner: Pubkey,
+    pub amount: u64,
+    pub remaining_allowance: u64,
+    pub auth_hash: [u8; 32],
+    pub total_settled: u64,
+}
+
+#[event]
+pub struct CardRefunded {
+    pub card: Pubkey,
+    pub owner: Pubkey,
+    pub amount: u64,
+    pub auth_hash: [u8; 32],
+    pub record_refunded: u64,
+    pub destination: Pubkey,
 }
 
 #[account]

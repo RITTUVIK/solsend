@@ -1,5 +1,5 @@
 // G0.7 offline self-test (no QuickNode needed):
-//  (a) filter.js against synthetic programs_with_logs + block payloads
+//  (a) filter.js against a synthetic programs_with_logs payload carrying a real CardSettled event encoding
 //  (b) webhook receiver: valid signature accepted; bad signature, replayed nonce,
 //      and stale timestamp rejected.
 // Usage: QN_STREAM_SECURITY_TOKEN=<any 32+ chars> G07_PORT=8799 pnpm exec tsx src/g07-selftest.ts
@@ -8,42 +8,43 @@ import { createHmac, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import vm from "node:vm";
+import { PublicKey } from "@solana/web3.js";
 import { SPIKES_DIR } from "./lib/env.js";
 import { record } from "./lib/evidence.js";
 
-const VAULT = "HcgWsXyjULsJiuH8Vx5ec7JZr98fa2rjDoricYW6YnVt";
-const OUR = "C31ntvRNLT8YuMuqHNkto5Pj3hgkQbCE1YZ4uaent8Zc";
-const src = readFileSync(join(SPIKES_DIR, "quicknode/filter.js"), "utf8")
-  .replaceAll("__WATCH_ACCOUNTS__", JSON.stringify([VAULT]))
-  .replaceAll("__OUR_PROGRAMS__", JSON.stringify([OUR]))
-  .replaceAll("__KV_LIST__", "null");
-const ctx = vm.createContext({ qnLib: {} });
+const OUR = "8uSYgZn5rvEbrpc3NgQFvqcqMA7snptsmiey5457ddR9";
+const ALLOW = "De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44";
+const src = readFileSync(join(SPIKES_DIR, "quicknode/filter.js"), "utf8").replaceAll("__OUR_PROGRAM__", JSON.stringify(OUR));
+const ctx = vm.createContext({ BigInt });
 vm.runInContext(src, ctx);
-const main = ctx.main as (s: unknown) => Promise<any>;
+const main = ctx.main as (s: unknown) => any;
 
+// CardSettled { card, owner, amount=10_000, remaining_allowance=990_000, auth_hash=0xab.., total_settled=10_000 }
+const u64le = (n: bigint) => { const b = Buffer.alloc(8); b.writeBigUInt64LE(n); return b; };
+const card = new PublicKey("6SJw6eTyDTghJoVWEtkjNHM1kge9jKdL1bUzPaVFQhgK");
+const owner = new PublicKey("DEGx8bvPLZQDS65xbw79My2tV97cfqsKQfGos6Nq3nWe");
+const ev = Buffer.concat([Buffer.from([34, 206, 169, 204, 178, 170, 227, 94]), card.toBuffer(), owner.toBuffer(), u64le(10_000n), u64le(990_000n), Buffer.alloc(32, 0xab), u64le(10_000n)]);
+const decoy = Buffer.concat([Buffer.from([34, 206, 169, 204, 178, 170, 227, 94]), Buffer.alloc(120, 1)]); // same disc, emitted by ANOTHER program
+const logs = [
+  `Program ${OUR} invoke [1]`, "Program log: Instruction: Settle",
+  `Program ${ALLOW} invoke [2]`, `Program data: ${decoy.toString("base64")}`, `Program ${ALLOW} success`,
+  `Program data: ${ev.toString("base64")}`, `Program ${OUR} success`,
+];
 const pwl = {
-  metadata: { dataset: "programs_with_logs", batch_start_range: 100 },
+  metadata: { dataset: "programs_with_logs", batch_start_range: 100, batch_end_range: 100 },
   data: [[
-    { signature: "sigMatch", slot: 100, blockTime: 1, success: true, logs: ["Program data: AAAA"],
-      programInvocations: [{ programId: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", instruction: { accounts: [{ pubkey: VAULT }, { pubkey: "x" }], data: "4" } }] },
-    { signature: "sigNoise", slot: 100, blockTime: 1, success: true, logs: [],
-      programInvocations: [{ programId: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", instruction: { accounts: [{ pubkey: "other" }], data: "3" } }] },
+    { signature: "sigOurs", slot: 100, blockTime: 1, success: true, logs,
+      programInvocations: [{ programId: OUR, instruction: { index: 1, accounts: [], data: "x", tokenBalances: [{ accountIndex: 5, mint: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU", owner: owner.toBase58(), uiTokenAmount: { amount: "1000" } }] } }] },
+    { signature: "sigOther", slot: 100, blockTime: 1, success: true, logs: [], programInvocations: [{ programId: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", instruction: { accounts: [], data: "3" } }] },
   ]],
 };
-const blk = {
-  metadata: { dataset: "block", batch_start_range: 200 },
-  data: [{ blockTime: 2, transactions: [
-    { meta: { err: null, logMessages: [`Program ${OUR} invoke [1]`] }, transaction: { signatures: ["sigOurs"], message: { accountKeys: [{ pubkey: "a" }], instructions: [] } } },
-    { meta: { err: null, logMessages: [] }, transaction: { signatures: ["sigOther"], message: { accountKeys: [{ pubkey: "b" }], instructions: [] } } },
-  ] }],
-};
-const r1 = await main(pwl);
-const r2 = await main(blk);
-const r3 = await main({ metadata: {}, data: [[]] });
-const filterOk =
-  r1?.matches?.length === 1 && r1.matches[0].signature === "sigMatch" && r1.matches[0].splOps?.[0]?.op === "Transfer" &&
-  r2?.matches?.length === 1 && r2.matches[0].signature === "sigOurs" && r2.matches[0].slot === 200 && r3 === null;
-record("g07", filterOk ? "selftest_filter_PASS" : "selftest_filter_FAIL", { programs_with_logs: r1, block: r2, empty: r3 });
+const r1 = main(pwl);
+const r3 = main({ metadata: {}, data: [[]] });
+const e = r1?.matches?.[0]?.events?.[0];
+const filterOk = r1?.matches?.length === 1 && r1.matches[0].instruction === "Settle" && r1.matches[0].allowancesInvoked === true
+  && r1.matches[0].events.length === 1 && e?.name === "CardSettled" && e.card === card.toBase58() && e.owner === owner.toBase58()
+  && e.amount === "10000" && e.remainingAllowance === "990000" && e.authHash === "ab".repeat(32) && r3 === null;
+record("g07", filterOk ? "selftest_filter_PASS" : "selftest_filter_FAIL", { programs_with_logs: r1, empty: r3, decoy_from_other_program_ignored: r1?.matches?.[0]?.events?.length === 1 });
 
 // (b) webhook receiver
 const token = process.env.QN_STREAM_SECURITY_TOKEN!;
