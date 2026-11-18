@@ -1,11 +1,12 @@
 "use client";
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { client, humanError, signAndSubmit } from "@/client/api";
+import { ApiCallError, client, humanError, signAndSubmit } from "@/client/api";
 import { usePoll } from "@/client/hooks";
-import { KIND_LABEL } from "@/client/format";
+import { KIND_LABEL, isPresetStore } from "@/client/format";
 import { AppShell, useAppData } from "@/components/AppShell";
 import { Stepper, type Stage } from "@/components/Stepper";
+import { WalletSetup } from "@/components/WalletSetup";
 import { ErrorNote, PageTitle, Spinner } from "@/components/ui";
 
 type Kind = keyof typeof KIND_LABEL;
@@ -22,7 +23,7 @@ const KINDS: { kind: Kind; title: string; hint: string }[] = [
 ];
 
 function Content() {
-  const { cards } = useAppData();
+  const { cards, wallet } = useAppData();
   const [store, setStore] = useState("Temu");
   const [custom, setCustom] = useState("");
   const [kind, setKind] = useState<Kind>("STORE_LOCKED");
@@ -33,12 +34,17 @@ function Content() {
   const [cardPda, setCardPda] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
+  const [needSetup, setNeedSetup] = useState(false);
+  const [setupDone, setSetupDone] = useState(false);
 
   const merchantName = (store === "Other" ? custom.trim() : store) || "";
   const cents = Math.round(Number(dollars) * 100);
   const limitOk = Number.isFinite(cents) && cents >= 100 && cents <= 50_000;
   const cardLabel = label.trim() || `${merchantName || "Store"} card`;
-  const formOk = merchantName.length > 0 && merchantName.length <= 32 && limitOk;
+  const preset = isPresetStore(merchantName);
+  // Allowances can't create the SubscriptionAuthority and a delegation in one tx: setup must confirm first.
+  const setupNeeded = needSetup || wallet.data?.subscriptionAuthorityReady === false;
+  const formOk = merchantName.length > 0 && merchantName.length <= 32 && limitOk && !setupNeeded;
 
   const polled = usePoll(client.listCards, 1200, cardPda != null);
   const card = useMemo(() => polled.data?.find((c) => c.cardPda === cardPda) ?? null, [polled.data, cardPda]);
@@ -59,6 +65,7 @@ function Content() {
       setStage("sent");
       void cards.refresh(); void polled.refresh();
     } catch (e) {
+      if (!prepared && e instanceof ApiCallError && e.code === "setup_required") { setStage(null); setNeedSetup(true); return; }
       setFailure(humanError(e));
       if (!prepared) { setStage(null); setErr(humanError(e)); }
     }
@@ -94,6 +101,7 @@ function Content() {
   return (
     <form className="space-y-5" onSubmit={(e) => { e.preventDefault(); if (formOk) void create(); }}>
       <PageTitle title="New card" sub="One card per store. Cap it, lock it, close it any time." />
+      {(setupNeeded || setupDone) && <WalletSetup onDone={() => { setNeedSetup(false); setSetupDone(true); }} />}
 
       <fieldset>
         <legend className="label">Store</legend>
@@ -147,9 +155,9 @@ function Content() {
       <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-950 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100" data-testid="explain">
         <p>
           <strong>Your USDC stays in your wallet.</strong> This card can pull at most <strong>${limitOk ? (cents / 100).toFixed(2) : "X"}</strong>
-          {kind === "SUBSCRIPTION" ? " per month" : ""}, only at <strong>{merchantName || "the store you pick"}</strong>.
+          {kind === "SUBSCRIPTION" ? " per month" : ""}, only at <strong>{merchantName ? (preset ? `${merchantName} (sandbox)` : "the first store that charges it") : "the store you pick"}</strong>.
         </p>
-        <p className="mt-1 text-xs opacity-80">The card locks onchain to the first store that charges it. You&apos;ll approve one signature in your wallet.</p>
+        <p className="mt-1 text-xs opacity-80">{preset ? `Locked onchain to ${merchantName} (sandbox) from the moment it's created, so a leaked number is useless anywhere else.` : "Other-store cards lock onchain to the first store that charges them."} You&apos;ll approve one signature in your wallet.</p>
       </div>
 
       {err && <ErrorNote>{err}</ErrorNote>}

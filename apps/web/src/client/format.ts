@@ -23,6 +23,10 @@ export const sandboxName = (name: string): string => (/\(sandbox\)/i.test(name) 
 export const MERCHANT_LABEL: Record<string, string> = { TEMU: "Temu", AMAZON: "Amazon", NETFLIX: "Netflix", OTHER_STORE: "Other store" };
 export const merchantLabel = (m: string): string => MERCHANT_LABEL[m] ?? m;
 
+/** Preset stores are locked onchain to that store FROM CREATION. "Other" cards lock to the first store that charges them. */
+export const PRESET_STORES = ["temu", "amazon", "netflix"];
+export const isPresetStore = (merchantName: string): boolean => PRESET_STORES.includes(merchantName.trim().toLowerCase());
+
 export const KIND_LABEL = { STORE_LOCKED: "Store-locked", ONE_TIME: "One-time", SUBSCRIPTION: "Subscription" } as const;
 
 export type DisplayStatus = "Active" | "Frozen" | "Used" | "Closed" | "Revoked" | "Setting up" | "Needs retry" | "Failed";
@@ -46,6 +50,7 @@ export const limitSuffix = (c: CardView): string => (c.limit.type === "per_perio
 export function declineCopy(lithicResult: string | null, reason: string | null): string {
   // Outer card-network safety limit (2x the onchain limit, or SINGLE_USE): declined before any onchain tx.
   if (reason && /safety limit/i.test(reason)) return reason;
+  if (reason && /idle/i.test(reason)) return "Card idle — unfreeze to reactivate";
   switch (lithicResult) {
     case "INSUFFICIENT_FUNDS": return "Over this card's limit";
     case "VELOCITY_EXCEEDED": return "Monthly cap reached";

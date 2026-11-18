@@ -18,6 +18,7 @@ export function humanError(e: unknown): string {
       case "unauthenticated": return "Your session expired. Please log in again.";
       case "rate_limited": return e.message || "Too many tries. Please wait a bit and try again.";
       case "intent_expired": return "That request timed out before it was signed. Please try again.";
+      case "setup_required": return "Your wallet needs a one-time setup before it can make cards.";
     }
     if (e.status === 0) return e.message;
     if (e.status >= 500) return "SolSend hit a snag on our side. Nothing was lost. Try again in a moment.";
@@ -33,14 +34,15 @@ export function humanError(e: unknown): string {
 interface CallOpts { params?: Record<string, string>; query?: Record<string, string | undefined>; body?: unknown; noAuth?: boolean }
 
 let binding: Promise<void> | null = null;
-/** F1: sign BindMessage(wallet, `${privyUserId}:${10-min bucket}`) and POST it. Deduped across concurrent calls. */
+/** F1: fetch the exact message from GET /api/auth/bind?wallet= (server owns the nonce format), sign THAT string, POST it. Deduped. */
 async function ensureBound(): Promise<void> {
   binding ??= (async () => {
     const s = getBridge();
-    if (!s.wallet || !s.privyUserId) throw new ApiCallError(0, "Your wallet isn't ready yet. Give it a second and try again.");
-    const message = api.BindMessage(s.wallet, `${s.privyUserId}:${Math.floor(Date.now() / 600_000)}`);
-    const sig = await s.signMsg(new TextEncoder().encode(message));
-    await raw("bindWallet", { body: { wallet: s.wallet, message, signatureBase64: bytesToB64(sig) } satisfies z.infer<typeof api.BindWalletRequest> }, false);
+    if (!s.wallet) throw new ApiCallError(0, "Your wallet isn't ready yet. Give it a second and try again.");
+    const m = api.BindMessageResponse.safeParse(await raw("bindMessage", { query: { wallet: s.wallet } }, false));
+    if (!m.success) throw new ApiCallError(502, "SolSend sent a response we couldn't understand. Please try again.", "bad_response");
+    const sig = await s.signMsg(new TextEncoder().encode(m.data.message));
+    await raw("bindWallet", { body: { wallet: s.wallet, message: m.data.message, signatureBase64: bytesToB64(sig) } satisfies z.infer<typeof api.BindWalletRequest> }, false);
   })().finally(() => { binding = null; });
   return binding;
 }
@@ -89,6 +91,8 @@ const pda = (cardPda: string) => ({ cardPda });
 
 export const client = {
   wallet: () => call("wallet", api.WalletResponse),
+  /** One-time: creates the Allowances SubscriptionAuthority. Must confirm before the first card. */
+  walletSetup: () => call("walletSetup", api.PreparedTx, { body: {} }),
   faucet: () => call("faucet", api.FaucetResponse, { body: {} }),
   listCards: async () => (await call("listCards", api.ListCardsResponse)).cards,
   prepareCard: (body: z.infer<typeof api.PrepareCardRequest>) => call("prepareCard", api.PrepareCardResponse, { body }),

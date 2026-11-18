@@ -2,6 +2,7 @@
 // state transitions. Nothing here touches a network. Signatures are obviously fake ("mock…" prefix) and the UI
 // marks them MOCK. State persists in localStorage so a reload keeps the demo going.
 import { api, explorerTx, centsToBase } from "@solsend/shared";
+import { isPresetStore } from "./format";
 
 type Kind = "STORE_LOCKED" | "ONE_TIME" | "SUBSCRIPTION";
 type CardStatus = "ACTIVE" | "FROZEN" | "USED" | "CLOSED";
@@ -11,10 +12,10 @@ interface MCard {
   cardPda: string; cardId: string; label: string; merchantName: string; kind: Kind; status: CardStatus; issueState: IssueState;
   lastFour: string | null; cardToken: string | null; totalBase: number; remainingBase: number; periodSecs: number | null;
   settledBase: number; refundedBase: number; lockedTo: string | null; delegationLive: boolean; delegation: string;
-  createdAt: string; registerSignature: string | null; confirmedAt: number | null; failIssue: boolean;
+  createdAt: string; registerSignature: string | null; confirmedAt: number | null; failIssue: boolean; idle: boolean; idleSeen?: boolean;
 }
 interface MAuth { token: string; cardPda: string; amountBase: number; merchant: string; voided: boolean }
-interface MIntent { id: string; type: "create" | "freeze" | "unfreeze" | "close" | "revoke_all"; cardPda: string | null; consumed: boolean; expires: number }
+interface MIntent { id: string; type: "setup" | "create" | "freeze" | "unfreeze" | "close" | "revoke_all"; cardPda: string | null; consumed: boolean; expires: number }
 interface MRefund { at: number; token: string }
 interface State {
   bound: boolean; wallet: string; usdc: number; lastFaucet: number; saReady: boolean;
@@ -126,6 +127,10 @@ export async function mockRequest(req: MockReq): Promise<Res> {
   if (path === "/api/status" && method === "GET") return ok(mockStatus());
   if (!req.hasToken) return err(401, "missing bearer token", "unauthenticated");
 
+  if (path === "/api/auth/bind" && method === "GET") {
+    const w = req.query.get("wallet") ?? "";
+    return ok({ message: api.BindMessage(w, `did:privy:mock-user:${Math.floor(Date.now() / 600_000)}`) });
+  }
   if (path === "/api/auth/bind" && method === "POST") {
     const b = api.BindWalletRequest.safeParse(req.body);
     if (!b.success || !b.data.message.startsWith("SolSend devnet login")) return err(400, "bad bind request", "bad_request");
@@ -136,6 +141,11 @@ export async function mockRequest(req: MockReq): Promise<Res> {
 
   if (path === "/api/wallet" && method === "GET") {
     return ok({ wallet: s.wallet, usdcBase: String(s.usdc), solLamports: "0", subscriptionAuthorityReady: s.saReady, delegateHealthy: true });
+  }
+  if (path === "/api/wallet/setup" && method === "POST") {
+    if (s.saReady) return err(409, "Your wallet is already set up.", "already_setup");
+    const intent = newIntent(s, "setup", null); save();
+    return ok(preparedTx(intent));
   }
   if (path === "/api/wallet/faucet" && method === "POST") {
     await sleep(900);
@@ -152,13 +162,14 @@ export async function mockRequest(req: MockReq): Promise<Res> {
   if (path === "/api/cards/prepare" && method === "POST") {
     const b = api.PrepareCardRequest.safeParse(req.body);
     if (!b.success) return err(400, "Check the card details and try again.", "bad_request");
+    if (!s.saReady) return err(409, "wallet setup required (POST /api/wallet/setup)", "setup_required");
     const { kind, label, merchantName, limitCents, periodDays } = b.data;
     const pda = fakePda();
     s.cards.push({
       cardPda: pda, cardId: String(jitter(1e9, 9e9)), label, merchantName, kind, status: "ACTIVE", issueState: "onchain_pending", lastFour: null, cardToken: null,
       totalBase: Number(centsToBase(limitCents)), remainingBase: Number(centsToBase(limitCents)), periodSecs: kind === "SUBSCRIPTION" ? (periodDays ?? 30) * 86400 : null,
-      settledBase: 0, refundedBase: 0, lockedTo: null, delegationLive: true, delegation: fakePda(), createdAt: new Date().toISOString(), registerSignature: null,
-      confirmedAt: null, failIssue: /fail/i.test(label),
+      settledBase: 0, refundedBase: 0, lockedTo: isPresetStore(merchantName) ? merchantName.trim().toUpperCase() : null, delegationLive: true, delegation: fakePda(), createdAt: new Date().toISOString(), registerSignature: null,
+      confirmedAt: null, failIssue: /fail/i.test(label), idle: false,
     });
     const intent = newIntent(s, "create", pda);
     save();
@@ -179,7 +190,7 @@ export async function mockRequest(req: MockReq): Promise<Res> {
       if (card.issueState !== "issued") return err(409, "This card isn't ready yet.", "not_ready");
       const t = b.data.action;
       if (t === "freeze" && card.status !== "ACTIVE") return err(409, "Only an active card can be frozen.", "bad_state");
-      if (t === "unfreeze" && card.status !== "FROZEN") return err(409, "This card isn't frozen.", "bad_state");
+      if (t === "unfreeze" && card.status !== "FROZEN" && !card.idle) return err(409, "This card isn't frozen.", "bad_state");
       if (t === "close" && card.status === "CLOSED") return err(409, "This card is already closed.", "bad_state");
       const intent = newIntent(s, t, card.cardPda); save();
       return ok(preparedTx(intent));
@@ -192,7 +203,10 @@ export async function mockRequest(req: MockReq): Promise<Res> {
     }
     if (m[2] === "embed" && method === "POST") {
       if (card.issueState !== "issued") return err(409, "This card isn't ready yet.", "not_ready");
-      return ok({ iframeUrl: mockEmbedUrl(card), expiresAt: new Date(Date.now() + 5 * 60_000).toISOString() });
+      return ok({
+        iframeUrl: mockEmbedUrl(card, "all"), expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+        iframes: { pan: mockEmbedUrl(card, "pan"), cvv: mockEmbedUrl(card, "cvv"), expMonth: mockEmbedUrl(card, "expMonth"), expYear: mockEmbedUrl(card, "expYear") },
+      });
     }
   }
   if (path === "/api/tx/submit" && method === "POST") {
@@ -241,14 +255,14 @@ const preparedTx = (i: MIntent) => ({ intentId: i.id, txBase64: btoa(`mock-tx:${
 function applyIntent(s: State, i: MIntent, signature: string): void {
   const c = i.cardPda ? s.cards.find((x) => x.cardPda === i.cardPda) : undefined;
   switch (i.type) {
+    case "setup": s.saReady = true; break;
     case "create":
       if (!c) return;
-      s.saReady = true;
       c.issueState = "onchain_confirmed"; c.confirmedAt = Date.now(); c.registerSignature = signature;
       pushFeed(s, { kind: "registered", source: "quicknode", cardPda: c.cardPda, amountBase: String(c.totalBase), signature, merchant: c.merchantName });
       break;
     case "freeze": if (c) { c.status = "FROZEN"; pushFeed(s, { kind: "frozen", source: "quicknode", cardPda: c.cardPda, signature }); } break;
-    case "unfreeze": if (c) { c.status = "ACTIVE"; pushFeed(s, { kind: "unfrozen", source: "quicknode", cardPda: c.cardPda, signature }); } break;
+    case "unfreeze": if (c) { c.status = "ACTIVE"; c.idle = false; pushFeed(s, { kind: "unfrozen", source: "quicknode", cardPda: c.cardPda, signature }); } break;
     case "close": if (c) { c.status = "CLOSED"; c.delegationLive = false; pushFeed(s, { kind: "closed", source: "quicknode", cardPda: c.cardPda, signature }); } break;
     case "revoke_all":
       for (const x of s.cards) if (x.delegationLive) { x.delegationLive = false; pushFeed(s, { kind: "closed", source: "quicknode", cardPda: x.cardPda, signature, reason: "Allowance revoked by owner" }); }
@@ -267,7 +281,10 @@ async function checkout(s: State, body: unknown): Promise<Res> {
   const amountBase = Number(centsToBase(amountCents));
   const token = crypto.randomUUID();
   let result: string | null = null;
-  if (c.issueState !== "issued" || !c.delegationLive || c.status === "FROZEN" || c.status === "CLOSED" || c.status === "USED") result = "CARD_PAUSED";
+  let idleDecline = false;
+  if (c.issueState === "issued" && c.status === "ACTIVE" && c.delegationLive && (c.idle || (/idle/i.test(c.label) && !c.idleSeen))) { c.idle = true; c.idleSeen = true; idleDecline = true; }
+  if (idleDecline) result = "CARD_PAUSED";
+  else if (c.issueState !== "issued" || !c.delegationLive || c.status === "FROZEN" || c.status === "CLOSED" || c.status === "USED") result = "CARD_PAUSED";
   else if (amountBase > c.totalBase * 2) result = "NETWORK_SAFETY_LIMIT"; // Lithic outer limit = 2x onchain limit: no onchain tx
   else if (c.lockedTo && c.lockedTo !== merchant) result = "UNAUTHORIZED_MERCHANT";
   else if (amountBase > c.remainingBase) result = c.kind === "SUBSCRIPTION" ? "VELOCITY_EXCEEDED" : "INSUFFICIENT_FUNDS";
@@ -275,9 +292,9 @@ async function checkout(s: State, body: unknown): Promise<Res> {
   const latencyMs = Math.max(1, Math.round(performance.now() - t0) + jitter(40, 220));
   if (result) {
     const failedSig = result === "CARD_PAUSED" || result === "NETWORK_SAFETY_LIMIT" ? null : fakeSig();
-    pushFeed(s, { kind: "authorization_declined", source: "lithic", cardPda, amountBase: String(amountBase), lithicToken: token, merchant, reason: DECLINE_REASON[result] ?? result, signature: failedSig });
+    pushFeed(s, { kind: "authorization_declined", source: "lithic", cardPda, amountBase: String(amountBase), lithicToken: token, merchant, reason: idleDecline ? "Card idle — unfreeze to reactivate" : DECLINE_REASON[result] ?? result, signature: failedSig });
     save();
-    return ok({ lithicToken: token, decision: "DECLINED", lithicResult: result, reason: DECLINE_REASON[result] ?? result, settleSignature: failedSig, explorer: failedSig ? explorerTx(failedSig) : null, remainingBase: String(c.remainingBase), latencyMs, label: "SANDBOX" });
+    return ok({ lithicToken: token, decision: "DECLINED", lithicResult: result, reason: idleDecline ? "Card idle — unfreeze to reactivate" : DECLINE_REASON[result] ?? result, settleSignature: failedSig, explorer: failedSig ? explorerTx(failedSig) : null, remainingBase: String(c.remainingBase), latencyMs, label: "SANDBOX" });
   }
   const signature = fakeSig();
   c.remainingBase -= amountBase; c.settledBase += amountBase; c.lockedTo = merchant; s.usdc -= amountBase;
@@ -302,11 +319,11 @@ function mockStatus(): api.TStatusResponse {
   return { ok: true, checkedAt: new Date().toISOString(), checks: checks.map(([name, detail]) => ({ name, ok: true, detail })) };
 }
 
-function mockEmbedUrl(c: MCard): string {
-  // A stand-in for Lithic's hosted iframe. It never contains a card number: the real iframe (Lithic's origin) renders those.
+function mockEmbedUrl(c: MCard, field: "all" | "pan" | "cvv" | "expMonth" | "expYear"): string {
+  // Stand-ins for Lithic's hosted iframes. They never contain a card number or CVV: the real iframes (Lithic's origin) render those.
+  const text = { all: `•••• •••• •••• ${c.lastFour ?? "0000"}`, pan: `•••• •••• •••• ${c.lastFour ?? "0000"}`, cvv: "•••", expMonth: "••", expYear: "••" }[field];
   const html = `<!doctype html><meta charset=utf-8><body style="margin:0;font:14px system-ui;background:#18181b;color:#e4e4e7;display:grid;place-items:center;height:100vh">
-<div style="text-align:center;padding:12px"><div style="font-size:11px;letter-spacing:.12em;color:#fbbf24">MOCK · SANDBOX</div>
-<div style="font-size:20px;letter-spacing:.2em;margin:8px 0">•••• •••• •••• ${c.lastFour ?? "0000"}</div>
-<div style="color:#a1a1aa;font-size:12px">In live mode Lithic's hosted frame shows the<br>card number, expiry and CVV here. SolSend never sees them.</div></div>`;
+<div style="text-align:center;padding:6px"><div style="font-size:9px;letter-spacing:.12em;color:#fbbf24">MOCK · SANDBOX</div>
+<div style="font-size:${field === "all" ? 20 : 16}px;letter-spacing:.15em;margin:4px 0">${text}</div>${field === "all" ? '<div style="color:#a1a1aa;font-size:12px">Lithic\'s hosted frame shows the card details here.<br>SolSend never sees them.</div>' : ""}</div>`;
   return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
 }
