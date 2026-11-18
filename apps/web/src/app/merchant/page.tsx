@@ -1,121 +1,199 @@
 "use client";
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { z } from "zod";
 import type { api } from "@solsend/shared";
 import { client, humanError } from "@/client/api";
-import { MERCHANT_LABEL, displayStatus, isUsable, sandboxName, usd } from "@/client/format";
+import { STORE_ART_NAME, cardArt } from "@/client/cardArt";
+import { MERCHANT_LABEL, displayStatus, isPresetStore, isUsable, sandboxName, usd, type DeclineFix } from "@/client/format";
 import { AppShell, useAppData } from "@/components/AppShell";
-import { CheckoutResult } from "@/components/CheckoutResult";
+import { ApprovalSheet, type PayAttempt } from "@/components/ApprovalSheet";
+import { CardVisual, StoreTile } from "@/components/CardVisual";
 import { FeedList } from "@/components/FeedList";
-import { ErrorNote, Icon, SandboxChip, Spinner } from "@/components/ui";
+import { Icon } from "@/components/ui";
 
 type Merchant = z.infer<typeof api.DemoMerchantZ>;
-const MERCHANTS: { id: Merchant; tone: string; blurb: string }[] = [
-  { id: "TEMU", tone: "from-orange-600 to-rose-700", blurb: "Gadgets, cheap" },
-  { id: "AMAZON", tone: "from-zinc-700 to-black", blurb: "Everything store" },
-  { id: "NETFLIX", tone: "from-red-700 to-zinc-950", blurb: "Streaming" },
-  { id: "OTHER_STORE", tone: "from-indigo-600 to-violet-800", blurb: "A different shop" },
-];
+const STORES: Merchant[] = ["TEMU", "AMAZON", "NETFLIX", "OTHER_STORE"];
+const PRODUCTS: Record<Merchant, { name: string; dollars: string }[]> = {
+  TEMU: [{ name: "Phone case", dollars: "5" }, { name: "Earbuds", dollars: "12" }, { name: "Drone", dollars: "45" }],
+  AMAZON: [{ name: "USB cable", dollars: "5" }, { name: "Book", dollars: "12" }, { name: "Headphones", dollars: "25" }],
+  NETFLIX: [{ name: "Monthly plan", dollars: "15.49" }, { name: "Premium", dollars: "22.99" }],
+  OTHER_STORE: [{ name: "Latte", dollars: "5" }, { name: "Lunch", dollars: "12" }],
+};
+const STORE_TAGLINE: Record<Merchant, string> = {
+  TEMU: "A store you're trying for the first time",
+  AMAZON: "Where a thief would try a leaked number",
+  NETFLIX: "Subscriptions and free trials",
+  OTHER_STORE: "Your neighbourhood café",
+};
+const enumFor = (merchantName: string): Merchant | null => {
+  const k = merchantName.trim().toUpperCase();
+  return (STORES as string[]).includes(k) ? (k as Merchant) : null;
+};
 
 function Content() {
   const { cards, wallet } = useAppData();
+  const router = useRouter();
   const params = useSearchParams();
   const wanted = params.get("card");
   const issued = (cards.data ?? []).filter((c) => c.issueState === "issued");
   const [cardPda, setCardPda] = useState<string>("");
   const [merchant, setMerchant] = useState<Merchant>("TEMU");
   const [amount, setAmount] = useState("12");
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  const [out, setOut] = useState<{ res: z.infer<typeof api.DemoCheckoutResponse>; cardPda: string; merchant: Merchant; cents: number } | null>(null);
+  const [attempt, setAttempt] = useState<PayAttempt | null>(null);
+  const [announce, setAnnounce] = useState("");
 
+  const selected = issued.find((c) => c.cardPda === cardPda);
+  function pickCard(pda: string) {
+    setCardPda(pda);
+    const c = issued.find((x) => x.cardPda === pda);
+    const m = c && isPresetStore(c.merchantName) ? enumFor(c.merchantName) : c ? "OTHER_STORE" : null;
+    if (m) { setMerchant(m); setAmount(PRODUCTS[m][Math.min(1, PRODUCTS[m].length - 1)]!.dollars); }
+  }
   useEffect(() => {
     if (cardPda || issued.length === 0) return;
-    setCardPda(issued.find((c) => c.cardPda === wanted)?.cardPda ?? issued.find(isUsable)?.cardPda ?? issued[0]!.cardPda);
-  }, [issued, cardPda, wanted]);
+    pickCard(issued.find((c) => c.cardPda === wanted)?.cardPda ?? issued.find(isUsable)?.cardPda ?? issued[0]!.cardPda);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [issued.length, cardPda, wanted]);
 
   const cents = Math.round(Number(amount) * 100);
   const amountOk = Number.isFinite(cents) && cents >= 1 && cents <= 5000;
-  const selected = issued.find((c) => c.cardPda === cardPda);
+  const storeLabel = MERCHANT_LABEL[merchant] ?? merchant;
+  const lockedStore = selected && selected.kind !== "ONE_TIME" && isPresetStore(selected.merchantName) ? enumFor(selected.merchantName) : null;
+  const leaked = !!lockedStore && lockedStore !== merchant;
 
   async function pay() {
     if (!selected || !amountOk) return;
-    setBusy(true); setErr(null); setOut(null);
+    const walletBefore = wallet.data ? BigInt(wallet.data.usdcBase) : null;
+    const base: PayAttempt = { card: selected, merchant, merchantLabel: storeLabel, amountCents: cents, walletBefore, res: null, error: null };
+    setAttempt(base); setAnnounce("");
     try {
       const res = await client.checkout({ cardPda: selected.cardPda, merchant, amountCents: cents });
-      setOut({ res, cardPda: selected.cardPda, merchant, cents });
+      setAttempt({ ...base, res });
+      setAnnounce(res.decision === "APPROVED" ? `Approved: ${usd(BigInt(cents) * 10_000n)} at ${sandboxName(storeLabel)}` : `Declined: ${res.reason ?? "blocked by the card's rules"}`);
       void cards.refresh(); void wallet.refresh();
-    } catch (e) { setErr(humanError(e)); } finally { setBusy(false); }
+    } catch (e) {
+      setAttempt({ ...base, error: humanError(e) });
+      setAnnounce(`Payment failed: ${humanError(e)}`);
+    }
+  }
+
+  function onFix(f: DeclineFix | "try_amazon") {
+    const a = attempt;
+    setAttempt(null);
+    if (f === "try_amazon") { setMerchant("AMAZON"); setAmount("5"); return; }
+    if (f === "use_locked_store" && lockedStore) { setMerchant(lockedStore); return; }
+    if (f === "pay_remaining" && a?.res?.remainingBase) { setAmount((Number(a.res.remainingBase) / 1e6).toFixed(2)); return; }
+    if (f === "lower_amount") { setAmount("5"); return; }
+    if (f === "add_usdc") { router.push("/home"); return; }
+    if ((f === "reactivate" || f === "unfreeze") && a) router.push(`/cards/${a.card.cardPda}`);
   }
 
   return (
     <div>
-      <div className="mb-4">
-        <div className="mb-1 flex flex-wrap items-center gap-2"><SandboxChip>SANDBOX STORE</SandboxChip><span className="text-xs text-zinc-500">Not a real merchant. No one is charged.</span></div>
-        <h1 className="text-2xl font-bold tracking-tight">Demo store checkout</h1>
-        <p className="mt-0.5 text-sm text-zinc-600 dark:text-zinc-400">Pay with your SolSend card. The swipe is settled on Solana devnet before it&apos;s approved.</p>
-      </div>
+      <div className="sr-only" aria-live="assertive" role="status">{announce}</div>
 
       {cards.data && issued.length === 0 ? (
         <div className="surface text-center">
-          <p className="font-semibold">You need a ready card to check out.</p>
-          <Link href="/cards/new" className="btn-primary mt-3">Create a card</Link>
+          <div className="mx-auto mb-3 w-40 opacity-60"><div className="aspect-[1.586] rounded-[14px] border-2 border-dashed border-line" /></div>
+          <p className="text-[17px] font-semibold">You need a card to check out</p>
+          <p className="mt-1 text-[15px] text-ink-2">Make a burner card for one store, then try it here.</p>
+          <Link href="/cards/new" className="btn-primary mt-4">Create a card</Link>
         </div>
       ) : (
-        <form className="space-y-5" onSubmit={(e) => { e.preventDefault(); void pay(); }}>
-          <div>
-            <label className="label" htmlFor="card-select">Card</label>
-            <select id="card-select" className="input" value={cardPda} onChange={(e) => setCardPda(e.target.value)} data-testid="card-select" disabled={!cards.data}>
-              {issued.map((c) => <option key={c.cardPda} value={c.cardPda}>{c.label} · {displayStatus(c)} · {usd(c.limit.remainingBase)} left</option>)}
-            </select>
+        <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); void pay(); }}>
+          {/* Storefront strip */}
+          <div className="relative overflow-hidden rounded-[20px] p-4 text-white">
+            <StoreBanner merchant={merchant} />
+            <div className="relative flex items-center gap-3">
+              <StoreTile merchant={STORE_ART_NAME[merchant]!} size={44} className="ring-2 ring-white/40" />
+              <div className="min-w-0 flex-1">
+                <span className="chip mb-1 bg-black/35 px-2 text-white">sandbox store</span>
+                <h1 className="text-[22px] font-semibold leading-7 tracking-[-0.02em]">{storeLabel} <span className="text-white/85">(sandbox)</span></h1>
+                <p className="text-[13px] font-medium leading-[18px] text-white/90">{STORE_TAGLINE[merchant]}</p>
+              </div>
+            </div>
           </div>
 
-          <fieldset>
-            <legend className="label">Store</legend>
-            <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Store">
-              {MERCHANTS.map((m) => (
-                <button key={m.id} type="button" role="radio" aria-checked={merchant === m.id} onClick={() => setMerchant(m.id)} data-testid={`store-${m.id}`}
-                  className={`rounded-xl bg-gradient-to-br ${m.tone} p-3 text-left text-white transition ${merchant === m.id ? "ring-4 ring-emerald-500/60 ring-offset-2 ring-offset-zinc-50 dark:ring-offset-zinc-950" : "opacity-80 hover:opacity-100"}`}>
-                  <span className="block font-bold">{MERCHANT_LABEL[m.id]}</span>
-                  <span className="block text-xs text-white/80">(sandbox) · {m.blurb}</span>
+          <fieldset className="min-w-0">
+            <legend className="label">Pay with</legend>
+            <div className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2 pt-1" role="radiogroup" aria-label="Card" data-testid="card-select">
+              {!cards.data && <div className="skeleton aspect-[1.586] w-[150px] shrink-0" />}
+              {issued.map((c) => (
+                <button key={c.cardPda} type="button" role="radio" aria-checked={c.cardPda === cardPda} onClick={() => pickCard(c.cardPda)}
+                  aria-label={`${c.label}, ${displayStatus(c)}, ${usd(c.limit.remainingBase)} left`}
+                  className={`w-[150px] shrink-0 snap-start text-left transition ${c.cardPda === cardPda ? "" : "opacity-70 hover:opacity-100"}`}>
+                  <span className={`block rounded-[19px] p-[3px] ${c.cardPda === cardPda ? "ring-2 ring-ink" : ""}`}><CardVisual card={c} showLimit size="small" /></span>
+                  <span className="mt-1 block truncate px-1 text-[12px] font-semibold text-ink-2">{c.label}</span>
                 </button>
               ))}
             </div>
           </fieldset>
 
+          <fieldset className="min-w-0">
+            <legend className="label">Shop at</legend>
+            <div className="grid grid-cols-4 gap-2" role="radiogroup" aria-label="Store">
+              {STORES.map((m) => (
+                <button key={m} type="button" role="radio" aria-checked={merchant === m} onClick={() => setMerchant(m)} data-testid={`store-${m}`}
+                  className={`flex min-h-16 flex-col items-center justify-center gap-1 rounded-[16px] px-1 text-[12px] font-semibold transition ${merchant === m ? "bg-surface text-ink ring-2 ring-ink" : "bg-surface/60 text-ink-2 ring-1 ring-line ring-inset hover:bg-surface"}`}>
+                  <StoreTile merchant={STORE_ART_NAME[m]!} size={28} />
+                  <span className="max-w-full truncate">{MERCHANT_LABEL[m]}</span>
+                </button>
+              ))}
+            </div>
+          </fieldset>
+
+          {leaked && (
+            <div className="flex gap-3 rounded-[16px] bg-warn-bg p-3.5 text-[14px] leading-5 text-ink" data-testid="leak-callout">
+              <Icon name="lock" className="mt-0.5 h-5 w-5 shrink-0 text-warn" />
+              <p>This card is locked to <strong>{sandboxName(MERCHANT_LABEL[lockedStore!]!)}</strong>. Paying at {storeLabel} simulates a thief using a <strong>leaked card number</strong>.</p>
+            </div>
+          )}
+
           <div>
-            <label className="label" htmlFor="amount">Amount (USD, max $50)</label>
-            <div className="flex items-center gap-2">
-              <span className="text-lg font-semibold text-zinc-500" aria-hidden="true">$</span>
-              <input id="amount" className="input tabular-nums" type="number" inputMode="decimal" min={0.01} max={50} step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} aria-invalid={!amountOk} required />
+            <p className="label" id="products-h">Add to cart</p>
+            <div className="flex flex-wrap gap-2" aria-labelledby="products-h">
+              {PRODUCTS[merchant].map((p) => (
+                <button key={p.name} type="button" className="pick" aria-pressed={Number(amount) === Number(p.dollars)} onClick={() => setAmount(p.dollars)}>
+                  {p.name} <span className="tnum font-medium opacity-70">${p.dollars}</span>
+                </button>
+              ))}
             </div>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {["5", "12", "25", "45"].map((v) => <button key={v} type="button" onClick={() => setAmount(v)} className="chip bg-zinc-200 px-3 text-xs hover:bg-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700">${v}</button>)}
+            <label className="label mt-4" htmlFor="amount">Amount (USD, max $50)</label>
+            <div className="flex items-center gap-1 rounded-[14px] bg-surface px-3.5 ring-1 ring-line ring-inset focus-within:ring-2 focus-within:ring-ink">
+              <span className="text-[22px] font-semibold text-ink-3" aria-hidden="true">$</span>
+              <input id="amount" className="tnum min-h-14 w-full bg-transparent text-[22px] font-semibold outline-none" type="number" inputMode="decimal" min={0.01} max={50} step="0.01"
+                value={amount} onChange={(e) => setAmount(e.target.value)} aria-invalid={!amountOk} aria-describedby={!amountOk ? "amount-err" : undefined} required />
             </div>
-            {!amountOk && <p className="mt-1 text-sm text-rose-600" role="alert">Enter an amount between $0.01 and $50.00.</p>}
+            {!amountOk && <p id="amount-err" className="mt-1.5 text-sm text-no" role="alert">Enter an amount between $0.01 and $50.00.</p>}
           </div>
 
-          {err && <ErrorNote>{err}</ErrorNote>}
-          <button type="submit" disabled={busy || !selected || !amountOk} className="btn-primary w-full !min-h-14 !text-base" data-testid="pay">
-            {busy ? <><Spinner />Settling onchain…</> : <><Icon name="bolt" className="h-5 w-5" />Pay with SolSend card</>}
-          </button>
-          <p className="text-xs text-zinc-500">Tip: an amount above a card&apos;s remaining limit (up to 2× its limit) is declined by the onchain rules. Try $45 on a $40 card.</p>
-          <p className="text-center text-xs text-zinc-500">Paying {amountOk ? usd(BigInt(cents) * 10_000n) : "—"} at {sandboxName(MERCHANT_LABEL[merchant] ?? merchant)}</p>
+          <div className="sticky bottom-[calc(60px+env(safe-area-inset-bottom))] z-10 -mx-4 bg-gradient-to-t from-paper from-70% to-transparent px-4 pb-3 pt-4 sm:static sm:mx-0 sm:bg-none sm:p-0">
+            <button type="submit" disabled={!selected || !amountOk || (!!attempt && !attempt.res && !attempt.error)} className="btn-primary w-full !min-h-14 !text-[17px]" data-testid="pay">
+              {leaked ? <>Try the leaked number at {storeLabel}</> : <>Pay {amountOk ? usd(BigInt(cents) * 10_000n) : ""}{selected?.lithic.lastFour ? <span className="font-medium opacity-70">&nbsp;with •••• {selected.lithic.lastFour}</span> : null}</>}
+            </button>
+          </div>
         </form>
       )}
 
-      {out && <CheckoutResult res={out.res} cardPda={out.cardPda} merchant={MERCHANT_LABEL[out.merchant] ?? out.merchant} amountCents={out.cents} onVoided={() => { void cards.refresh(); void wallet.refresh(); }} />}
+      <ApprovalSheet attempt={attempt} walletNow={wallet.data ? BigInt(wallet.data.usdcBase) : null} onClose={() => setAttempt(null)} onFix={onFix}
+        onVoided={() => { void cards.refresh(); void wallet.refresh(); }} />
+
       {selected && (
-        <section className="mt-8" aria-labelledby="recent-h">
-          <h2 id="recent-h" className="font-semibold">Recent sandbox purchases</h2>
-          <p className="mb-1 text-sm text-zinc-600 dark:text-zinc-400">On {selected.label}. You can void an approved purchase here any time.</p>
+        <section className="mt-10" aria-labelledby="recent-h">
+          <h2 id="recent-h" className="text-[17px] font-semibold">Recent sandbox purchases</h2>
+          <p className="mb-2 text-[13px] text-ink-3">On {selected.label}. You can void an approved purchase here any time.</p>
           <FeedList key={selected.cardPda} cardPda={selected.cardPda} limit={8} empty="No purchases on this card yet." />
         </section>
       )}
     </div>
   );
+}
+
+/** Re-uses the card art so the store and its card read as one identity. */
+function StoreBanner({ merchant }: { merchant: Merchant }) {
+  return <div className="card-noise absolute inset-0" style={{ background: cardArt(STORE_ART_NAME[merchant]!).background }} aria-hidden="true" />;
 }
 
 export default function MerchantPage() {
