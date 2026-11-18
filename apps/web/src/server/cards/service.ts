@@ -152,6 +152,7 @@ export function toCardView(row: CardRow, c: ChainCard | undefined, nowMs: number
   const status = card ? cardStatusName(card.status) : "CLOSED";
   return {
     cardPda: row.card_pda, cardId: row.card_id, label: row.label, merchantName: row.merchant_name, kind: row.kind, status, issueState: row.issue_state,
+    expiresAt: null, expired: false, // TODO(W2): read the delegation expiry_ts (onchain) for free-trial cards
     lithic: { cardToken: row.lithic_card_token, lastFour: row.lithic_last_four, state: null },
     limit: {
       type: recurring ? "per_period" : "lifetime", totalBase: row.limit_base,

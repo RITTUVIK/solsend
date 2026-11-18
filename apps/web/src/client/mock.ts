@@ -99,6 +99,7 @@ function issue(s: State, c: MCard): void {
 function view(c: MCard): api.TCardView {
   return {
     cardPda: c.cardPda, cardId: c.cardId, label: c.label, merchantName: c.merchantName, kind: c.kind, status: c.status, issueState: c.issueState,
+    expiresAt: null, expired: false, // TODO(UI): mock free-trial expiry
     lithic: { cardToken: c.cardToken, lastFour: c.lastFour, state: c.issueState === "issued" ? (c.status === "FROZEN" ? "PAUSED" : c.status === "CLOSED" ? "CLOSED" : "OPEN") : null },
     limit: { type: c.kind === "SUBSCRIPTION" ? "per_period" : "lifetime", totalBase: String(c.totalBase), remainingBase: String(c.delegationLive ? c.remainingBase : 0), periodSecs: c.periodSecs },
     totals: { settledBase: String(c.settledBase), refundedBase: String(c.refundedBase) },

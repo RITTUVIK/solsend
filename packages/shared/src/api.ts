@@ -39,6 +39,9 @@ export const SubmitTxResponse = z.object({ signature: Signature, explorer: z.str
 export const PrepareCardRequest = z.object({
   kind: CardKindZ, label: z.string().min(1).max(32), merchantName: z.string().min(1).max(40),
   limitCents: z.number().int().min(100).max(50_000), periodDays: z.number().int().min(1).max(366).optional(), // SUBSCRIPTION only
+  /** Optional ONCHAIN expiry (Allowances delegation expiry_ts): after it, every pull fails onchain — e.g. a free-trial card
+   *  that can't roll into a paid plan. 2 min (demo) … 90 days. Omitted = never expires. */
+  expiresInMinutes: z.number().int().min(2).max(129_600).optional(),
 });
 export const PrepareCardResponse = PreparedTx.extend({ cardPda: Pubkey, cardId: z.string() });
 export const CardView = z.object({
@@ -48,6 +51,9 @@ export const CardView = z.object({
   totals: z.object({ settledBase: Base, refundedBase: Base }), merchantLocked: z.boolean(),
   /** false once the owner revoked the Allowances delegation (in SolSend or directly) — card can never pay again. */
   delegationLive: z.boolean(),
+  /** Onchain delegation expiry (ISO) or null; `expired` = now ≥ expiresAt (pulls fail onchain). */
+  expiresAt: z.string().nullable().default(null),
+  expired: z.boolean().default(false),
   delegation: Pubkey, createdAt: z.string(), registerSignature: Signature.nullable(),
 });
 export const ListCardsResponse = z.object({ cards: z.array(CardView) });
