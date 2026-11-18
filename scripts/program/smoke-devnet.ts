@@ -25,9 +25,9 @@ import {
 import { ROOT, STATE_DIR, type Ix, type SentTx, connect, explorer, explorerAddr, loadKeypair, plain, sendTx, spl, tokenBalance, web3 } from "./lib.js";
 
 const SETTLE_CU_LIMIT = 100_000; // smoke headroom; the measured value is recorded below
-const DEMO_MERCHANT = "SOLSENDDEMOTEMU01";
-const OTHER_MERCHANT = "SOLSENDDEMOAMZN01";
-const SUB_MERCHANT = "SOLSENDDEMONFLX01";
+const DEMO_MERCHANT = "SOLSENDTEMU01";
+const OTHER_MERCHANT = "SOLSENDAMZN01";
+const SUB_MERCHANT = "SOLSENDNFLX01";
 
 const sha256 = (s: string) => Uint8Array.from(createHash("sha256").update(s, "utf8").digest());
 /** Mirrors the lead's packages/shared authCommitment() / merchantCommitment() (inline until merged). */

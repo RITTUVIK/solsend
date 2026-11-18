@@ -63,7 +63,7 @@ describe("security-review amendments", () => {
   it("commitments are domain-separated sha256 (verifiable with node crypto)", async () => {
     const t = "934ca60c-f410-47e7-ac06-41f9994d9e4b";
     expect(await authCommitmentHex(t)).toBe(createHash("sha256").update("solsend:auth:v1:" + t).digest("hex"));
-    expect(toHex(await merchantCommitment("SOLSENDDEMOTEMU01"))).toBe(createHash("sha256").update("solsend:merchant:v1:SOLSENDDEMOTEMU01").digest("hex"));
+    expect(toHex(await merchantCommitment("SOLSENDTEMU01"))).toBe(createHash("sha256").update("solsend:merchant:v1:SOLSENDTEMU01").digest("hex"));
     expect(await authCommitmentHex(t)).not.toBe(createHash("sha256").update(t).digest("hex"));
   });
   it("Lithic outer limits are 2x onchain and never MERCHANT_LOCKED", () => {

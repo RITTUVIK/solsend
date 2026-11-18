@@ -2,12 +2,13 @@
 import { z } from "zod";
 
 export const LITHIC_SANDBOX_BASE = "https://sandbox.lithic.com";
-/** Descriptors are limited to 25 chars by Lithic (CP0b S2 finding). Always suffixed "(SANDBOX)" in our UI. */
+/** Descriptors ≤25 chars (CP0b S2); simulate/authorize `merchant_acceptor_id` ≤15 chars (W2 finding, HTTP 400 otherwise).
+ *  The acceptorId also feeds merchantCommitment() → the onchain merchant lock / pre-lock. */
 export const DEMO_MERCHANTS = {
-  TEMU: { descriptor: "TEMU (SANDBOX)", acceptorId: "SOLSENDDEMOTEMU01", mcc: "5399" },
-  AMAZON: { descriptor: "AMAZON (SANDBOX)", acceptorId: "SOLSENDDEMOAMZN01", mcc: "5942" },
-  NETFLIX: { descriptor: "NETFLIX (SANDBOX)", acceptorId: "SOLSENDDEMONFLX01", mcc: "4899" },
-  OTHER_STORE: { descriptor: "UNKNOWN STORE (SANDBOX)", acceptorId: "SOLSENDDEMOOTHR01", mcc: "5999" },
+  TEMU: { descriptor: "TEMU (SANDBOX)", acceptorId: "SOLSENDTEMU01", mcc: "5399" },
+  AMAZON: { descriptor: "AMAZON (SANDBOX)", acceptorId: "SOLSENDAMZN01", mcc: "5942" },
+  NETFLIX: { descriptor: "NETFLIX (SANDBOX)", acceptorId: "SOLSENDNFLX01", mcc: "4899" },
+  OTHER_STORE: { descriptor: "UNKNOWN STORE (SANDBOX)", acceptorId: "SOLSENDOTHR01", mcc: "5999" },
 } as const;
 
 /** Tags we set on every Lithic card (mapping card → onchain Card PDA without a DB lookup). */

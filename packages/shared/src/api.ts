@@ -19,9 +19,15 @@ export const ApiError = z.object({ error: z.string(), code: z.string().optional(
 export const BindWalletRequest = z.object({ wallet: Pubkey, message: z.string().max(300), signatureBase64: z.string() });
 export const BindWalletResponse = z.object({ userId: z.string(), wallet: Pubkey });
 export const BindMessage = (wallet: string, nonce: string) => `SolSend devnet login\nWallet: ${wallet}\nNonce: ${nonce}`;
+/** GET /api/auth/bind?wallet= → the exact message the wallet must sign (server owns the nonce format). */
+export const BindMessageResponse = z.object({ message: z.string() });
 
 // ── Wallet ───────────────────────────────────────────────────────────────────────────────
 export const WalletResponse = z.object({ wallet: Pubkey, usdcBase: Base, solLamports: z.string(), subscriptionAuthorityReady: z.boolean(), delegateHealthy: z.boolean() });
+/** POST /api/wallet/setup → owner-signed tx creating/re-arming the Allowances SubscriptionAuthority. Must confirm BEFORE
+ *  the first card: Allowances sets SA.init_id to the creation slot, so SA-create + delegation in one tx fails (Custom 136).
+ *  /api/cards/prepare returns 409 {code:"setup_required"} until WalletResponse.subscriptionAuthorityReady is true. */
+export const WalletSetupResponse = z.lazy(() => PreparedTx);
 export const FaucetResponse = z.object({ signature: Signature, explorer: z.string(), amountBase: Base, label: z.literal("devnet test USDC") });
 
 // ── Transactions (server builds → user signs → server cosigns + sends) ───────────────────
@@ -49,7 +55,11 @@ export const CardActionRequest = z.object({ action: z.enum(["freeze", "unfreeze"
 export const RevokeAllResponse = PreparedTx; // owner-signed tx revoking every delegation directly in Allowances
 export const RetryIssueResponse = z.object({ card: CardView });
 /** Lithic hosted iframe session (PAN/CVV rendered by Lithic in the browser; never touches our servers). */
-export const EmbedSessionResponse = z.object({ iframeUrl: z.string().url(), expiresAt: z.string() });
+export const EmbedSessionResponse = z.object({
+  iframeUrl: z.string().url(), expiresAt: z.string(),
+  /** Per-field Lithic hosted iframes (sandbox). All render inside Lithic's origin; values never reach our servers. */
+  iframes: z.object({ pan: z.string().url(), cvv: z.string().url(), expMonth: z.string().url(), expYear: z.string().url() }).partial().optional(),
+});
 
 // ── Activity feed ────────────────────────────────────────────────────────────────────────
 export const FeedKindZ = z.enum(["registered", "authorization_approved", "authorization_declined", "settled", "refunded", "frozen", "unfrozen", "closed", "faucet"]);
@@ -90,7 +100,9 @@ export type TStatusResponse = z.infer<typeof StatusResponse>;
 /** Route table (path → method, request schema, response schema). Owners: W2 unless noted. */
 export const ROUTES = {
   bindWallet: { method: "POST", path: "/api/auth/bind" },
+  bindMessage: { method: "GET", path: "/api/auth/bind" }, // ?wallet=
   wallet: { method: "GET", path: "/api/wallet" },
+  walletSetup: { method: "POST", path: "/api/wallet/setup" }, // → PreparedTx (sign + /api/tx/submit)
   faucet: { method: "POST", path: "/api/wallet/faucet" },
   prepareCard: { method: "POST", path: "/api/cards/prepare" },
   listCards: { method: "GET", path: "/api/cards" },

@@ -43,7 +43,7 @@ describe("demo merchant checkout", () => {
     expect(r).toMatchObject({ decision: "APPROVED", label: "SANDBOX", settleSignature: SIG, remainingBase: "8500000", lithicToken: "tx-1" });
     expect(r.explorer).toContain(SIG);
     const auth = calls.find((c) => c.url.endsWith("/simulate/authorize"))!;
-    expect(JSON.parse(auth.body!)).toMatchObject({ amount: 150, descriptor: "TEMU (SANDBOX)", mcc: "5399", merchant_acceptor_id: "SOLSENDDEMOTEMU01" });
+    expect(JSON.parse(auth.body!)).toMatchObject({ amount: 150, descriptor: "TEMU (SANDBOX)", mcc: "5399", merchant_acceptor_id: "SOLSENDTEMU01" });
     expect(sixteen.test(JSON.stringify(r))).toBe(false);
     expect(calls.every((c) => c.url.startsWith("https://sandbox.lithic.com/"))).toBe(true);
   });

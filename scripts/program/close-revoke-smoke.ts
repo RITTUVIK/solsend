@@ -35,7 +35,7 @@ const c = decodeCard((await connection.getAccountInfo(card))!.data)!;
 console.log(`delegation account closed: ${after === null}; card status: ${cardStatusName(c.status)}`);
 
 const settle = await sendTx(connection, [ixSettle({ settler: settler.publicKey, owner: owner.publicKey, cardId, amount: 10_000n,
-  authHash: await authCommitment(`smoke-${cardId}`), merchantHash: await merchantCommitment("SOLSENDDEMOTEMU01") })], settler, [], { expectFailure: true });
+  authHash: await authCommitment(`smoke-${cardId}`), merchantHash: await merchantCommitment("SOLSENDTEMU01") })], settler, [], { expectFailure: true });
 console.log(`settle after close ok=${settle.ok} err=${JSON.stringify(settle.err)} ${explorer(settle.signature)}`);
 const fpAfter = await connection.getBalance(feePayer.publicKey);
 console.log(`fee payer net lamports (card rent kept for late refunds; delegation rent returned): ${fpAfter - fpBefore}`);

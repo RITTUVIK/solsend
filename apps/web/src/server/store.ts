@@ -144,8 +144,15 @@ export class SupabaseStore implements Store {
     return (this.ok(r, "consumeIntent") as unknown[]).length === 1;
   }
   async setIntentSignature(id: string, signature: string) { this.ok(await this.sb.from("tx_intents").update({ signature }).eq("id", id), "setIntentSignature"); }
+  /** Update-first (partial patches never hit NOT NULL constraints), insert if absent; a concurrent insert race
+   *  (unique violation) falls back to update. Inserts must carry the NOT NULL columns (auth_hash, amount_cents). */
   async upsertAuthorization(row: Partial<AuthorizationRow> & Pick<AuthorizationRow, "lithic_token">) {
-    this.ok(await this.sb.from("authorizations").upsert({ ...row, updated_at: now() }, { onConflict: "lithic_token" }), "upsertAuthorization");
+    const patch = { ...row, updated_at: now() };
+    const upd = await this.sb.from("authorizations").update(patch).eq("lithic_token", row.lithic_token).select("lithic_token");
+    if ((this.ok(upd, "upsertAuthorization.update") as unknown[]).length > 0) return;
+    const ins = await this.sb.from("authorizations").insert(patch);
+    if (ins.error?.code === UNIQUE_VIOLATION) { this.ok(await this.sb.from("authorizations").update(patch).eq("lithic_token", row.lithic_token), "upsertAuthorization.retry"); return; }
+    this.ok(ins, "upsertAuthorization.insert");
   }
   async getAuthorization(t: string) { return this.ok(await this.sb.from("authorizations").select().eq("lithic_token", t).maybeSingle(), "getAuthorization") as AuthorizationRow | null; }
   async getAuthorizationByAuthHash(h: string) { return this.ok(await this.sb.from("authorizations").select().eq("auth_hash", h).maybeSingle(), "getAuthorizationByAuthHash") as AuthorizationRow | null; }
