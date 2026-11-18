@@ -5,12 +5,28 @@
 ### A burner card for every store — your money stays in your wallet until the moment you pay.
 
 - Each card is an **onchain allowance that holds $0**. Nothing is pre-funded and nothing sits on an issuer's balance sheet.
-- Every card is **capped and locked to one store** from creation, by Solana, not by our server's goodwill.
+- Every card is **capped and locked to one store** from creation. The cap and expiry are enforced by Solana; the store lock is checked onchain against the merchant ID the card network reports, which our server relays.
 - Your **blast radius** is the sum of your caps: the most anyone — a hacked store, a leaked card number, even our own server — can ever pull.
 
 **Live app: https://solsend-ashen.vercel.app** (devnet + sandbox) · SolSend program (devnet): [`GfMyGffqQA7KNUYWByEDtQKEFmHzBPTJgsuYSaruWdZp`](https://explorer.solana.com/address/GfMyGffqQA7KNUYWByEDtQKEFmHzBPTJgsuYSaruWdZp?cluster=devnet)
 
 UBC 2026 entry. Track: Consumer Applications. Chain award: Best use of Solana. Bounty: QuickNode Streams.
+
+## Proven live on the deployed app (18 November 2026)
+
+A real email login, real Lithic **sandbox** card authorizations and Solana **devnet** USDC, on https://solsend-ashen.vercel.app. Every row was then checked independently against the chain (account state and USDC balance changes). Full write-up: [docs/evidence/rehearsal-2026-11-18.md](docs/evidence/rehearsal-2026-11-18.md).
+
+| What happened | Result onchain | Transaction (devnet) |
+|---|---|---|
+| $12 purchase at the card's own store | Approved in 915 ms, **after** the USDC pull confirmed. Wallet −$12 | [`2QT4k4cK…`](https://explorer.solana.com/tx/2QT4k4cKpZiZKCRRPpVyEaMTCU6qibDfwQj9wqoq5fgp5NwaLnrjqHW2tY3TcuaCCHKXZ3A6K29bUttAnDYvzBee?cluster=devnet) |
+| The same card number tried at another store ($5) | Declined by the SolSend program (merchant mismatch). No USDC moved | [`ko4XZjax…`](https://explorer.solana.com/tx/ko4XZjaxq6btWc4mnojTe1VzPvf9p8KBkfZpkEE6t3JNdyJJNZDfdTaD2H6otsReMQjFWajat1uVoxKKzMfvLTP?cluster=devnet) |
+| $45 charge with $28 left on the card | Declined by the Allowances cap. No USDC moved | [`b6sGxACn…`](https://explorer.solana.com/tx/b6sGxACnkkYBm9Lnm9huRqgZ1iNn4A4bjFwAg7zm4PRBFgHrv5a5LZBamJbDDaRidtcdYi8wK5bHXPz2S66r7s9?cluster=devnet) |
+| $1 charge on a free-trial card after it expired | Declined by Allowances (`delegationExpired`). No USDC moved | [`3q4HQCQf…`](https://explorer.solana.com/tx/3q4HQCQfRUkiSCgrzykYLMCozJrbAtW9LzAQsXXB2kbUcwiBsc1fjBfYvTHo8UguX4DPrxSV4mcTfq2khezLw4md?cluster=devnet) |
+| The store cancels an earlier $1.14 purchase | Exactly $1.14 returned to the same wallet, once | [`63fBvpBw…`](https://explorer.solana.com/tx/63fBvpBwpFd8cr2iaZoeSaiK5DfJpMhHKA6cqURAJnincqicdhUU4KX1tmvhjp3t1VzZG795pFKFwKg2h76d7mB?cluster=devnet) |
+
+The failed transactions are the proof that no money moved: the program rejected them. Lithic's sandbox simulates the card network; no real merchant or card network is involved.
+
+### Interface
 
 <p align="center">
   <img src="docs/evidence/ui-v2/after-03b-pay-sheet-approved.png" width="190" alt="Approval sheet: Approved, Settled onchain first, proof row, Settlement streamed by QuickNode">
@@ -19,7 +35,7 @@ UBC 2026 entry. Track: Consumer Applications. Chain award: Best use of Solana. B
   <img src="docs/evidence/ui-v2/after-12-expired-free-trial.png" width="190" alt="Expired free-trial card">
 </p>
 
-*Approval sheet · leaked number declined · blast radius on Home · expired free trial. UI captured in mock mode (illustrative signatures); real devnet evidence is linked below ([docs/EVIDENCE.md](docs/EVIDENCE.md)).*
+*Approval sheet · leaked number declined · blast radius on Home · expired free trial. **These screenshots come from the app's local mock-data build** (note the MOCK DATA badge): they show the real interface, but their signatures and amounts are illustrative, not transactions. The real transactions are in the table above and in [docs/EVIDENCE.md](docs/EVIDENCE.md).*
 
 ## Try it (30 seconds)
 
@@ -29,14 +45,14 @@ UBC 2026 entry. Track: Consumer Applications. Chain award: Best use of Solana. B
 4. **Demo store**: **Earbuds $12**, **Pay $12.00**. The sheet shows **Approved** and **Settled onchain first**, with an Explorer link to the settle that confirmed *before* the card network was told yes.
 5. In the same sheet tap **Try this card's number at Amazon**: **Declined**, with **Rejected onchain** and the failed transaction. Try the **Drone $45**: declined by the cap.
 6. **New card** with **Netflix** and the **2 minutes (demo)** expiry: after two minutes it is stamped **EXPIRED** and every pull fails onchain.
-7. **Activity**: the QuickNode-sourced rows; **Void (sandbox store)** returns the USDC. **Wallet** shows "Most that can ever be pulled" and **Revoke all cards…** (one transaction, straight to Solana's Allowances program).
+7. **Activity**: every purchase and card change, with a line showing whether the QuickNode Stream delivered it; **Simulate store refund** voids a purchase and returns the USDC. **Wallet** shows "Most that can ever be pulled" and **Revoke all cards…** (one transaction, straight to Solana's Allowances program).
 
 The full presenter walkthrough is in [docs/DEMO-SCRIPT.md](docs/DEMO-SCRIPT.md).
 
 ## The problem
 
 - Saved cards are liabilities. Card numbers leak, stores get breached, and free trials quietly become subscriptions you forget about.
-- Prepaid and burner cards fix some of that but make you **pre-fund** them, so your money sits with an issuer. When an issuer fails, the card stops working at best. Competitors and prior art are compared in [docs/POSITIONING.md](docs/POSITIONING.md).
+- Burner cards fix some of that, but the best-known (Privacy.com) needs a US bank account and keeps the limits in its own systems, and prepaid or crypto cards either hold your money with an issuer or back a single card with one approval for your whole account. When an issuer fails, the card stops working at best. Competitors and prior art are compared in [docs/POSITIONING.md](docs/POSITIONING.md).
 
 ## How it works
 
@@ -53,11 +69,11 @@ The full presenter walkthrough is in [docs/DEMO-SCRIPT.md](docs/DEMO-SCRIPT.md).
 | **SolSend** (ours, Anchor, devnet) | [`GfMyGffqQA7KNUYWByEDtQKEFmHzBPTJgsuYSaruWdZp`](https://explorer.solana.com/address/GfMyGffqQA7KNUYWByEDtQKEFmHzBPTJgsuYSaruWdZp?cluster=devnet) | Card registry, merchant lock, per-tx cap, freeze and idle lock, `settle` and `refund`, one permanent `SettlementRecord` per authorization |
 | **Subscriptions & Allowances** (official) | [`De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44`](https://explorer.solana.com/address/De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44?cluster=devnet) | The capped, revocable delegation behind every card; the spending cap and revocation live here |
 
-- **The primitive.** The Allowances program is live on mainnet and devnet, was [audited by Cantina](https://github.com/solana-foundation/subscriptions/blob/main/audits/AUDIT_STATUS.md), and its mainnet build is [verified by OtterSec](https://verify.osec.io/status/De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44). Launch coverage: [Chainstack](https://docs.chainstack.com/docs/solana-subscriptions-and-allowances), [Helius](https://www.helius.dev/blog/solana-subscriptions-recurring-payments). We build on it rather than reinventing delegation. SolSend itself runs on devnet.
+- **The primitive (not ours).** The Allowances program was published by the Solana Foundation in June 2026. It is live on mainnet and devnet, was [audited by Cantina](https://github.com/solana-foundation/subscriptions/blob/main/audits/AUDIT_STATUS.md), and has a reproducible mainnet build [verified through OtterSec's service](https://verify.osec.io/status/De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44). Launch coverage: [Chainstack](https://docs.chainstack.com/docs/solana-subscriptions-and-allowances), [Helius](https://www.helius.dev/blog/solana-subscriptions-recurring-payments). The Foundation named card-linked spending as a use; SolSend gives every card its own allowance. Our own program and backend have **not** had a professional audit (see "Security work"). SolSend runs on devnet.
 - **One allowance per card.** The delegatee is the card's Card PDA, which has no private key, so only the SolSend program can pull, and only inside `settle`. Existing self-custodial cards use a single delegation per wallet; per-store allowances are the difference ([POSITIONING](docs/POSITIONING.md)).
 - **Settlement.** `settle` CPIs into Allowances, moving USDC from your wallet into the treasury PDA, and creates a `SettlementRecord` at `["settle", auth_hash]`. That record can never be closed, so an authorization pulls once in total.
 - **Policy onchain.** Merchant lock, per-transaction cap, freeze, idle lock, and refunds only to your stored source account.
-- **Free-trial expiry.** A free-trial card's Allowances delegation carries an expiry (7, 14 or 30 days, or 2 minutes for the demo). After it, every pull fails onchain inside the Allowances program (error 128, `delegationExpired`), so a trial can't quietly become a paid plan. Proof: failed devnet settle [`42fhAuNK…`](https://explorer.solana.com/tx/42fhAuNKvytc4iR6sRaH9RTsRNNXqqaqskG2k4z7yf7JL7AMC5yLFTs7cN2JJJzkKQCuHEvrGC1pVgECVVJCtd8W?cluster=devnet), after a successful settle before expiry. That proof is a direct program-level devnet test (`scripts/ops/expiry-proof.ts`, settlement-authority signed, no card network involved). A separate app-path check through the ASA route used locally signed **MOCK** requests. See [w2-free-trial-expiry.md](docs/evidence/w2-free-trial-expiry.md).
+- **Free-trial expiry.** A free-trial card's Allowances delegation carries an expiry (7, 14 or 30 days, or 2 minutes for the demo). After it, every pull fails onchain inside the Allowances program (error 128, `delegationExpired`), so the trial cannot charge that card. Live proof: a real Lithic sandbox authorization after expiry, declined onchain, [`3q4HQCQf…`](https://explorer.solana.com/tx/3q4HQCQfRUkiSCgrzykYLMCozJrbAtW9LzAQsXXB2kbUcwiBsc1fjBfYvTHo8UguX4DPrxSV4mcTfq2khezLw4md?cluster=devnet) ([rehearsal](docs/evidence/rehearsal-2026-11-18.md)). An earlier direct program-level test ([`42fhAuNK…`](https://explorer.solana.com/tx/42fhAuNKvytc4iR6sRaH9RTsRNNXqqaqskG2k4z7yf7JL7AMC5yLFTs7cN2JJJzkKQCuHEvrGC1pVgECVVJCtd8W?cluster=devnet), [w2-free-trial-expiry.md](docs/evidence/w2-free-trial-expiry.md)) showed the same failure after a successful settle before expiry.
 - **Speed.** Confirmation is fast enough to approve inside a card network's deadline: hosted cold start 2.4 s and warm p50 0.84 s against Lithic's 6 s hard limit.
 - **Revocation.** Revoke-all is a transaction to the Allowances program, not ours.
 - Accounts and PDAs: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -73,9 +89,11 @@ The full presenter walkthrough is in [docs/DEMO-SCRIPT.md](docs/DEMO-SCRIPT.md).
 | Destination | Webhook `POST /api/quicknode` on Vercel: HMAC-SHA256 signature over nonce, timestamp and body, timestamp window, replay-nonce guard; events are upserted idempotently into the Supabase feed |
 | Consumer | The app's **Activity** feed (polled about every 1.5 s) |
 
-**Why.** The feed is our live, authoritative activity view: every approve, decline, refund and freeze that hits the chain shows up as a row sourced from QuickNode. We use a Stream because the program emits its own events and `programs_with_logs` delivers exactly those. The Lithic token never appears onchain; the server joins the onchain `auth_hash` commitment back to the authorization.
+**Why.** The Stream is how the app learns about onchain events without polling the chain: every settle, refund, card registration and freeze our program emits is delivered to the webhook and shown in Activity. We use a Stream because the program emits its own events and `programs_with_logs` delivers exactly those. The Lithic token never appears onchain; the server joins the onchain `auth_hash` commitment back to the authorization.
 
 **Measured:** `CardSettled` reached the deployed webhook **+584 ms after the settle was confirmed** ([evidence](docs/evidence/lead-deployed-e2e.md)). QuickNode devnet is also the hot-path RPC.
+
+**What the app claims, and when.** The app says "streamed by QuickNode" only for an event whose Stream delivery has actually been recorded. While a delivery is outstanding it says "Waiting for QuickNode Stream…", and after 15 seconds without one it says the stream may be paused. A purchase still shows its settlement either way, because SolSend approves only after that settle confirmed (tested in `apps/web/tests/e2e`, including a paused-stream test).
 
 **Honest limits.** The trial allows one Solana stream, bills per processed block, has no reorg handling and its usage API is not readable with our key, so the stream stays **paused** outside test and demo windows. Stream rows are notifications; money decisions use RPC reads at `confirmed`. Stream lifecycle commands are in [docs/DEPLOY.md](docs/DEPLOY.md).
 
@@ -101,15 +119,18 @@ All are tested; see [docs/TRUST.md](docs/TRUST.md).
 
 ## Measured results
 
+Real card-network (Lithic sandbox) runs come first; **MOCK** rows used locally signed requests to our real endpoint, with real devnet settles.
+
 | What | Result | Evidence |
 |---|---|---|
-| Hosted ASA, **MOCK** (locally signed requests to our endpoint, real devnet settles), n=12 | cold first **1838 ms**, warm p50 **837 ms**, p95/max 1741 ms; 12/12 approved, 12/12 records found onchain | [lead-hosted-asa.md](docs/evidence/lead-hosted-asa.md) |
-| Long-idle cold start, **MOCK** request | **2438 ms**, then warm **1043 ms**; real devnet settles, both verified onchain | [lead-hosted-asa.md](docs/evidence/lead-hosted-asa.md) |
+| **Live rehearsal**, real Lithic sandbox on the deployed app | $12 approved after the settle confirmed (915 ms); wrong store, over cap and expired trial each declined onchain; void refunded exactly once | [rehearsal-2026-11-18.md](docs/evidence/rehearsal-2026-11-18.md) |
 | Real Lithic sandbox to hosted ASA | $0.37 approved (confirmed settle before reply); $0.52 declined onchain with a failed-tx signature | [lead-hosted-asa.md](docs/evidence/lead-hosted-asa.md) |
 | Real Lithic flow on the deployed stack | approve, QuickNode delivery **+584 ms**, async void, reconciler refund | [lead-deployed-e2e.md](docs/evidence/lead-deployed-e2e.md) |
+| Program tests | 41 LiteSVM tests against the **real devnet Allowances binary** | [w1-program-devnet.md](docs/evidence/w1-program-devnet.md) |
+| Hosted ASA, **MOCK** (locally signed requests to our endpoint, real devnet settles), n=12 | cold first **1838 ms**, warm p50 **837 ms**, p95/max 1741 ms; 12/12 approved, 12/12 records found onchain | [lead-hosted-asa.md](docs/evidence/lead-hosted-asa.md) |
+| Long-idle cold start, **MOCK** request | **2438 ms**, then warm **1043 ms**; real devnet settles, both verified onchain | [lead-hosted-asa.md](docs/evidence/lead-hosted-asa.md) |
 | Hot path on QuickNode RPC, **MOCK**, n=50 (CP0b, laptop) | 50/50 approved only after `confirmed`; p50 852 ms, p99 1027 ms | [GATE0.md](GATE0.md) |
 | Free-trial expiry, **MOCK** ASA, real devnet | settle before expiry succeeds; after expiry fails `Custom 128` (`delegationExpired`) | [w2-free-trial-expiry.md](docs/evidence/w2-free-trial-expiry.md) |
-| Program tests | 41 LiteSVM tests against the **real devnet Allowances binary** | [w1-program-devnet.md](docs/evidence/w1-program-devnet.md) |
 
 Latencies are measured from Halifax; functions run in Vercel `iad1`. Every onchain claim is indexed with its devnet signature in **[docs/EVIDENCE.md](docs/EVIDENCE.md)**.
 
@@ -118,7 +139,7 @@ Latencies are measured from Halifax; functions run in Vercel `iad1`. Every oncha
 - **Two adversarial security reviews, all findings fixed.** These were AI-assisted reviews: separate Claude review agents, each with fresh context and only the code to work from. They are not a professional third-party audit. The **program review** found no Critical issue and no fund-theft path; its High, Medium and Low findings were fixed in a devnet upgrade ([report](docs/evidence/audit-program-cp1.md)). The **backend review** found no Critical issue; its High, 5 Medium and Low findings were fixed and pinned as regression tests ([report](docs/evidence/audit-backend-cp1.md)). An earlier internal security review shaped the contract (no memo so Lithic tokens never go onchain, permanent replay records, Lithic outer limits).
 - **Supabase lockdown.** RLS on all tables with no policies; `anon` and `authenticated` hold no privileges. Verification caught an ineffective `PUBLIC` execute grant, which was then revoked. `supabase/verify.mts` passes 11/11. The browser never talks to Supabase.
 - **Unauthenticated calls** to the sensitive routes return 401 on the deployment.
-- **Secret scanning.** gitleaks runs as a pre-commit hook and in CI. Secrets live only in Vercel env or gitignored local files.
+- **Secret scanning.** gitleaks runs as a pre-commit hook and in CI. Secrets live only in Vercel env or gitignored local files. Before publishing, the full git history (every blob on every branch) was also checked for valid Solana keypairs and for every real secret value we hold, and the production JavaScript bundle was checked the same way: none found.
 - **Demo Merchant.** The sandbox card number is read in server memory only; it is never returned, logged or stored, and non-sandbox Lithic hosts are refused.
 
 ## Tracks and bounties
@@ -140,7 +161,7 @@ Latencies are measured from Halifax; functions run in Vercel `iad1`. Every oncha
 | [supabase](supabase) | Migrations, migrate and verify scripts |
 | [scripts](scripts) | Devnet deploy and smoke scripts, ops CLIs, `merchant-sim` fallback |
 | [docs](docs) | [ARCHITECTURE](docs/ARCHITECTURE.md), [TRUST](docs/TRUST.md), [EVIDENCE](docs/EVIDENCE.md), [POSITIONING](docs/POSITIONING.md), [DEMO-SCRIPT](docs/DEMO-SCRIPT.md), [PITCH](docs/PITCH.md), [VIDEO-PLAN](docs/VIDEO-PLAN.md), [SUBMISSION](docs/SUBMISSION.md), [DEPLOY](docs/DEPLOY.md), [CP1-CONTRACTS](docs/CP1-CONTRACTS.md) |
-| [GATE0.md](GATE0.md) | Early validation history (CP0b) |
+| [GATE0.md](GATE0.md), [spikes](spikes) | Early validation history (Gate 0 and CP0b, 16 to 17 November): the spikes that chose this architecture, including the abandoned Stripe + Bridge card track. Kept as evidence; not part of the running app |
 
 ## Local dev quickstart
 
@@ -151,7 +172,8 @@ pnpm install
 cp .env.example apps/web/.env.local   # fill in your own devnet/sandbox values; never commit them
 pnpm dev                               # http://localhost:3000
 pnpm test                              # unit tests (shared + web)
-pnpm test:program                      # LiteSVM program tests (needs Rust and the dumped Allowances .so)
+bash scripts/program/fetch-allowances.sh  # once: dumps the real Allowances program binary from devnet for the tests
+pnpm test:program                      # LiteSVM program tests (needs Rust)
 ```
 
 Variables are documented in [`.env.example`](.env.example). Deployment and the Stream lifecycle are in [docs/DEPLOY.md](docs/DEPLOY.md). A UI-only mock mode (`NEXT_PUBLIC_MOCK_API=1`) exists for front-end work; no claim in this README comes from it.
@@ -159,6 +181,8 @@ Variables are documented in [`.env.example`](.env.example). Deployment and the S
 ## Limitations and trust assumptions
 
 - **Sandbox + devnet only.** No real merchants, no card-network settlement, no mainnet. Treasury-to-issuer settlement is out of scope.
+- **An authorization is not the final charge.** On real card networks the final amount can differ from the authorization (tips, hotels, fuel), some charges post with no authorization at all, and disputes arrive weeks later. A limit on the chain cannot stop the network from doing those things; a production version needs a licensed issuing partner, reserves and refund handling built for them. The demo does not cover this.
+- **Safety, not privacy.** Amounts and timing of settles are public on the ledger (see the last point below).
 - **The settlement authority is trusted to relay the card network's authorization and merchant ID.** Lithic signs requests to us (HMAC-verified), but the program cannot verify that onchain. The chain enforces the caps and the lock; a compromised key can pull live cards only up to their remaining caps and only into the treasury PDA, and the admin can pause and rotate.
 - **The program is upgradeable on devnet.** The deployer is the upgrade authority. Freezing the program after the hackathon is the mitigation.
 - **Legacy records can't be refunded.** 43 SettlementRecords from before Upgrade 1 use the old seeds and cannot be refunded through the program (0.82 devnet USDC outstanding, accepted for devnet).
@@ -168,6 +192,10 @@ Variables are documented in [`.env.example`](.env.example). Deployment and the S
 - **QuickNode trial limits** apply; the stream stays paused when not demoing.
 - **Card creation is not atomic across systems** (onchain first, then Lithic, with a retry). An onchain card with no Lithic card cannot be pulled.
 - **Public onchain:** owner wallet, card PDAs, settle and refund amounts and timing, and a pseudonymous `merchant_hash`. Never onchain: Lithic tokens, card numbers, merchant names, emails.
+
+## How this was built
+
+SolSend was built during the hackathon by a two-person team: the repository was created on 16 November 2026, and the hackathon opened on 12 November. Most of the code, tests and documentation were written by **Claude Code, Anthropic's AI coding agent, working under the team's direction**. The humans set the requirements, approved the architecture at each checkpoint, configured every provider account, ran the end-to-end rehearsals that found the last bugs, and approved each release. The two security reviews were done by separate AI review agents, not by professional auditors. The commit history shows this openly: almost every commit carries a Claude co-author trailer.
 
 ## Roadmap
 

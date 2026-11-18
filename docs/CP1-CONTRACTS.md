@@ -124,7 +124,7 @@ Every authenticated route resolves `wallet` from `users`, never from the request
 - Refunds never restore the consumed allowance. The UI copy says so.
 
 ### F6 Live feed (QuickNode Streams)
-- A `programs_with_logs` Stream on the SolSend program (devnet) runs `infra/quicknode/filter.js`, which
+- A `programs_with_logs` Stream on the SolSend program (devnet) runs `infra/quicknode/filter.dist.js` (generated from the IDL by `build-filter.ts`), which
   decodes SolSend events into the `QnPayload` contract. The `auth_hash` → Lithic token join happens server-side (A1).
 - `POST /api/quicknode` verifies the `x-qn-signature` HMAC and the timestamp, rejects a replayed nonce,
   and upserts into `feed_events` (`source='quicknode'`, idempotent unique index).

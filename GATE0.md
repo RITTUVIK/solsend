@@ -1,5 +1,7 @@
 # GATE 0 — Validation Report (Checkpoint 0)
 
+> **Historical record, frozen on 2026-11-17.** This is the validation log that chose SolSend's architecture before the build (16 to 17 November). It is kept unchanged as evidence, including the conversation-style status notes near the end and the abandoned Stripe + Bridge card track. The current system is described in the [README](README.md); live results are in [docs/EVIDENCE.md](docs/EVIDENCE.md).
+
 **Status: CP0b COMPLETE, all validation items PASS** (approved direction: Consumer SolSend on Solana Subscriptions & Allowances, Lithic sandbox card rail). S1, S2 (real Lithic sandbox), S3 and S4 (public and QuickNode RPC), G0.7 (live QuickNode Stream) and G0.8 (Privy sponsored transaction) pass. Awaiting CP1 approval. Tier 1 (Stripe + Bridge) remains BLOCKED on provider provisioning.
 Branch `feat/gate0-validation` · last updated 2026-11-17 · all onchain activity is **Solana devnet**, and all provider activity is **sandbox**.
 

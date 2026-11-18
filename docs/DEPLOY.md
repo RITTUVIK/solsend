@@ -7,8 +7,8 @@ Zero spend. Everything below is free tier. A human supplies credentials; nothing
 2. API key: Dashboard -> Settings -> API Keys -> "Publishable and secret API keys" -> create a secret key named `solsend-server`. It is server-only (Supabase rejects secret keys from browsers); never `NEXT_PUBLIC_`. **No publishable/anon key is needed.** `SUPABASE_SERVICE_ROLE_KEY` is only the legacy fallback.
 3. Apply the schema, in order (never edit 0001; add new files):
    - SQL editor: paste and run `supabase/migrations/0001_init.sql`, then any `0002_*.sql` and later.
-   - or CLI / psql with the **session-pooler** connection string (IPv4) from the Connect dialog, stored as `SUPABASE_DB_URL` in local `spikes/.env` only (never Vercel): `supabase db push --db-url "$SUPABASE_DB_URL"`.
-4. Verify: tables `users, cards, tx_intents, authorizations, feed_events, webhook_receipts, app_settings, rate_limits` exist, RLS is ON, and there are no anon policies.
+   - or CLI / psql with the **session-pooler** connection string (IPv4) from the Connect dialog, stored as `SUPABASE_DB_URL` in local `spikes/.env` only (never Vercel), then from the repo root: `pnpm db:migrate`.
+4. Verify: `npx tsx supabase/verify.mts` (11 checks: tables exist, RLS on, no anon/authenticated privileges, no PUBLIC execute on functions).
 5. Copy `SUPABASE_URL` and the secret key (`SUPABASE_SECRET_KEY`).
 
 ## 2. Vercel Hobby (free)
@@ -16,7 +16,7 @@ Monorepo with pnpm, Next.js app in `apps/web`.
 1. Import the GitHub repo. **Root Directory: `apps/web`.** Framework: Next.js (auto).
 2. Enable "Include source files outside of the Root Directory" (needed for `packages/shared`).
 3. Install command: `pnpm install --frozen-lockfile` (Vercel detects pnpm from `packageManager`). Build: default `next build`. Node 22.
-4. `apps/web/vercel.json` pins region `iad1` and function durations (`api/lithic/**` 10 s, `api/demo-merchant/**` 30 s; Hobby max is 60 s).
+4. `apps/web/vercel.json` pins region `iad1` and function durations (`api/lithic/**` 60 s, `api/reconcile/**` 60 s, `api/demo-merchant/**` 30 s; the ASA handler enforces its own 4.5 s deadline).
 5. Environment variables (Production + Preview). Values come from `.env.example`; never commit them:
 
 | Variable | Notes |
@@ -62,4 +62,4 @@ All commands run from `scripts/`: `pnpm qn:stream <cmd>`. Needs `QUICKNODE_API_K
 - `/api/status` all green; settler and fee payer funded; treasury ATA exists.
 - Stream `get` shows `paused` until the recording or judging window; `activate` just before; `pause` right after.
 - GitHub Actions `reconcile` last run is green.
-- Program LiteSVM tests (`pnpm test:program`) are run locally, not in CI (they need the dumped Allowances `.so` and a Rust toolchain).
+- Program LiteSVM tests (`pnpm test:program`) are run locally, not in CI: run `bash scripts/program/fetch-allowances.sh` once to dump the Allowances `.so` from devnet; a Rust toolchain is required.

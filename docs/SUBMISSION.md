@@ -20,7 +20,7 @@ SolSend is a burner-card app on Solana. You log in with email, create a card for
 
 ## What problem does it solve?
 
-Saved cards are liabilities. Numbers leak, stores get breached, and free trials quietly become subscriptions; consumers underestimate subscription spending by $133 a month and 42% pay for one they stopped using (CNBC, 2022). Prepaid and burner cards help, but make you pre-fund a balance held by an issuer, and when an issuer winds down (as Solflare's card issuer did) the card stops. Existing self-custodial Solana cards use one delegation per wallet, so one leak exposes everything. SolSend gives each store its own capped, locked allowance. Your blast radius is the sum of your caps: the most a hacked store, a leaked number, or even our own server can pull.
+Saved cards are liabilities. Numbers leak, stores get breached, and free trials quietly become subscriptions; consumers underestimate subscription spending by $133 a month and 42% pay for one they stopped using (CNBC, 2022). Burner cards help, but Privacy.com, the best-known, needs a US bank account and keeps the limits in its own systems. Cards that spend digital dollars from your own wallet exist, but the ones we could document give you one card backed by one approval for the whole account, so a single leak reaches the whole approved amount. SolSend gives each store its own capped, store-locked allowance. The most a hacked store, a leaked number, or even our own server can ever pull is the sum of your caps.
 
 ## How does it work?
 
@@ -28,7 +28,7 @@ Creating a card is one owner signature: an Allowances delegation whose only dele
 
 ## What makes it unique?
 
-One allowance per card, not one delegation per wallet, so caps and store locks are enforced by a Solana program rather than a company's database. The card holds $0: nothing to pre-fund, nothing for an issuer to lose, and revoke-all is one transaction sent straight to Solana's audited Allowances program, not ours. Free-trial cards expire onchain: after expiry every pull fails inside the Allowances program (a live sandbox charge after expiry, declined onchain: [`3q4HQCQf…`](https://explorer.solana.com/tx/3q4HQCQfRUkiSCgrzykYLMCozJrbAtW9LzAQsXXB2kbUcwiBsc1fjBfYvTHo8UguX4DPrxSV4mcTfq2khezLw4md?cluster=devnet)). We approve only after a confirmed settle, with a permanent replay guard per authorization. 41 LiteSVM tests and two AI-assisted security reviews, all findings fixed. Limits: sandbox, devnet, a trusted server relay, an upgradeable devnet program.
+As far as we could find, this is the first working demo in which every card is its own capped, expiring, store-bound allowance in Solana's Subscriptions & Allowances program, so each limit is a separate permission you can revoke from your own wallet rather than a rule in an issuer's database. The Solana Foundation named card-linked spending as a use for the program; we take it to one allowance per card. The card holds $0, nothing is pre-funded, and revoke-all is one transaction sent straight to the Allowances program, not ours. Free-trial cards expire onchain: after expiry the trial cannot charge that card (a live sandbox charge after expiry, declined onchain: [`3q4HQCQf…`](https://explorer.solana.com/tx/3q4HQCQfRUkiSCgrzykYLMCozJrbAtW9LzAQsXXB2kbUcwiBsc1fjBfYvTHo8UguX4DPrxSV4mcTfq2khezLw4md?cluster=devnet)). 41 LiteSVM tests and two AI-assisted security reviews, all findings fixed. Limits: sandbox, devnet, a trusted server relay, an upgradeable devnet program.
 
 ## What would you build next?
 
@@ -58,13 +58,29 @@ Solana (devnet), Anchor (Rust), Solana Subscriptions & Allowances program, SPL T
 
 ## Team
 
-TODO: team members and roles (names to be filled in by the team).
+**Draft: both teammates must confirm every sentence before it is submitted. Do not add anything that did not happen.**
+
+- **Ritty** (Rithvik Balavikram): proposed the original idea (a temporary virtual card funded with USDC), created the repository, and leads the pitch, demo video and submission.
+- **Darren** (Darren Deepak): led product and engineering. Set the requirements, reviewed and approved the architecture at each checkpoint (including moving from a Stripe + Bridge card program to Lithic, and building on Solana's Allowances program), created and configured the provider accounts (Lithic, QuickNode, Privy, Supabase, Vercel), ran the live rehearsals, and approved each release.
+
+## AI assistance (disclosure)
+
+Most of SolSend's code, tests and documentation were written by Claude Code, Anthropic's AI coding agent, working under Darren's direction in this event's window (repository created 16 November 2026). The two security reviews were done by separate AI review agents; they are not a professional audit. The commit history records this: 75 of the 76 commits carry a Claude co-author trailer. The humans decided what to build, approved the design at each checkpoint, tested it on the live deployment, and decided what shipped.
+
+Open question for the organizers (ask before submitting, in the hackathon Telegram): the Devpost rules reportedly say "AI tools may be used, but builders must remain the primary creators." We read that as allowing an AI-written codebase directed by the team, but it is the organizers' call, not ours.
 
 ## Submission checklist
 
-- [ ] Repo public; README renders; no secrets (gitleaks clean)
-- [ ] Video 2 to 3 minutes, link works in a private window
-- [ ] All five answers pasted; each 150 words or fewer
-- [ ] Track, chain award and bounty selected
-- [ ] `/api/status` green and the QuickNode stream state noted (paused outside demo windows)
-- [ ] Free-trial expiry proof links checked: the live Lithic-driven decline from the 2026-11-18 rehearsal ([`3q4HQCQf…`](https://explorer.solana.com/tx/3q4HQCQfRUkiSCgrzykYLMCozJrbAtW9LzAQsXXB2kbUcwiBsc1fjBfYvTHo8UguX4DPrxSV4mcTfq2khezLw4md?cluster=devnet), [rehearsal-2026-11-18.md](evidence/rehearsal-2026-11-18.md)) and the direct program-level devnet test (scripts/ops/expiry-proof.ts)
+Owner in brackets. Darren = engineering, Ritty = repository owner, pitch, video and submission.
+
+- [ ] **[Both]** Ask the organizers (hackathon Telegram) about the AI rule before submitting, quoting the disclosure above; confirm the Devpost eligibility wording ("Students only" in the header vs a broader rules body)
+- [ ] **[Both]** Confirm every sentence of the Team and AI-assistance sections above
+- [ ] **[Ritty]** Choose a license (MIT is the usual hackathon choice) or decide to publish without one; add `LICENSE` before going public if chosen
+- [ ] **[Ritty]** Update the GitHub repository description (it still describes the original browser-extension idea), e.g. "Burner cards for every store: capped, store-locked onchain allowances on Solana (sandbox + devnet)"; website https://solsend-ashen.vercel.app
+- [ ] **[Ritty]** Make the repository public only after the final secret scan on the release commit; README renders on GitHub
+- [ ] **[Ritty]** Video 2 to 3 minutes, recorded on the live app per [VIDEO-PLAN.md](VIDEO-PLAN.md); the QuickNode badge appeared for real; no full card number, CVV or email on screen; link works in a private window
+- [ ] **[Ritty]** All five answers pasted; each 150 words or fewer; Team section filled
+- [ ] **[Ritty]** Track: Consumer Applications · chain award: Best use of Solana · bounty: QuickNode Streams, and opt in to each on Devpost
+- [ ] **[Darren]** `/api/status` green; QuickNode stream state decided (paused outside demo windows, or left on through judging if credits allow)
+- [ ] **[Both]** Free-trial expiry proof links checked: the live Lithic-driven decline from the 2026-11-18 rehearsal ([`3q4HQCQf…`](https://explorer.solana.com/tx/3q4HQCQfRUkiSCgrzykYLMCozJrbAtW9LzAQsXXB2kbUcwiBsc1fjBfYvTHo8UguX4DPrxSV4mcTfq2khezLw4md?cluster=devnet), [rehearsal-2026-11-18.md](evidence/rehearsal-2026-11-18.md)) and the direct program-level devnet test (scripts/ops/expiry-proof.ts)
+- [ ] **[Both]** Submit by Thursday 21:00 CST; hard deadline Fri 2026-11-20 12:00 PM CST; someone must be in Austin for the closing ceremony to receive any prize

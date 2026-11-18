@@ -1,5 +1,7 @@
 # SolSend — GATE 0 spikes (throwaway)
 
+> **Historical.** These spikes ran on 16 and 17 November to choose the architecture; results are frozen in [`../GATE0.md`](../GATE0.md). Steps G0.1 to G0.6 belong to the **abandoned Stripe + Bridge card track** (Bridge stablecoin cards were sales-gated and excluded Canadian cardholders) and are no longer meant to be run; their sandbox keys are not used by the app. The shipped product uses Lithic sandbox cards and lives in `apps/`, `programs/` and `packages/`.
+
 These are validation scripts only. They run on Solana **devnet** against provider **sandboxes**, and nothing here ships. Results go to [`../GATE0.md`](../GATE0.md), and per-step evidence goes to `evidence/<step>.jsonl`.
 
 ## Setup

@@ -119,7 +119,7 @@ Lithic state after the tests:
 
 ## Backend audit fix batch (2026-11-18, after merging feat/solsend-mvp @ fdaa8a8)
 
-The regression tests ported from the independent audit live in `apps/web/src/server/__test__/audit.regression.test.ts`.
+The regression tests ported from the AI-assisted review live in `apps/web/src/server/__test__/audit.regression.test.ts`.
 7 of them failed on the pre-fix code; all pass now. Full suite: 107 passed, 1 skipped (the live Supabase test, opt-in).
 
 - **H1.** An in-flight hit must match the request fingerprint: status, amount, currency, card token and state, and

@@ -1,54 +1,68 @@
 # Positioning: where SolSend sits
 
-SolSend is a **burner card per store with onchain caps, funded straight from your own wallet**. Burner cards are a solved problem in fiat; self-custodial crypto cards exist. The combination, one capped and store-locked allowance per card, did not turn up in the sources below. This page only states what those sources support. Cells marked "not established" mean our sources do not say, not that the answer is no. Sandbox + devnet caveats from the [README](../README.md) apply to SolSend itself.
+SolSend is a **burner card per store whose limit is its own allowance on Solana, funded straight from your own wallet**. Burner cards are a solved problem in fiat, self-custodial crypto cards exist, and card limits enforced by a Solana program exist. What we did not find anywhere is the combination: **every card is its own capped, expiring, store-bound allowance that the user creates and can revoke from their own wallet.** This page states only what its sources support. "Not established" means our sources do not say, not that the answer is no. The sandbox and devnet caveats in the [README](../README.md) apply to SolSend itself: the products below are shipping, and SolSend is a demo.
+
+*Sources re-checked on 2026-11-18.*
 
 ## Comparison
 
-| | Custody | Per-merchant cards | Onchain spending caps | Survives issuer failure | Multiple cards per wallet |
+| | Custody | A card per merchant | Where the limit is enforced | If the issuer fails | Cards per user |
 |---|---|---|---|---|---|
-| **Privacy.com** [1] | Fiat; funded from a bank account. It runs on Lithic, the same issuer API as our sandbox | Yes. Burner cards are fiat-solved [1] | No (not crypto) | n/a (fiat) | Yes |
-| **Solflare Card** [2] | Self-custodial: spends from your wallet with one SPL delegation per wallet | Not established | Delegation amount is the cap | Partly: when its issuer Kulipa wound down, the card paused but funds stayed in users' wallets [3] | No: one delegation per wallet [2] |
-| **MoonPay MoonAgents Card** [4] | Crypto-funded virtual cards; one delegation | Not established | Not established | Not established | "Multi-card support is on the roadmap" [4] |
-| **MetaMask Card** [5] | Self-custodial; funded via a spending-cap approval | Not established | A spending-cap approval | Not established | Not established |
-| **Gnosis Pay** [6] | Not established here | Not established | Not established | Its Delay module was exploited for about $265k on 2026-06-01; Gnosis said it would cover user losses [6] | Not established |
-| **KAST, RedotPay** (custodial crypto cards) | Custodial: the provider holds the funds | Not established | No (offchain) | No: funds are with the provider | Not established. *No source in our verified set; do not quote this row externally without one* |
-| **SolSend** | Self-custodial: the card holds $0; USDC stays in your wallet until a swipe settles | Yes: each card is locked to one store, enforced onchain from creation | Yes: the cap is the Allowances delegation, enforced by Solana | Yes: revoke every card in one transaction directly in Solana's Allowances program, not ours | Yes: one allowance and one Card PDA per card |
+| **Privacy.com** [1][2] | Fiat. Funded from a linked US bank or debit card; US residents only. Its parent company is Lithic, the issuer API our sandbox uses | Yes: merchant-locked and single-use cards | The company's systems | n/a (fiat) | Many |
+| **Rain scoped cards** (launched 2026-11-10) [3] | Stablecoin balance held for the cards (pre-funded vault) | Yes: "a fixed amount, merchant, and expiry" per card | Rain's authorization engine ("checked by Rain at authorisation") | Not established | Many; sold for AI agents |
+| **Bridge cards program** (used by Phantom's card) [4] | Self-custodial: one token approval to a program-derived delegate | No: "merchant" there means the card partner | A Solana program: per-transaction and per-period limits set by the issuer | Not established | One delegate per token account |
+| **MoonPay MoonAgents Card** [5] | Self-custodial: spends from your Solana wallet up to the SPL Approve allowance you set | Not established | The allowance amount (one SPL approval) | Not established | One per user at launch; "Multi-card support is on the roadmap" |
+| **MetaMask Card** [6][7] | Self-custodial: a spending-cap approval; funds stay in the account until spent | Not established | The spending-cap approval | Not established | "You can only create one MetaMask Card" |
+| **Solflare Card** [8] | Self-custodial: spends from the wallet at purchase | Not established | Not established | The card paused on 2026-07-28 when its issuer Kulipa failed; Solflare says funds stayed "completely safe" in wallets | One |
+| **SolSend** (sandbox, devnet) | Self-custodial: the card holds $0; USDC stays in your wallet until a swipe settles | Yes: each card is locked to one store from creation | Solana: the cap and expiry in the Allowances program; the store lock in our program, checked against the merchant ID our server relays | The card stops, but your money never left your wallet, and you can revoke every card yourself in the Allowances program | Many: one allowance and one Card PDA per card |
 
 ## What is different, precisely
 
-- **Existing self-custodial Solana cards use one SPL delegation per wallet** [2][4][5]. A leak or a breached store exposes the whole delegation. SolSend uses **one allowance per card**, so the blast radius is the sum of your caps: the most anyone can ever pull.
-- **The issuer is not your custodian.** Solflare's card paused when Kulipa wound down, but the money stayed in wallets [3]. That precedent is the argument for not pre-funding. SolSend's revoke-all goes to the Allowances program directly, so it works even if SolSend is gone.
-- **Burner cards are not new.** Privacy.com solved them for fiat [1]. Our difference is self-custody plus caps enforced by a program instead of a company's database.
-- **Why caps onchain matter.** A cap in a provider's database is a promise. The Gnosis Pay incident [6] shows that onchain card stacks carry exploit risk of their own, which is why we build on Solana's audited Allowances program [7] and keep our own program small and reviewed (41 LiteSVM tests, two adversarial AI-assisted security reviews with all findings fixed: [audit-program-cp1](evidence/audit-program-cp1.md), [audit-backend-cp1](evidence/audit-backend-cp1.md)).
+- **One allowance per card.** The self-custodial cards we could document (MoonPay, MetaMask, Bridge-powered cards) fund the card with a single token approval per token account. A leaked number or a breached store can therefore reach the whole approved amount. SolSend gives every card its own allowance, so the most anyone can ever pull is the sum of your caps.
+- **The limit is not a row in an issuer's database.** Privacy.com and Rain offer per-merchant, capped, expiring cards, but the rules live in the company's systems and, for Rain, the balance is funded in advance. In SolSend each card's cap and expiry are enforced by Solana's Allowances program, and the store lock is checked onchain against the merchant ID our server relays (see the trust model in [TRUST.md](TRUST.md)).
+- **The issuer is not your custodian.** When Solflare's issuer failed, the card stopped but the money stayed in wallets [8]. That is the argument for not pre-funding. SolSend's revoke-all goes to the Allowances program directly, so it works even if SolSend is gone.
+- **Credit where due.** When the Solana Foundation launched the Subscriptions & Allowances program it named card-linked spending as a use: "a wallet can simultaneously authorize a card program and one or more subscription plans" [9]. That describes one authorization per card program. SolSend takes it down to one authorization per card.
+- **Burner cards are not new**, and neither are onchain card limits. Our claim is the combination above, as far as we could find. We searched products, hackathon projects and public code and may still have missed one.
+
+## Why caps onchain matter, and the risk that comes with them
+
+A cap in a provider's database is a promise. Onchain card stacks carry exploit risk of their own: Gnosis Pay's Delay module was exploited for about $265k on 2026-06-01 [10]. That is why we build on Solana's audited Allowances program and keep our own program small and reviewed: 41 LiteSVM tests against the real Allowances binary, and two adversarial **AI-assisted** security reviews with all findings fixed ([audit-program-cp1](evidence/audit-program-cp1.md), [audit-backend-cp1](evidence/audit-backend-cp1.md)). Those reviews are not a professional audit.
 
 ## The consumer pain
 
-- Consumers underestimate their subscription spending by $133 a month, and 42% pay for one they stopped using (CNBC, 2022) [8].
-- The FTC "click-to-cancel" rule was vacated in July 2025 [9], so the burden of ending a subscription stays with the consumer. A card that holds $0 and expires on its own ends a free trial without a cancellation flow. (Free-trial expiry is in progress; see the [roadmap](../README.md#roadmap).)
+- Consumers underestimate their subscription spending by $133 a month, and 42% pay for a subscription they stopped using (CNBC, 2022) [11].
+- The FTC's "click-to-cancel" rule was vacated in July 2025 [12]. The FTC reopened rulemaking on the Negative Option Rule in March 2026; no replacement rule is in force [13]. The burden of ending a subscription stays with the consumer.
+- A SolSend free-trial card expires onchain: after expiry every pull fails inside the Allowances program, so the trial cannot quietly charge that card. Proven live on 2026-11-18 with a real Lithic sandbox authorization ([rehearsal-2026-11-18.md](evidence/rehearsal-2026-11-18.md)).
 
 ## The primitive we build on
 
-Solana's **Subscriptions & Allowances** program (`De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44`) is live on mainnet and devnet, audited by Cantina, and OtterSec-verified for its mainnet build [7][10]. Launch coverage [11][12].
+Solana's **Subscriptions & Allowances** program (`De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44`) was published by the Solana Foundation on 2026-06-02 and built by Moonsong Labs. It is live on mainnet and devnet and audited by Cantina (audit scope is commit-based) [14], with a reproducible mainnet build verified through OtterSec's service [15]. Launch coverage: [16][17]. We did not write it. SolSend runs on devnet.
 
 ## Honest limits of this positioning
 
-- SolSend is a sandbox on devnet; competitors are shipping products. We compare designs, not maturity.
-- The settlement authority is trusted to relay the card network's authorization and merchant ID; the chain enforces the caps and the lock.
+- SolSend is a sandbox on devnet; every product above is shipping. We compare designs, not maturity.
+- Our server is trusted to relay the card network's authorization and merchant ID. The chain enforces the caps, the expiry and the lock on what it is told.
+- Card-network realities a production version must handle (final amounts that differ from the authorization, force-posted charges, disputes) are outside the demo; see the README's limitations.
 - Competitor details come only from the linked pages, which may change.
 
 ## Sources
 
-1. Privacy.com on Lithic: https://support.privacy.com/hc/en-us/articles/360039642653-What-is-Lithic
-2. Solflare Card funding (single SPL delegation per wallet): https://help.solflare.com/en/articles/12866865-funding-and-using-your-solflare-card
-3. Ready (Solflare card) shuts the program after the issuer winds down; funds stayed in wallets: https://thedefiant.io/news/cefi/ready-shuts-card-program-after-issuer-winds-down
-4. MoonPay MoonAgents Card: https://support.moonpay.com/en/articles/629708-moonagents-card-crypto-funded-virtual-payment-cards
-5. MetaMask Card funding (spending-cap approval): https://support.metamask.io/trade/metamask-card/funding/
-6. Gnosis Pay exploit, about $265k, 2026-06-01: https://www.theblock.co/news/regulation/2026-06-01-gnosis-will-cover-all-user-losses-amid-exploit-related-to-gnosis-pay-co-founder-koppelmann-says-403147
-7. Cantina audit status of the Allowances program: https://github.com/solana-foundation/subscriptions/blob/main/audits/AUDIT_STATUS.md
-8. CNBC, subscription costs: https://www.cnbc.com/2022/09/06/consumers-underestimate-monthly-subscription-costs-by-at-least-100.html
-9. FTC click-to-cancel vacated, July 2025: https://www.lw.com/en/insights/eighth-circuit-vacates-ftc-click-to-cancel-rule
-10. OtterSec verified build: https://verify.osec.io/status/De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
-11. Chainstack: https://docs.chainstack.com/docs/solana-subscriptions-and-allowances
-12. Helius: https://www.helius.dev/blog/solana-subscriptions-recurring-payments
+1. Privacy.com, virtual cards (merchant-locked, single-use; US eligibility): https://www.privacy.com/blog/how-to-use-virtual-mastercard
+2. Privacy.com on its parent company Lithic: https://privacy.com/blog/virtual-card-companies
+3. Rain launches Agent Vaults and scoped cards (2026-11-10): https://thepaypers.com/payments/news/rain-launches-agent-vaults-to-embed-payments-in-ai-agents and https://www.rain.xyz/resources/introducing-the-agent-control-layer
+4. Bridge cards program (open-source Solana program): https://github.com/withbridge/bridge-cards
+5. MoonPay MoonAgents Card: https://support.moonpay.com/en/articles/629708-moonagents-card-crypto-funded-virtual-payment-cards
+6. MetaMask Card FAQ ("You can only create one MetaMask Card"): https://support.metamask.com/trade/metamask-card/card-faq/
+7. MetaMask Card funding (spending-cap approval): https://support.metamask.com/trade/metamask-card/funding/
+8. Solflare: card paused on 2026-07-28 after its issuer wound down: https://help.solflare.com/en/articles/17335647-solflare-card-pauses-july-28th-and-returns-with-apple-pay-higher-limits-and-cashback
+9. Solana Foundation launch post for Subscriptions & Allowances: https://github.com/solana-foundation/solana-com/blob/main/apps/media/content/posts/subscriptions-and-allowances.mdx
+10. Gnosis Pay incident analysis (about $265k): https://www.certik.com/blog/gnosispay-incident-analysis
+11. CNBC, subscription costs: https://www.cnbc.com/2022/09/06/consumers-underestimate-monthly-subscription-costs-by-at-least-100.html
+12. FTC click-to-cancel vacated, July 2025: https://www.lw.com/en/insights/eighth-circuit-vacates-ftc-click-to-cancel-rule
+13. FTC reopens Negative Option rulemaking, March 2026: https://www.cov.com/en/news-and-insights/insights/2026/03/ftc-launches-new-rulemaking-on-the-negative-option-rule
+14. Cantina audit status of the Allowances program: https://github.com/solana-foundation/subscriptions/blob/main/audits/AUDIT_STATUS.md
+15. OtterSec verified build status: https://verify.osec.io/status/De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44
+16. Chainstack: https://docs.chainstack.com/docs/solana-subscriptions-and-allowances
+17. Helius: https://www.helius.dev/blog/solana-subscriptions-recurring-payments
 
-Hackathon rules referenced by the rest of the package (UBC 2026 official guide, PDF): deadline Fri 2026-11-20 12:00 PM CST; finals 5 min + 2 min Q&A in person (judging criteria p.18); video 2 to 3 minutes; Consumer track "use every day, not just once" (p.8); Best use of Solana asks for program IDs and a README explanation (p.9); QuickNode Streams asks for a configured Stream with a filter and destination, explained in the README (p.13).
+Hackathon rules referenced by the rest of the package (UBC 2026 official guide, PDF): deadline Fri 2026-11-20 12:00 PM CST; finalists are shortlisted from submissions; finals 5 min + 2 min Q&A in person; judging criteria Technical Execution, Product & UX, Innovation, Impact & Potential, Demo; video 2 to 3 minutes; Consumer track "use every day, not just once"; Best use of Solana asks for program IDs and a README explanation; QuickNode Streams asks for a configured Stream with a filter and destination, explained in the README.

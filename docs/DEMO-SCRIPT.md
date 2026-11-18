@@ -6,6 +6,8 @@ About 4 minutes of demo. The 5-minute finals pitch in [PITCH.md](PITCH.md) wraps
 
 Live app: https://solsend-ashen.vercel.app. Tabs at the bottom (mobile) or top (desktop): **Wallet**, **Demo store**, **Activity**. Labels below are quoted from the UI v2 code and screenshots ([evidence/ui-v2](evidence/ui-v2/README.md)); the screenshots there are **mock mode**, so exact dollar figures on your screen will differ.
 
+**Never show a full card number, expiry or CVV on screen, even sandbox ones:** do not open card **Details** during the demo or the recording. The masked card (`•••• 1234`) is enough.
+
 Core idea to land: each card is an onchain allowance that **holds $0**. The blast radius is the sum of your caps: the most anyone, a hacked store, a leaked number, even our own server, can ever pull.
 
 ## Pre-demo setup
@@ -15,10 +17,10 @@ Commands run from `scripts/` ([DEPLOY.md](DEPLOY.md) section 4; credentials are 
 | When | Do | Pass |
 |---|---|---|
 | 30 min before | Open `https://solsend-ashen.vercel.app/status` and `/api/status` | All checks green, including the settler SOL runway line and no failing refunds. Checkout returns 503 `demo_paused_low_sol` below 0.03 SOL |
-| 30 min before | Log in on the presenter device; wallet funded with about **$20+ devnet USDC**; wallet already set up | **Wallet** shows the balance. The faucet default is 5 USDC per claim, once per hour per wallet, so raise `FAUCET_AMOUNT_BASE` on Vercel or pre-fund the wallet. Use **Add test USDC** if needed. (If the checklist still shows "Set up your wallet", tap **Set up wallet · free** and approve once) |
+| 30 min before | Log in on the presenter device; wallet funded with **$40+ devnet USDC**; wallet already set up | **Wallet** shows the balance. The faucet default is 5 USDC per claim, once per hour per wallet, so raise `FAUCET_AMOUNT_BASE` on Vercel or pre-fund the wallet. Use **Add test USDC** if needed. (If the checklist still shows "Set up your wallet", tap **Set up wallet · free** and approve once) |
 | 30 min before | Pre-create a spare Temu card (**New card**, Temu tile "First try", $40) | Visible as a card on **Wallet** |
 | **At least 3 minutes before stage** | Create the Netflix 2-minute trial: **New card**, tile **Netflix** ("Free trial"), expiry chip **2 minutes (demo)**, then **Create Netflix card · $15.49** and approve once | Card named "Netflix free trial"; it will read "Expired" by the time you reach beat 5. If you create it too late, skip beat 5 |
-| Right before | `pnpm qn:stream activate` | Then `pnpm qn:stream get` shows active |
+| Right before | `pnpm qn:stream activate` (from `scripts/`) | `pnpm qn:stream get` shows active, and **Activity** reads **Streamed by QuickNode · last event …** after the next onchain action |
 | Right after | `pnpm qn:stream pause`, then `pnpm qn:stream get` | `paused` (the trial bills per processed block) |
 | Always | Backup video open in a second window; a second browser profile already logged in | See fallback plan |
 
@@ -42,7 +44,7 @@ Cumulative timing. "Say" is one or two plain sentences.
 ### 3. Pay $12; settled onchain first (1:00 to 1:40)
 
 - **Click:** **Pay at the sandbox store** (or the **Demo store** tab). The header shows "Temu (sandbox)". In "Add to cart" tap **Earbuds $12**. Tap **Pay $12.00 with •••• NNNN**.
-- **Expect:** a sheet opens at once: "Pay Temu (sandbox)", "$12.00", then "Settling on Solana before approval…". Then **Approved**, "$12.00 at Temu (sandbox)", chips **Settled onchain first**, the decision time in ms, and "$28.00 left on card". "Wallet $X → $Y" shows the drop. A proof row **Settled on Solana** expands to **View settlement on Explorer (devnet)**. A badge reads **Settlement streamed by QuickNode**. Open the Explorer link: a successful `settle`.
+- **Expect:** a sheet opens at once: "Pay Temu (sandbox)", "$12.00", then "Settling on Solana before approval…". Then **Approved**, "$12.00 at Temu (sandbox)", chips **Settled onchain first**, the decision time in ms, and "$28.00 left on card". "Wallet $X → $Y" shows the drop. A proof row **Settled on Solana** expands to **View settlement on Explorer (devnet)**. Within about 1 to 3 seconds the badge **Settlement streamed by QuickNode** appears: it shows only once the Stream has actually delivered this settlement. If it says "Waiting for QuickNode Stream…" or "Not streamed yet", the stream is paused; don't claim it. Open the Explorer link: a successful `settle`.
 - **Say:** "The card network asked us, we pulled the money onchain, and only after that transaction confirmed did we answer yes. The proof row is the transaction, and that badge is our QuickNode Stream delivering it."
 - **Do not tap Done yet.**
 
@@ -59,13 +61,13 @@ Cumulative timing. "Say" is one or two plain sentences.
 
 - **Click:** **Demo store**, choose the **Netflix free trial** card under "Pay with", tile **Netflix**, chip **Monthly plan $15.49**, **Pay $15.49 with •••• NNNN**.
 - **Expect:** **Declined**. The explanation for an expired card reads "This card expired when your free trial ended. Your USDC didn't move." Open the card on **Wallet**: the card face is stamped **EXPIRED**.
-- **Say:** "This is a free trial I signed up for a few minutes ago. It expired on its own, onchain, so it can never quietly roll into a paid plan, and there is no cancel button to hunt for."
+- **Say:** "This is a free trial I signed up for a few minutes ago. It expired on its own, onchain, so the trial can't charge this card, and there is no cancel button to hunt for."
 - **Proof (real devnet):** after expiry the same pull fails inside the Allowances program with error 128 (`delegationExpired`): [`42fhAuNK…`](https://explorer.solana.com/tx/42fhAuNKvytc4iR6sRaH9RTsRNNXqqaqskG2k4z7yf7JL7AMC5yLFTs7cN2JJJzkKQCuHEvrGC1pVgECVVJCtd8W?cluster=devnet). That test used locally signed requests (MOCK ASA) against real devnet; see [w2-free-trial-expiry.md](evidence/w2-free-trial-expiry.md). The 2026-11-18 rehearsal then ran it **live**: a real Lithic sandbox authorization after the trial ended was declined with 128, [`3q4HQCQf…`](https://explorer.solana.com/tx/3q4HQCQfRUkiSCgrzykYLMCozJrbAtW9LzAQsXXB2kbUcwiBsc1fjBfYvTHo8UguX4DPrxSV4mcTfq2khezLw4md?cluster=devnet) ([rehearsal-2026-11-18.md](evidence/rehearsal-2026-11-18.md)). Cite that one as the live run.
 
 ### 6. Blast radius, void and refund (3:00 to 3:30)
 
-- **Click:** **Activity**. On the $12 Temu row tap **Void (sandbox store)**, then in the sheet "Void this purchase?" tap **Void purchase**. Then go to **Wallet**.
-- **Expect:** the row shows "Refund on its way: sandbox voids are asynchronous (usually under a minute)", then "Refunded to your wallet" with **Refund transaction (devnet)**; the row reads "Refunded +$12.00 · onchain". Home shows "Most that can ever be pulled: $X across N live cards — even by SolSend." Void timeline order: Approved, Voided by the store, Refunded to your wallet onchain.
+- **Click:** **Activity**. On the $12 Temu row tap **Simulate store refund**, then in the sheet "Void this purchase?" tap **Void purchase**. Then go to **Wallet**.
+- **Expect:** the row shows "Refund on its way: sandbox voids are asynchronous (usually under a minute)", then "Refunded to your wallet" with **Refund transaction (devnet)**; the row reads "Refunded +$12.00". Home shows "Most that can ever be pulled: $X across N live cards — even by SolSend." Void timeline order: Approved, Voided by the store, Refunded to your wallet onchain.
 - **Say:** "The home screen shows my blast radius: the most anyone can ever pull is the sum of my caps. The void sends my USDC back onchain, but the card's limit stays used on purpose, because we never silently re-grant spending permission."
 - **Timing tip:** do the void right after beat 3 if the refund is slow on rehearsal; the Lithic sandbox void is asynchronous and the refund follows its event.
 
