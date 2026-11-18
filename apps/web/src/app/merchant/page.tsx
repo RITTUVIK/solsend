@@ -8,6 +8,7 @@ import { client, humanError } from "@/client/api";
 import { MERCHANT_LABEL, displayStatus, isUsable, sandboxName, usd } from "@/client/format";
 import { AppShell, useAppData } from "@/components/AppShell";
 import { CheckoutResult } from "@/components/CheckoutResult";
+import { FeedList } from "@/components/FeedList";
 import { ErrorNote, Icon, SandboxChip, Spinner } from "@/components/ui";
 
 type Merchant = z.infer<typeof api.DemoMerchantZ>;
@@ -106,6 +107,13 @@ function Content() {
       )}
 
       {out && <CheckoutResult res={out.res} cardPda={out.cardPda} merchant={MERCHANT_LABEL[out.merchant] ?? out.merchant} amountCents={out.cents} onVoided={() => { void cards.refresh(); void wallet.refresh(); }} />}
+      {selected && (
+        <section className="mt-8" aria-labelledby="recent-h">
+          <h2 id="recent-h" className="font-semibold">Recent sandbox purchases</h2>
+          <p className="mb-1 text-sm text-zinc-600 dark:text-zinc-400">On {selected.label}. You can void an approved purchase here any time.</p>
+          <FeedList key={selected.cardPda} cardPda={selected.cardPda} limit={8} empty="No purchases on this card yet." />
+        </section>
+      )}
     </div>
   );
 }

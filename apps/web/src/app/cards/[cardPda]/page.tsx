@@ -90,8 +90,7 @@ function Content() {
   async function act(a: Act) {
     setBusy(a); setErr(null); setDone(null); setConfirmClose(false);
     try {
-      const p = await client.cardAction(cardPda, a);
-      const r = await signAndSubmit(p);
+      const r = await signAndSubmit(() => client.cardAction(cardPda, a));
       setDone({ act: a, sig: r.signature });
       await Promise.all([cards.refresh(), wallet.refresh()]);
     } catch (e) { setErr(humanError(e)); } finally { setBusy(null); }

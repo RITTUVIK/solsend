@@ -16,8 +16,7 @@ export function OutagePanel() {
   async function revoke() {
     setBusy(true); setErr(null); setDone(null);
     try {
-      const p = await client.revokeAll();
-      const r = await signAndSubmit(p);
+      const r = await signAndSubmit(() => client.revokeAll());
       setDone({ sig: r.signature });
       void cards.refresh(); void wallet.refresh();
     } catch (e) {

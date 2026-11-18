@@ -55,13 +55,11 @@ function Content() {
     setErr(null); setFailure(null); setStage("preparing");
     let prepared = false;
     try {
-      const prep = await client.prepareCard({
-        kind, label: cardLabel.slice(0, 32), merchantName, limitCents: cents, ...(kind === "SUBSCRIPTION" ? { periodDays: 30 } : {}),
-      });
-      prepared = true;
-      setCardPda(prep.cardPda);
-      setStage("signing");
-      await signAndSubmit(prep, () => setStage("submitting"));
+      await signAndSubmit(
+        () => client.prepareCard({ kind, label: cardLabel.slice(0, 32), merchantName, limitCents: cents, ...(kind === "SUBSCRIPTION" ? { periodDays: 30 } : {}) }),
+        // An automatic tx_expired retry re-runs prepare: it yields a NEW card, so track the latest cardPda.
+        { onPrepared: (p) => { prepared = true; setCardPda(p.cardPda); setStage("signing"); }, onSigned: () => setStage("submitting") },
+      );
       setStage("sent");
       void cards.refresh(); void polled.refresh();
     } catch (e) {

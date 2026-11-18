@@ -8,6 +8,7 @@ import { client } from "@/client/api";
 import { DATA_POLL_MS } from "@/client/config";
 import { usePoll, type Polled } from "@/client/hooks";
 import type { CardView } from "@/client/format";
+import { useSignNotice } from "@/client/notice";
 import { useSession } from "@/client/session";
 import { Icon, MockBadge, Skeleton, Spinner } from "./ui";
 
@@ -48,6 +49,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const path = usePathname();
   useEffect(() => { if (s.ready && !s.authenticated) router.replace("/"); }, [s.ready, s.authenticated, router]);
 
+  const notice = useSignNotice();
   const gated = !s.ready || !s.authenticated || s.walletPending || !s.wallet;
   return (
     <div className="mx-auto flex min-h-[calc(100dvh-28px)] w-full max-w-3xl flex-col">
@@ -76,6 +78,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Data>{children}</Data>
         )}
       </main>
+      {notice && (
+        <div role="status" data-testid="sign-notice" className="anim-rise fixed inset-x-4 bottom-20 z-50 mx-auto max-w-md rounded-xl bg-zinc-900 px-4 py-3 text-center text-sm font-medium text-white shadow-lg sm:bottom-6 dark:bg-zinc-100 dark:text-zinc-900">{notice}</div>
+      )}
       <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-40 border-t border-zinc-200 bg-white/90 pb-[env(safe-area-inset-bottom)] backdrop-blur sm:hidden dark:border-zinc-800 dark:bg-zinc-950/90">
         <ul className="mx-auto flex max-w-3xl">
           {NAV.map((n) => (
