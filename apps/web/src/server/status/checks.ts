@@ -1,5 +1,6 @@
 // /api/status checks (W4). Public, read-only, secret-free: never includes keys, RPC URLs or tokens, only booleans,
 // public addresses' balances and short human details. Each check is isolated so one failure never hides the rest.
+import "server-only";
 import { api, configPda, DEVNET_GENESIS_HASH, decodeConfig, LITHIC_SANDBOX_BASE, SOLSEND_PROGRAM_ID, treasuryAta } from "@solsend/shared";
 import type { PublicKey } from "@solana/web3.js";
 import type { Store } from "../store";
@@ -19,6 +20,10 @@ export type StatusDeps = {
 export const MIN_SETTLER_LAMPORTS = 50_000_000; // 0.05 SOL: settle txs pay fees + record rent
 export const MIN_FEEPAYER_LAMPORTS = 100_000_000; // 0.1 SOL: pays card/ATA rent for every new card
 export const UNRECONCILED_AFTER_SECS = 120;
+/** audit M4: approximate settle cost for the runway line = SettlementRecord rent (97 B + 128 B overhead at 6960
+ *  lamports/B) + one 5,000-lamport signature fee. Records are permanent (Upgrade 1), so every settle consumes it. */
+export const SETTLE_COST_LAMPORTS = 1_571_000;
+export const MIN_RUNWAY_SETTLES = 20;
 
 const sol = (l: number) => (l / 1e9).toFixed(3);
 async function run(name: string, fn: () => Promise<{ ok: boolean; detail: string }>): Promise<Check> {
@@ -44,13 +49,20 @@ export async function runChecks(d: StatusDeps): Promise<ReturnType<typeof api.St
       if (!cfg) return { ok: false, detail: "program executable, config account missing (run init-config)" };
       return { ok: !cfg.paused, detail: cfg.paused ? "program executable; settles PAUSED by admin" : "program executable; config live, settles enabled" };
     }));
+    let settlerLamports: number | null = null;
     for (const [name, key, min] of [["settler SOL", d.settler, MIN_SETTLER_LAMPORTS], ["fee payer SOL", d.feePayer, MIN_FEEPAYER_LAMPORTS]] as const) {
       checks.push(await run(name, async () => {
         if (!key) return { ok: false, detail: "key not configured" };
         const l = await rpc.getBalance(key);
+        if (name === "settler SOL") settlerLamports = l;
         return { ok: l >= min, detail: `${sol(l)} SOL (min ${sol(min)})` };
       }));
     }
+    checks.push(await run("settler SOL runway", async () => {
+      if (settlerLamports === null) return { ok: false, detail: "settler balance unavailable" };
+      const n = Math.floor(settlerLamports / SETTLE_COST_LAMPORTS);
+      return { ok: n >= MIN_RUNWAY_SETTLES, detail: `~${n} settles left at ~${sol(SETTLE_COST_LAMPORTS)} SOL each (record rent + fee); demo checkout pauses below 0.030 SOL` };
+    }));
     checks.push(await run("treasury USDC", async () => {
       try {
         const b = await rpc.getTokenAccountBalance(treasuryAta());
@@ -76,6 +88,10 @@ export async function runChecks(d: StatusDeps): Promise<ReturnType<typeof api.St
       const age = Math.max(0, Math.round((now() - Date.parse(last.at)) / 1000));
       return { ok: true, detail: `last quicknode feed row ${age}s ago` };
     }));
+    checks.push(await run("refunds failing", async () => {
+      const n = await store.countAuthorizations({ reconcileAction: "anomaly_refund_failing" });
+      return { ok: n === 0, detail: n === 0 ? "no refund stuck after 8 attempts" : `${n} authorization(s) tagged anomaly_refund_failing (manual action needed)` };
+    }));
     checks.push(await run("unreconciled authorizations", async () => {
       const n = (await store.listUnreconciled(UNRECONCILED_AFTER_SECS, 100)).length;
       return { ok: n === 0, detail: n === 0 ? "none older than 2 min" : `${n}${n >= 100 ? "+" : ""} older than 2 min (reconciler lagging?)` };
@@ -98,3 +114,17 @@ export async function lithicPing(apiKey: string | undefined, fetchImpl: typeof f
   return ok;
 }
 export const __resetLithicCache = () => { lithicCache = null; };
+
+/** audit M5: the public /api/status result is computed at most once per 30 s per instance (concurrent callers share
+ *  one computation); the route also sets CDN cache headers so floods are absorbed before reaching us. */
+export const STATUS_CACHE_MS = 30_000;
+export const STATUS_CACHE_CONTROL = "public, s-maxage=30, stale-while-revalidate=60";
+type StatusBody = Awaited<ReturnType<typeof runChecks>>;
+export function statusCache(compute: () => Promise<StatusBody>, now: () => number = Date.now) {
+  let cached: { at: number; body: StatusBody } | null = null;
+  let inflight: Promise<StatusBody> | null = null;
+  return async (): Promise<StatusBody> => {
+    if (cached && now() - cached.at < STATUS_CACHE_MS) return cached.body;
+    return (inflight ??= compute().then((body) => { cached = { at: now(), body }; return body; }).finally(() => { inflight = null; }));
+  };
+}

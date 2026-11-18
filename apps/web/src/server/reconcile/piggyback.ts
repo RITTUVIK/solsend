@@ -2,6 +2,7 @@
 // UI's own polling (GET /api/feed every ~1.5 s, GET /api/cards) triggers a small sweep in `waitUntil`,
 // at most once per 60 s globally (store.rateLimit fails CLOSED → skip). Never blocks or fails the request.
 // Independent triggers: ASA late-settle watcher, Lithic events webhook, this piggyback, POST /api/reconcile.
+import "server-only";
 import type { Store } from "../store";
 import { safeErr } from "../lib/safe";
 import { sweep, type ReconcileDeps } from "./reconciler";

@@ -1,4 +1,5 @@
 // Cards (CP1 F3 recoverable workflow + F8 lifecycle). Pure over injected deps (rpc/store/keys/lithic/clock).
+import "server-only";
 import { randomBytes } from "node:crypto";
 import { ComputeBudgetProgram, PublicKey, Transaction, type Keypair } from "@solana/web3.js";
 import { createAssociatedTokenAccountIdempotentInstruction } from "@solana/spl-token";

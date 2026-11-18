@@ -3,7 +3,7 @@
 // { items?: [{token, cardPda}] } to recover authorizations whose DB row is missing (rebuilt from chain).
 import { z } from "zod";
 import { env } from "@/server/env";
-import { errorResponse } from "@/server/auth";
+import { HttpError, errorResponse } from "@/server/auth";
 import { requireBearer } from "@/server/lib/http";
 import { reconcileDeps } from "@/server/deps";
 import { reconcileAuthorization, recoverMissingRow, sweep, type ReconcileResult } from "@/server/reconcile/reconciler";
@@ -23,7 +23,11 @@ export async function POST(req: Request): Promise<Response> {
   try {
     requireBearer(req, env().RECONCILE_CRON_SECRET, "reconcile");
     const text = await req.text();
-    const body = Body.parse(text ? JSON.parse(text) : {});
+    let raw: unknown = {};
+    try { raw = text ? JSON.parse(text) : {}; } catch { throw new HttpError(400, "invalid JSON body", "bad_request"); }
+    const parsed = Body.safeParse(raw);
+    if (!parsed.success) throw new HttpError(400, "invalid reconcile request", "bad_request");
+    const body = parsed.data;
     const deps = reconcileDeps();
     let results: ReconcileResult[] = [];
     if (body.items?.length) {

@@ -7,6 +7,7 @@ import nacl from "tweetnacl";
 import { PublicKey } from "@solana/web3.js";
 import { api } from "@solsend/shared";
 import { getStore } from "./store";
+import { safeErr } from "./lib/safe";
 
 export class HttpError extends Error {
   constructor(public status: number, message: string, public code?: string) { super(message); }
@@ -27,7 +28,7 @@ export async function verifyPrivyToken(req: Request): Promise<string> {
   const id = appId();
   jwks ??= createRemoteJWKSet(new URL(`https://auth.privy.io/api/v1/apps/${id}/jwks.json`));
   try {
-    const { payload } = await jwtVerify(token, jwks, { issuer: "privy.io", audience: id });
+    const { payload } = await jwtVerify(token, jwks, { issuer: "privy.io", audience: id, algorithms: ["ES256"], requiredClaims: ["exp"] });
     if (typeof payload.sub !== "string") throw new Error("no sub");
     return payload.sub;
   } catch {
@@ -59,6 +60,6 @@ export function verifyBindSignature(privyUserId: string, body: { wallet: string;
 /** Uniform JSON error response for route handlers (never leaks internals/secrets). */
 export function errorResponse(e: unknown): Response {
   if (e instanceof HttpError) return Response.json({ error: e.message, code: e.code }, { status: e.status });
-  console.error("[api] unhandled:", e instanceof Error ? e.message : "unknown");
+  console.error("[api] unhandled:", safeErr(e));
   return Response.json({ error: "internal error" }, { status: 500 });
 }

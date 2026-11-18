@@ -59,3 +59,26 @@ describe("status checks", () => {
     expect(n).toBe(2);
   });
 });
+
+
+describe("audit M4/M5 status additions", () => {
+  it("settler SOL runway line + refunds-failing count", async () => {
+    const store = new MemoryStore();
+    const r = await runChecks(base({ store, rpc: rpc({ lamports: 100_000_000 }) }));
+    expect(r.checks.find((c) => c.name === "settler SOL runway")!.detail).toMatch(/~63 settles left/);
+    await store.upsertAuthorization({ lithic_token: "t", decision: "INSUFFICIENT_FUNDS", reconcile_action: "anomaly_refund_failing" });
+    const r2 = await runChecks(base({ store }));
+    expect(r2.checks.find((c) => c.name === "refunds failing")).toMatchObject({ ok: false });
+  });
+  it("status result is computed at most once per 30 s (concurrent callers share one computation)", async () => {
+    const { statusCache, STATUS_CACHE_CONTROL } = await import("./checks");
+    let n = 0, t = 0;
+    const c = statusCache(async () => { n++; return { ok: true, checkedAt: new Date(t).toISOString(), checks: [] }; }, () => t);
+    await Promise.all([c(), c(), c()]);
+    t = 29_000; await c();
+    expect(n).toBe(1);
+    t = 31_000; await c();
+    expect(n).toBe(2);
+    expect(STATUS_CACHE_CONTROL).toBe("public, s-maxage=30, stale-while-revalidate=60");
+  });
+});

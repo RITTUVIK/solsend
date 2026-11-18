@@ -15,6 +15,7 @@ export async function POST(req: Request): Promise<Response> {
     const { wallet } = await requireUser(req);
     const deps = cardDeps();
     if (!(await deps.store.rateLimit(`setup:${wallet}`, 86_400, 5))) throw new HttpError(429, "too many setup attempts today", "rate_limited");
+    if (!(await deps.store.rateLimit("setup:global", 86_400, 200))) throw new HttpError(429, "wallet setup is at today's capacity, try tomorrow", "rate_limited");
     return respond(api.PreparedTx, await prepareWalletSetup(deps, wallet));
   } catch (e) {
     return errorResponse(e);

@@ -113,3 +113,36 @@ describe("demo merchant void", () => {
     await expect(demoVoid({ lithicToken: "missing" }, deps)).rejects.toMatchObject({ status: 404 });
   });
 });
+
+
+describe("audit M4: demo cannot drain the settlement authority", () => {
+  it("amount below 100 cents -> 400 amount_too_small", async () => {
+    const { deps } = await setup();
+    await expect(demoCheckout({ ...req, amountCents: 99 }, deps)).rejects.toMatchObject({ status: 400, code: "amount_too_small" });
+  });
+  it("settler SOL below 0.03 (or unknown) -> 503 demo_paused_low_sol, before any Lithic call", async () => {
+    const { calls, deps } = await setup();
+    await expect(demoCheckout(req, { ...deps, settlerLamports: async () => 29_999_999 })).rejects.toMatchObject({ status: 503, code: "demo_paused_low_sol" });
+    await expect(demoCheckout(req, { ...deps, settlerLamports: async () => null })).rejects.toMatchObject({ status: 503, code: "demo_paused_low_sol" });
+    expect(calls.length).toBe(0);
+  });
+  it("31st checkout in a day for one wallet -> 429 (per-minute windows reset between requests)", async () => {
+    const { store, deps } = await setup();
+    await store.upsertAuthorization({ lithic_token: "tx-1", decision: "APPROVED" });
+    const resetMinute = () => { for (const k of [...store.limits.keys()]) if (k.startsWith("demo:w:") || k.startsWith("demo:global")) store.limits.delete(k); };
+    for (let i = 0; i < 30; i++) { resetMinute(); await demoCheckout(req, { ...deps, settlerLamports: async () => 1e9 }); }
+    resetMinute();
+    await expect(demoCheckout(req, deps)).rejects.toMatchObject({ status: 429 });
+  });
+  it("SOL gate caches the balance for 30 s and never caches a failure", async () => {
+    const { solGate } = await import("./sol-gate");
+    let t = 0, n = 0, fail = true;
+    const g = solGate(async () => { n++; if (fail) throw new Error("rpc down"); return 5e7; }, () => t);
+    expect(await g()).toBeNull();
+    fail = false;
+    expect(await g()).toBe(5e7);
+    t = 29_000; expect(await g()).toBe(5e7);
+    t = 31_000; await g();
+    expect(n).toBe(3);
+  });
+});
