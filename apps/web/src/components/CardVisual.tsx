@@ -8,13 +8,17 @@ const DEAD: DisplayStatus[] = ["Closed", "Revoked", "Used", "Expired", "Failed"]
 
 /** A thin remaining-limit bar (on paper, below a card). */
 export function LimitBar({ card }: { card: CardView }) {
+  const status = displayStatus(card);
+  const ended = status === "Expired" || status === "Revoked" || status === "Closed";
   const total = Number(card.limit.totalBase) || 1;
-  const remaining = Number(card.limit.remainingBase);
+  const remaining = ended ? 0 : Number(card.limit.remainingBase);
   const pct = Math.max(0, Math.min(100, (remaining / total) * 100));
   return (
     <div>
       <div className="flex items-baseline justify-between gap-3">
-        <p className="text-[15px] text-ink-2"><strong className="tnum text-[17px] font-semibold text-ink">{usd(card.limit.remainingBase)}</strong> of {usd(card.limit.totalBase)} left</p>
+        {ended
+          ? <p className="text-[15px] text-ink-2"><strong className="tnum text-[17px] font-semibold text-ink">{usd(0n)}</strong> can be pulled · {status.toLowerCase()}</p>
+          : <p className="text-[15px] text-ink-2"><strong className="tnum text-[17px] font-semibold text-ink">{usd(card.limit.remainingBase)}</strong> of {usd(card.limit.totalBase)} left</p>}
         <p className="text-[13px] text-ink-3">{limitSuffix(card)}</p>
       </div>
       <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-sunken" role="progressbar" aria-label="Remaining limit" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)}>
@@ -95,7 +99,7 @@ export function CardVisual({ card, showLimit = false, idle = false, born = false
       </div>
 
       {status === "Frozen" && (
-        <div className="anim-fade absolute inset-0 grid place-items-center rounded-[inherit] bg-white/25 backdrop-blur-[2px]">
+        <div className="anim-fade absolute inset-0 grid place-items-center rounded-[inherit] bg-[linear-gradient(135deg,rgb(255_255_255/.28),rgb(200_225_255/.18))]">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-black/45 px-3 py-1.5 text-[13px] font-semibold"><Icon name="snow" className="h-4 w-4" />Frozen</span>
         </div>
       )}
