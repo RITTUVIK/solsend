@@ -12,13 +12,14 @@ const sixteen = /(?:\d[ -]?){16}/;
 
 type Call = { method: string; url: string; body?: string };
 function fakeFetch(calls: Call[], opts: { authorizeStatus?: number; authorizeBody?: string; txResult?: string } = {}) {
+  let voided = false; // realistic: Lithic reports PENDING until the void is simulated, VOIDED after
   return async (url: string, init: { method: string; body?: string }) => {
     calls.push({ method: init.method, url, body: init.body });
     const reply = (status: number, body: unknown) => ({ status, ok: status < 300, text: async () => (typeof body === "string" ? body : JSON.stringify(body)) });
     if (url.endsWith("/v1/cards/lcard-1")) return reply(200, { token: "lcard-1", pan: PAN, cvv: "123", last_four: "1111" });
     if (url.endsWith("/v1/simulate/authorize")) return opts.authorizeStatus ? reply(opts.authorizeStatus, opts.authorizeBody ?? { message: "bad pan " + PAN }) : reply(200, { token: "tx-1" });
-    if (url.endsWith("/v1/simulate/void")) return reply(200, {});
-    if (url.includes("/v1/transactions/")) return reply(200, { token: "tx-1", status: "VOIDED", result: opts.txResult ?? "APPROVED", events: [] });
+    if (url.endsWith("/v1/simulate/void")) { voided = true; return reply(200, {}); }
+    if (url.includes("/v1/transactions/")) return reply(200, { token: "tx-1", status: voided ? "VOIDED" : "PENDING", result: opts.txResult ?? "APPROVED", events: [] });
     return reply(404, {});
   };
 }

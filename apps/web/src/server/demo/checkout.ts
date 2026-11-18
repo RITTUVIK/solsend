@@ -6,6 +6,7 @@ import { api, DEMO_MERCHANTS, explorerTx } from "@solsend/shared";
 import type { z } from "zod";
 import { HttpError } from "../auth";
 import type { Store } from "../store";
+import type { CardRow } from "@solsend/shared";
 import type { LithicSim } from "./lithic-sim";
 
 type Sim = Pick<LithicSim, "authorize" | "voidTransaction" | "transaction">;
@@ -13,6 +14,8 @@ export type DemoDeps = {
   store: Store; sim: Sim; wallet: string; enabled: boolean; maxCents: number;
   /** Settlement-authority balance in lamports (cached ~30 s by the caller); null = unknown. Omitted in unit tests. */
   settlerLamports?: () => Promise<number | null>;
+  /** Remaining spending power of the card, read ONCHAIN (base units string; "0" if the card is not Active). Omitted in unit tests. */
+  remainingOnchain?: (card: CardRow) => Promise<string | null>;
   sleep?: (ms: number) => Promise<void>; now?: () => number; pollMs?: number;
 };
 const defSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -81,8 +84,11 @@ export async function demoCheckout(input: unknown, d: DemoDeps): Promise<api.TDe
     lithicResult = row.decision;
   }
 
+  // Remaining limit is read ONCHAIN (the source of truth) for approvals and declines alike. The feed only has it when the
+  // QuickNode stream is active, which it is not outside demo windows (user-reported: "missing remaining limit").
   let remaining: string | null = null;
-  if (settleSig) {
+  if (d.remainingOnchain) { try { remaining = await d.remainingOnchain(card); } catch { remaining = null; } }
+  if (remaining === null && settleSig) {
     try { remaining = (await d.store.listFeed({ cardPda, limit: 10 })).find((f) => f.signature === settleSig && f.remaining_base)?.remaining_base ?? null; } catch { /* feed is best-effort */ }
   }
   return api.DemoCheckoutResponse.parse({
@@ -91,6 +97,14 @@ export async function demoCheckout(input: unknown, d: DemoDeps): Promise<api.TDe
   });
 }
 
+const TERMINAL = new Set(["VOIDED", "DECLINED", "EXPIRED"]);
+/** Sandbox merchant void of ONE approved purchase. Idempotent and state-checked:
+ *  - only APPROVED authorizations of the caller's own cards;
+ *  - already refunded → returns the existing refund (no Lithic call);
+ *  - Lithic already terminal (VOIDED/DECLINED/EXPIRED) → no second void; the reconciler refunds;
+ *  - SETTLED (store already captured) → 409 not_voidable;
+ *  - a 60 s per-token lock stops double clicks from issuing two Lithic voids.
+ *  The refund itself is the onchain `refund` (capped at record.amount - refunded, destination fixed to the card's source). */
 export async function demoVoid(input: unknown, d: DemoDeps): Promise<z.infer<typeof api.DemoVoidResponse>> {
   const now = d.now ?? Date.now, sleep = d.sleep ?? defSleep;
   if (!d.enabled) throw new HttpError(403, "demo merchant disabled", "demo_disabled");
@@ -101,13 +115,21 @@ export async function demoVoid(input: unknown, d: DemoDeps): Promise<z.infer<typ
   const row = await d.store.getAuthorization(lithicToken);
   const card = row?.card_pda ? await d.store.getCard(row.card_pda) : null;
   if (!row || !card || card.owner_wallet !== d.wallet) throw new HttpError(404, "authorization not found", "not_found");
+  if (row.decision !== "APPROVED") throw new HttpError(409, "only approved purchases can be voided", "not_voidable");
+  const done = (sig: string | null, status: string) =>
+    api.DemoVoidResponse.parse({ lithicStatus: status, refundSignature: sig, explorer: sig ? explorerTx(sig) : null, note: VOID_NOTE });
+  if (row.refund_signature) return done(row.refund_signature, row.lithic_final_status ?? "VOIDED");
   await limits(d.store, d.wallet);
 
-  await d.sim.voidTransaction(lithicToken);
+  const before = await d.sim.transaction(lithicToken);
+  if (before?.status === "SETTLED") throw new HttpError(409, "this purchase was already settled by the store and can't be voided", "not_voidable");
+  const lockAcquired = await d.store.rateLimit(`void:${lithicToken}`, 60, 1);
+  if (!before || !TERMINAL.has(before.status)) {
+    if (lockAcquired) await d.sim.voidTransaction(lithicToken);
+  }
   const deadline = now() + (d.pollMs ?? VOID_POLL_MS);
   let cur = await d.store.getAuthorization(lithicToken);
   while (!cur?.refund_signature && now() < deadline) { await sleep(400); cur = await d.store.getAuthorization(lithicToken); }
   const status = (await d.sim.transaction(lithicToken))?.status ?? cur?.lithic_final_status ?? "UNKNOWN";
-  const sig = cur?.refund_signature ?? null;
-  return api.DemoVoidResponse.parse({ lithicStatus: status, refundSignature: sig, explorer: sig ? explorerTx(sig) : null, note: VOID_NOTE });
+  return done(cur?.refund_signature ?? null, status);
 }

@@ -11,16 +11,33 @@ import { cosign, takeIntent } from "./intents";
 
 const FEED_KIND: Record<string, string> = { create_card: "registered", card_freeze: "frozen", card_unfreeze: "unfrozen", card_close: "closed" };
 
+const BLOCKHASH_ERR = /blockhash not found|BlockhashNotFound|block height exceeded|TransactionExpired/i;
+/** Send with preflight. "Blockhash not found" has two causes: (a) the RPC node serving the send lags the one that issued
+ *  the blockhash → a short retry succeeds; (b) the user took longer to sign than the blockhash lives (~60–90 s; e.g. the
+ *  first wallet setup right after login, user-reported) → 409 `tx_expired`; the client re-prepares and asks to sign once
+ *  more. Other preflight failures stay 400 `tx_rejected`. The intent is already consumed, so a re-prepare is required. */
+export async function sendWithBlockhashRetry(rpc: Pick<CardDeps["rpc"], "sendRawTransaction">, wire: Uint8Array | Buffer, sleep = (ms: number) => new Promise((r) => setTimeout(r, ms)), attempts = 3): Promise<void> {
+  for (let i = 1; ; i++) {
+    try {
+      await rpc.sendRawTransaction(wire, { skipPreflight: false, preflightCommitment: "confirmed", maxRetries: 2 });
+      return;
+    } catch (e) {
+      const msg = safeErr(e, 160);
+      if (BLOCKHASH_ERR.test(msg)) {
+        if (i < attempts) { await sleep(500); continue; }
+        throw new HttpError(409, "this transaction expired before it reached the network (signing took a little long). Please sign again.", "tx_expired");
+      }
+      const logs = ((e as { logs?: string[] }).logs ?? []).filter((l) => /failed|error/i.test(l)).slice(-2).join(" | ");
+      throw new HttpError(400, `transaction rejected by devnet: ${safeErr(e, 120)}${logs ? ` (${logs.slice(0, 200)})` : ""}`, "tx_rejected");
+    }
+  }
+}
+
 export async function submitTx(deps: CardDeps, owner: string, req: z.infer<typeof api.SubmitTxRequest>): Promise<z.infer<typeof api.SubmitTxResponse>> {
   const { intent, verified } = await takeIntent(deps.store, req.intentId, req.signedTxBase64, { owner, feePayer: deps.feePayer.publicKey, nowMs: deps.clock.now() });
   const { wire, signatureBytes } = cosign(verified, deps.feePayer);
   const signature = bs58.encode(signatureBytes);
-  try {
-    await deps.rpc.sendRawTransaction(wire, { skipPreflight: false, preflightCommitment: "confirmed", maxRetries: 2 });
-  } catch (e) {
-    const logs = ((e as { logs?: string[] }).logs ?? []).filter((l) => /failed|error/i.test(l)).slice(-2).join(" | ");
-    throw new HttpError(400, `transaction rejected by devnet: ${safeErr(e, 120)}${logs ? ` (${logs.slice(0, 200)})` : ""}`, "tx_rejected");
-  }
+  await sendWithBlockhashRetry(deps.rpc, wire);
   await deps.store.setIntentSignature(intent.id, signature);
   const until = deps.clock.now() + 45_000;
   const stop = rebroadcast(deps.rpc, wire, until, deps.clock, 2000);
