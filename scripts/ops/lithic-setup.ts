@@ -7,7 +7,7 @@
 //   npx tsx@4.23.15 scripts/ops/lithic-setup.ts --url https://<host>
 //   npx tsx@4.23.15 scripts/ops/lithic-setup.ts --disenroll      (stop Lithic calling a dead tunnel)
 //   npx tsx@4.23.15 scripts/ops/lithic-setup.ts --status
-import { SPIKES_ENV, appEnv, lithic, lithicCallsUsed, upsertEnvFile, writeEnvLocal } from "./_lib";
+import { SPIKES_ENV, GEN_ENV, appEnv, lithic, lithicCallsUsed, upsertEnvFile, writeEnvLocal } from "./_lib";
 
 const args = process.argv.slice(2);
 const flag = (n: string) => args.includes(`--${n}`);
@@ -57,9 +57,9 @@ if (subToken) {
   const key = s.json.key ?? s.json.secret;
   if (typeof key === "string" && key.startsWith("whsec_")) {
     console.log(`wrote ${writeEnvLocal(new Map([["LITHIC_EVENTS_SECRET", key]])).join(", ")} to apps/web/.env.local (value not printed)`);
-    // Lead's env-sync pushes spikes/.env to Vercel: store it there too (mode 600, never printed).
-    upsertEnvFile(SPIKES_ENV, "LITHIC_EVENTS_SECRET", key);
-    console.log(`wrote LITHIC_EVENTS_SECRET to ${SPIKES_ENV} (mode 600, value not printed)`);
+    // Lead's env-sync pushes spikes/.env.generated to Vercel: store it there (mode 600, never printed, never hand-edited).
+    upsertEnvFile(GEN_ENV, "LITHIC_EVENTS_SECRET", key);
+    console.log(`wrote LITHIC_EVENTS_SECRET to ${GEN_ENV} (mode 600, value not printed)`);
   }
   else console.log(`events secret fetch: HTTP ${s.status} (no whsec_ key)`);
 }

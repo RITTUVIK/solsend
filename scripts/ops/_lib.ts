@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 export const REPO = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const ENV_LOCAL = join(REPO, "apps", "web", ".env.local");
 export const SPIKES_ENV = process.env.SOLSEND_SPIKES_ENV ?? "/Users/darrendeepak/solsend/spikes/.env";
+/** Machine-generated secrets live here (never hand-edited); overlays SPIKES_ENV. */
+export const GEN_ENV = process.env.SOLSEND_GEN_ENV ?? "/Users/darrendeepak/solsend/spikes/.env.generated";
 export const KEYS_DIR = (process.env.SOLSEND_KEYS_DIR ?? "~/.config/solsend/devnet").replace(/^~(?=\/)/, homedir());
 export const LITHIC_SANDBOX = "https://sandbox.lithic.com";
 
@@ -53,9 +55,10 @@ export const readKeyfile =(name: string): string => {
   return JSON.stringify(arr);
 };
 
-/** Load app env: apps/web/.env.local overlaid on spikes/.env (in-process only). */
+/** Load app env: apps/web/.env.local overlaid on spikes/.env.generated overlaid on spikes/.env (in-process only). */
 export function appEnv(): Map<string, string> {
   const m = parseEnvFile(SPIKES_ENV);
+  for (const [k, v] of parseEnvFile(GEN_ENV)) m.set(k, v);
   for (const [k, v] of parseEnvFile(ENV_LOCAL)) m.set(k, v);
   return m;
 }

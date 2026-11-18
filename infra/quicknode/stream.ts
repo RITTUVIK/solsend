@@ -16,10 +16,12 @@ import { buildFilterSource } from "./build-filter.js";
 export const STREAM_NAME = "solsend-mvp-devnet";
 const API = "https://api.quicknode.com/streams/rest/v1";
 const ENV_FILE = process.env.SOLSEND_ENV_FILE ?? "/Users/darrendeepak/solsend/spikes/.env";
+const GEN_FILE = process.env.SOLSEND_GEN_ENV ?? "/Users/darrendeepak/solsend/spikes/.env.generated"; // fresh stream tokens go here
 
 /** Parse KEY=VALUE lines into process.env (without overriding). Never prints values. */
 function loadEnv(): void {
   if (existsSync(ENV_FILE)) process.loadEnvFile(ENV_FILE);
+  if (existsSync(GEN_FILE)) process.loadEnvFile(GEN_FILE);
 }
 function need(name: string): string {
   const v = process.env[name];
@@ -27,8 +29,10 @@ function need(name: string): string {
   return v;
 }
 
-/** Rewrite (or append) KEY=value in the env file, mode 600. */
+/** Rewrite (or append) KEY=value in the MACHINE-GENERATED env file (spikes/.env.generated), mode 600. Never writes the
+ *  hand-edited spikes/.env: an editor saving a stale buffer there silently dropped generated secrets twice. */
 function setEnvVar(key: string, value: string): void {
+  const ENV_FILE = GEN_FILE;
   const lines = existsSync(ENV_FILE) ? readFileSync(ENV_FILE, "utf8").split("\n") : [];
   const i = lines.findIndex((l) => l.startsWith(`${key}=`));
   if (i >= 0) lines[i] = `${key}=${value}`;

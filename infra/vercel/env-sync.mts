@@ -7,21 +7,24 @@ import os from "node:os";
 import path from "node:path";
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
-const ENV_FILE = path.join(ROOT, "spikes/.env");
+const ENV_FILE = path.join(ROOT, "spikes/.env");                 // human-edited credentials
+const GEN_FILE = path.join(ROOT, "spikes/.env.generated");       // machine-generated secrets (never hand-edited)
 const KEYS = path.join(os.homedir(), ".config/solsend/devnet");
 const dry = process.argv.includes("--dry-run");
 
 const parseEnv = (t: string) => Object.fromEntries(t.split("\n").filter((l) => /^[A-Z0-9_]+=/.test(l)).map((l) => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1).trim().replace(/^["']|["']$/g, "")]));
-let local = parseEnv(readFileSync(ENV_FILE, "utf8"));
+const readAll = () => ({ ...parseEnv(readFileSync(ENV_FILE, "utf8")), ...(existsSync(GEN_FILE) ? parseEnv(readFileSync(GEN_FILE, "utf8")) : {}) });
+let local = readAll();
 
-/** Generate-once secrets are persisted to spikes/.env (mode 600) so local tools can use them too. */
+/** Generate-once secrets are persisted to spikes/.env.generated (mode 600). That file is never hand-edited, so an
+ *  editor saving a stale buffer of spikes/.env can't silently drop them (happened twice on 2026-11-18). */
 function ensureLocal(name: string, gen: () => string): string {
   if (local[name]) return local[name]!;
   const v = gen();
-  const t = readFileSync(ENV_FILE, "utf8");
-  writeFileSync(ENV_FILE, `${t.endsWith("\n") ? t : t + "\n"}${name}=${v}\n`);
-  chmodSync(ENV_FILE, 0o600);
-  local = parseEnv(readFileSync(ENV_FILE, "utf8"));
+  const t = existsSync(GEN_FILE) ? readFileSync(GEN_FILE, "utf8") : "# MACHINE-GENERATED secrets. Do not edit by hand.\n";
+  writeFileSync(GEN_FILE, `${t.endsWith("\n") ? t : t + "\n"}${name}=${v}\n`, { mode: 0o600 });
+  chmodSync(GEN_FILE, 0o600);
+  local = readAll();
   return v;
 }
 const keyJson = (name: string) => {

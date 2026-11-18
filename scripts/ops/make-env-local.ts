@@ -3,9 +3,10 @@
 // Prints ONLY the variable names written — never values.
 //   npx tsx@4.23.15 scripts/ops/make-env-local.ts
 import { randomBytes } from "node:crypto";
-import { ENV_LOCAL, SPIKES_ENV, lithic, lithicCallsUsed, parseEnvFile, readKeyfile, writeEnvLocal } from "./_lib";
+import { ENV_LOCAL, GEN_ENV, SPIKES_ENV, lithic, lithicCallsUsed, parseEnvFile, readKeyfile, writeEnvLocal } from "./_lib";
 
 const spikes = parseEnvFile(SPIKES_ENV);
+const generated = parseEnvFile(GEN_ENV); // machine-generated secrets are the source of truth (also pushed to Vercel)
 const existing = parseEnvFile(ENV_LOCAL);
 const need = (k: string) => { const v = spikes.get(k); if (!v) throw new Error(`spikes/.env is missing ${k}`); return v; };
 
@@ -25,8 +26,8 @@ const out = new Map<string, string>([
   ["ASA_BUDGET_MS", existing.get("ASA_BUDGET_MS") ?? "4500"],
   ["PRIVY_APP_ID", privy],
   ["NEXT_PUBLIC_PRIVY_APP_ID", privy],
-  ["RECONCILE_CRON_SECRET", existing.get("RECONCILE_CRON_SECRET") ?? randomBytes(24).toString("base64url")],
-  ["ADMIN_API_TOKEN", existing.get("ADMIN_API_TOKEN") ?? randomBytes(24).toString("base64url")],
+  ["RECONCILE_CRON_SECRET", generated.get("RECONCILE_CRON_SECRET") ?? existing.get("RECONCILE_CRON_SECRET") ?? randomBytes(24).toString("base64url")],
+  ["ADMIN_API_TOKEN", generated.get("ADMIN_API_TOKEN") ?? existing.get("ADMIN_API_TOKEN") ?? randomBytes(24).toString("base64url")],
   ["DEMO_MERCHANT_ENABLED", existing.get("DEMO_MERCHANT_ENABLED") ?? "1"],
   ["DEMO_MERCHANT_MAX_CENTS", existing.get("DEMO_MERCHANT_MAX_CENTS") ?? "5000"],
 ]);
