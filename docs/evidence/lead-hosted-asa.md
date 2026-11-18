@@ -32,5 +32,12 @@ On Vercel without Supabase, the issuer-outage flag called `getStore()` outside i
 That is fail-closed, but a demo toggle must never block payments. Fixed: `deps.ts` resolves the store lazily inside the
 flag's try. Regression test in `server/asa/outage.test.ts`.
 
-**Pending:** a long-idle cold-start sample (after more than 15 min idle), and void → events webhook → refund on the
-hosted path. Both need Supabase on Vercel for persistence.
+## Long-idle cold start (06:40 UTC, after Supabase was connected and Upgrade 1 was live)
+This was the first-ever ASA request to a deployment created at 06:29 (the function had never been invoked, and the app had been idle more than 10 min):
+- **Cold:** 2438 ms, APPROVED. The time includes function boot, the genesis check, the blockhash fetch and the **confirmed** settle.
+- **Warm**, immediately after: 1043 ms.
+- Both SettlementRecords were verified onchain (new per-authorization seeds).
+
+The worst case is still about 2 s under our 4.5 s budget and about 3.5 s under Lithic's 6 s hard limit, so no keep-warm workaround is needed.
+
+The hosted **void → events webhook → refund** path was verified separately; see `lead-deployed-e2e.md`.
