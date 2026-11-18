@@ -84,11 +84,14 @@ Earlier real-Lithic runs against a local server through a tunnel (W2) are record
 
 | # | Claim | Evidence |
 |---|---|---|
-| A1 | Independent program audit: no Critical finding, no fund-theft path; findings H1, M1, L1, L2, L3, D1, T1 fixed or improved in Upgrade 1 (D2 intended) | [audit-program-cp1.md](evidence/audit-program-cp1.md); fixes proven by P2 to P18 |
+| A1 | AI-assisted adversarial program review (separate review agent; not a professional audit): no Critical finding, no fund-theft path; findings H1, M1, L1, L2, L3, D1, T1 fixed or improved in Upgrade 1 (D2 intended) | [audit-program-cp1.md](evidence/audit-program-cp1.md); fixes proven by P2 to P18 |
 | A2 | Security review amendments A1 to A5 (no memo, permanent records, Lithic outer limits, status gate, Supabase secret keys) | [CP1-CONTRACTS.md](CP1-CONTRACTS.md) |
 | A3 | Supabase lockdown found an ineffective revoke in migration 0001 and fixed it in 0002 | E6 above |
 | A4 | Secret scanning: gitleaks pre-commit hook and CI job | `.gitleaks.toml`, `.github/workflows/ci.yml` |
 | A5 | Legacy-record impact of the L1 seed change: 43 old-seed records, 2.15 USDC settled, 1.33 refunded, 0.82 USDC no longer refundable through the program (accepted for devnet) | [w1-program-devnet.md](evidence/w1-program-devnet.md) |
+| A6 | AI-assisted adversarial backend review (separate review agent; not a professional audit): no Critical finding; 1 High, 5 Medium, 3 Low and Info findings fixed; 9 confirming tests are permanent regressions (7 failed before the fixes); 107 web unit tests pass | [audit-backend-cp1.md](evidence/audit-backend-cp1.md), `apps/web/src/server/__test__/audit.regression.test.ts` |
+| A7 | Post-audit deployed re-verification: real Lithic sandbox approve (token `ce7b1d47-e4ff-4827-b49b-e5fbeae5e9c6`) only after settle [`rn4fpLVA…`](https://explorer.solana.com/tx/rn4fpLVAGe2T6ZdFFDX87UbPfqALUDQyEZvarzKrEsD8H9mhnhynTZ5J9PvkSPLZS6feCbSJ6KqqmnEydAMaNY3?cluster=devnet) confirmed; 9 sensitive routes return 401; `/api/status` 11/11 | [audit-backend-cp1.md](evidence/audit-backend-cp1.md), [lead-deployed-e2e.md](evidence/lead-deployed-e2e.md) |
+| A8 | Program tests: 41 LiteSVM tests (29 + 12) against the real devnet Allowances binary | `programs/solsend/tests/` |
 
 ## 6. CP0b validation (early spikes, spike program)
 

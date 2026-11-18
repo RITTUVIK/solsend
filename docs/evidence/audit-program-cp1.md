@@ -1,6 +1,6 @@
 # Independent program audit, CP1 (2026-11-18)
 
-An independent reviewer (read-only, fresh context) examined `programs/solsend` as deployed on devnet, using its
+An independent **AI review agent** (a separate Claude agent with no shared context; not a professional audit firm), working read-only from fresh context, examined `programs/solsend` as deployed on devnet, using its
 own LiteSVM tests against the real devnet Allowances binary (sha256 `2675ad1d…ddbf`).
 
 **Result: no Critical findings and no fund-theft path.**

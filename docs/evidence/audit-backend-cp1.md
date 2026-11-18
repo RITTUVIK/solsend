@@ -1,6 +1,6 @@
 # Independent backend security review, CP1 (2026-11-18)
 
-An independent reviewer (read-only, fresh context, no network calls) examined `apps/web/src/server/**`,
+An independent **AI review agent** (a separate Claude agent with no shared context; not a professional audit firm), working read-only from fresh context with no network calls, examined `apps/web/src/server/**`,
 `apps/web/src/app/api/**`, the shared helpers, and the client bundle for exposed secrets. Each finding below was
 confirmed with a test the reviewer ran, or by exact code reasoning. All 9 confirming tests are now permanent
 regressions in `apps/web/src/server/__test__/audit.regression.test.ts`. 7 of them failed before the fixes, and the
