@@ -1,0 +1,6 @@
+{
+  "name": "@solsend/ops-scripts-local",
+  "private": true,
+  "type": "module",
+  "description": "W2 ops scripts (run with npx tsx@4.23.15). Not a workspace package; deps resolve via packages/shared and apps/web."
+}

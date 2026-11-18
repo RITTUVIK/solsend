@@ -90,6 +90,16 @@ describe("ASA decision (confirmed-before-approve)", () => {
     if (out.status === 200) { expect(["deadline_exceeded", "no_confirmation"]).toContain(out.decision.reason); expect(out.decision.settleSent).toBe(true); expect(out.decision.signature).toBeTruthy(); }
   });
 
+  it("deadline fires BEFORE the send (slow blockhash) → decline and NOTHING is sent afterwards (no unwatched late settle)", async () => {
+    const rpc = new MockRpc();
+    const slow = () => new Promise<string>((r) => setTimeout(async () => r((await rpc.getLatestBlockhash()).blockhash), 1_000));
+    const out = await run(engine(rpc, { blockhash: slow }), req());
+    expect(out.status === 200 && out.body.result).toBe("INSUFFICIENT_FUNDS");
+    if (out.status === 200) expect([out.decision.reason, out.decision.settleSent, out.decision.signature]).toEqual(["deadline_exceeded", false, null]);
+    await new Promise((r) => setTimeout(r, 400)); // let the abandoned work resume
+    expect(rpc.sent.length).toBe(0);
+  });
+
   it("never throws: RPC exceptions → decline", async () => {
     const rpc = new MockRpc();
     rpc.sendThrows = new Error("socket hang up");

@@ -27,7 +27,10 @@ export async function afterAsaReply(deps: AfterDeps, d: AsaDecision, repliedAt: 
     await confirmSignature(deps.rpc, d.signature, until, deps.clock, 2000);
     try {
       const row = await deps.store.getAuthorization(d.token);
-      if (row) await reconcileAuthorization(deps, row);
+      if (row) {
+        const r = await reconcileAuthorization(deps, row);
+        console.log(`[asa:after] late-settle check token=${d.token} → ${r.outcome}/${r.tag}${r.refundSignature ? ` refund=${r.refundSignature}` : ""}`);
+      }
     } catch (e) {
       console.error(`[asa:after] late-settle reconcile failed token=${d.token}: ${safeErr(e)} (cron will retry)`);
     }

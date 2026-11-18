@@ -20,7 +20,7 @@ import { safeErr } from "../lib/safe";
 /** Statuses we settle (amendment 3a). Everything else declines without a settle. */
 export const SETTLE_STATUSES = new Set(["AUTHORIZATION", "FINANCIAL_AUTHORIZATION"]);
 /** Measured on devnet (see docs/evidence/w2-backend.md); override with SETTLE_CU_LIMIT. */
-export const DEFAULT_SETTLE_CU_LIMIT = 120_000;
+export const DEFAULT_SETTLE_CU_LIMIT = 70_000; // fixed-delegation settle measured 41,830 CU on devnet (sig 2kPLyG75…)
 
 export type AsaDeps = {
   rpc: Rpc;
@@ -58,7 +58,7 @@ export type AsaOutcome =
   | { status: 401; body: { error: string }; reason: string; decision: null }
   | { status: 200; body: { result: AsaResult }; decision: AsaDecision; deduped: boolean };
 
-type Ctx = { signature: string | null; settleSent: boolean; card: CardRef | null; sentAt?: number };
+type Ctx = { signature: string | null; settleSent: boolean; card: CardRef | null; sentAt?: number; /** set synchronously when the deadline reply is taken: nothing may be SENT after it */ closed: boolean };
 
 export function createAsaEngine(deps: AsaDeps) {
   const { clock } = deps;
@@ -113,6 +113,10 @@ export function createAsaEngine(deps: AsaDeps) {
     const raw = tx.serialize();
     const signature = bs58.encode(tx.signature!);
     const tSend = elapsed();
+    // The deadline reply may already have been taken while we awaited above (cold blockhash, outage read,
+    // …). Its decision says "no settle sent", so sending now would create a settle nobody watches →
+    // abort. This check and the ctx assignment below run with no await in between (atomic vs the timer).
+    if (ctx.closed || clock.now() >= deadlineAt) return out("INSUFFICIENT_FUNDS", "deadline_exceeded");
     ctx.signature = signature;
     ctx.settleSent = true;
     ctx.sentAt = clock.now();
@@ -148,7 +152,7 @@ export function createAsaEngine(deps: AsaDeps) {
 
   /** Hard deadline: reply by `deadlineAt` no matter what; never approve after it; never throw. */
   async function decideWithDeadline(req: AsaRequest, t0: number): Promise<AsaDecision> {
-    const ctx: Ctx = { signature: null, settleSent: false, card: null };
+    const ctx: Ctx = { signature: null, settleSent: false, card: null, closed: false };
     const deadlineAt = t0 + deps.budgetMs;
     const fallback = (reason: string): AsaDecision => ({
       ...base(req, req.token), card: ctx.card, signature: ctx.signature, settleSent: ctx.settleSent,
@@ -157,10 +161,11 @@ export function createAsaEngine(deps: AsaDeps) {
     const work = decide(req, t0, deadlineAt, ctx).catch((e: unknown) => fallback(`handler_error:${safeErr(e, 80)}`));
     let timer: ReturnType<typeof setTimeout> | undefined;
     const deadline = new Promise<AsaDecision>((resolve) => {
-      timer = setTimeout(() => resolve(fallback("deadline_exceeded")), Math.max(0, deadlineAt - clock.now()));
+      timer = setTimeout(() => { ctx.closed = true; resolve(fallback("deadline_exceeded")); }, Math.max(0, deadlineAt - clock.now()));
     });
     const d = await Promise.race([work, deadline]);
     clearTimeout(timer);
+    ctx.closed = true; // the reply is decided: no later send, whichever side won
     // Belt and braces: an APPROVED decision that somehow resolved after the deadline is declined.
     if (d.result === "APPROVED" && clock.now() > deadlineAt + 50) return { ...fallback("deadline_exceeded"), amountBase: d.amountBase };
     return d;

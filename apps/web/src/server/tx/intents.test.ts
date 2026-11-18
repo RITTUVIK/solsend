@@ -37,7 +37,7 @@ describe("fee-payer cosign gate (byte-identical intent, CP0b G0.8)", () => {
   });
   it("rejects a modified message (even one byte), with the owner's valid signature over it", async () => {
     const { owner, feePayer, prepared, intent } = await setup();
-    const tampered = ownerSign(prepared.txBase64, owner, (m) => { m[m.length - 1] ^= 1; });
+    const tampered = ownerSign(prepared.txBase64, owner, (m) => { m[m.length - 1] = m[m.length - 1]! ^ 1; });
     expect(() => verifySignedAgainstIntent(intent, tampered, { owner: owner.publicKey.toBase58(), feePayer: feePayer.publicKey, nowMs: Date.now() })).toThrow(/does not match/);
   });
   it("rejects a missing/invalid owner signature, another wallet, an expired intent", async () => {

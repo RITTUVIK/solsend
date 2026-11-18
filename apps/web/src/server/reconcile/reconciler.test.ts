@@ -6,7 +6,8 @@ import { MemoryStore } from "../store";
 import { authCommitment } from "../lib/commitments";
 import { realClock } from "../solana/rpc";
 import { MockRpc, encodeCard, putRecord } from "../__test__/mockRpc";
-import { reconcileAuthorization, sweep } from "./reconciler";
+import { reconcileAuthorization, recoverMissingRow, sweep } from "./reconciler";
+import { maybePiggybackSweep } from "./piggyback";
 import { applyTransactionUpdate, intakeLithicEvent } from "./events";
 import { signLikeLithic } from "../lithic/webhook";
 import { afterAsaReply } from "../asa/after";
@@ -77,6 +78,25 @@ describe("reconciler executor", () => {
     await addAuth(w, "INSUFFICIENT_FUNDS", null, { reconcile_action: "none_no_settle" });
     const res = await sweep(w.deps, { olderThanSecs: 0 });
     expect(res.length).toBe(1);
+  });
+});
+
+describe("piggyback sweep + missing-row recovery", () => {
+  it("piggyback runs at most once per 60 s window and never throws", async () => {
+    const w = world("DECLINED");
+    await addAuth(w, "INSUFFICIENT_FUNDS", null);
+    expect(await maybePiggybackSweep(() => w.deps, w.store)).toBe(0); // row is <20 s old → not yet in the batch, but the window is consumed
+    expect(await maybePiggybackSweep(() => w.deps, w.store)).toBeNull();
+    expect(await maybePiggybackSweep(() => { throw new Error("boom"); }, new MemoryStore())).toBeNull();
+  });
+  it("missing authorizations row + onchain record + Lithic NOT_FOUND (aged) → rebuilt from chain and refunded", async () => {
+    const w = world(null);
+    const token = randomUUID();
+    putRecord(w.rpc, w.pda, authCommitment(token), 30_000n); // created_ts = 1 (1970) → past the NOT_FOUND grace
+    const r = await recoverMissingRow(w.deps, token, w.pda.toBase58());
+    expect([r.outcome, r.tag]).toEqual(["refund", "refunded"]);
+    expect((await w.store.getAuthorization(token))!).toMatchObject({ decision: "UNKNOWN", reconcile_action: "refunded" });
+    expect((await recoverMissingRow(w.deps, randomUUID(), w.pda.toBase58())).tag).toBe("no_onchain_record");
   });
 });
 

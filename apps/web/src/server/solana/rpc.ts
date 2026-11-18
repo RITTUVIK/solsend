@@ -35,14 +35,15 @@ export function confirmSignature(rpc: Rpc, signature: string, untilMs: number, c
   return new Promise((resolve) => {
     let done = false;
     let subId: number | null = null;
-    const finish = (v: ConfirmResult) => {
+    const finish = (v: ConfirmResult, viaWs = false) => {
       if (done) return;
       done = true;
-      if (subId !== null) void Promise.resolve(rpc.removeSignatureListener(subId)).catch(() => {});
+      // web3.js drops a one-shot signature subscription itself once it fires; only remove it otherwise.
+      if (subId !== null && !viaWs) void Promise.resolve(rpc.removeSignatureListener(subId)).catch(() => {});
       resolve(v);
     };
     try {
-      subId = rpc.onSignature(signature, (r) => finish({ err: r.err }), "confirmed");
+      subId = rpc.onSignature(signature, (r) => finish({ err: r.err }, true), "confirmed");
     } catch { /* websocket unavailable → polling only */ }
     void (async () => {
       await clock.sleep(Math.min(pollMs, Math.max(0, untilMs - clock.now())));

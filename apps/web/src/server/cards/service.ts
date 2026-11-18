@@ -21,7 +21,7 @@ import { ixRevokeDelegationWithReceiver, readChainCards, readWalletChain, remain
 export type CardDeps = { rpc: Rpc; store: Store; feePayer: Keypair; lithic: LithicApi; clock: Clock };
 
 /** Measured on devnet (docs/evidence/w2-backend.md). */
-export const CREATE_CARD_CU = 150_000;
+export const CREATE_CARD_CU = 80_000; // register path measured 26,223 CU (+~5k when re-arming the SA)
 export const ACTION_CU = 80_000;
 const MAX_REVOKES_PER_TX = 12;
 

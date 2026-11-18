@@ -3,7 +3,7 @@
 // record.amount − record.refunded onchain). Refunds NEVER restore the card's allowance.
 import { ComputeBudgetProgram, PublicKey, Transaction, type Keypair } from "@solana/web3.js";
 import bs58 from "bs58";
-import { LITHIC_TERMINAL_DECLINE, fromHex, ixRefund, toHex, type AuthorizationRow, type LithicTransaction } from "@solsend/shared";
+import { LITHIC_TERMINAL_DECLINE, SOLSEND_PROGRAM_ID, decodeSettlementRecord, fromHex, ixRefund, settlementRecordPda, toHex, type AuthorizationRow, type LithicTransaction } from "@solsend/shared";
 import type { Store } from "../store";
 import type { LithicApi } from "../lithic/client";
 import { authCommitment } from "../lib/commitments";
@@ -116,6 +116,26 @@ export async function sendRefund(deps: Pick<ReconcileDeps, "rpc" | "settler" | "
   } finally {
     stop();
   }
+}
+
+/**
+ * Recovery when the authorizations row is missing (ASA persist failed, DB reset): rebuild a minimal row from
+ * the onchain SettlementRecord (created_at = record.created_ts) and run the normal Lithic-status rule.
+ * Decision is unknown, so an APPROVED-only branch can never fire; DECLINED/VOIDED/EXPIRED/NOT_FOUND refund.
+ */
+export async function recoverMissingRow(deps: ReconcileDeps, token: string, cardPdaStr: string): Promise<ReconcileResult> {
+  const existing = await deps.store.getAuthorization(token);
+  if (existing) return reconcileAuthorization(deps, existing);
+  const pda = new PublicKey(cardPdaStr);
+  const acc = await deps.rpc.getAccountInfo(settlementRecordPda(pda, authCommitment(token)), "confirmed");
+  const rec = acc && acc.owner.equals(SOLSEND_PROGRAM_ID) ? decodeSettlementRecord(acc.data) : null;
+  if (!rec || !rec.card.equals(pda)) return { token, outcome: "skipped", tag: "no_onchain_record", lithicStatus: null };
+  await deps.store.upsertAuthorization({
+    lithic_token: token, auth_hash: toHex(authCommitment(token)), card_pda: cardPdaStr, amount_cents: Number(rec.amount / 10_000n), merchant_descriptor: null, acceptor_id: null,
+    decision: "UNKNOWN", reason: "row recovered from onchain SettlementRecord", settle_signature: null, confirmed_at: null, replied_at: null, timings: {},
+    lithic_final_status: null, reconcile_action: null, refund_signature: null, created_at: new Date(Number(rec.createdTs) * 1000).toISOString(),
+  });
+  return reconcileAuthorization(deps, (await deps.store.getAuthorization(token))!);
 }
 
 /** Cron / manual sweep of `reconcile_action IS NULL` rows (oldest first). Sequential to respect RPC limits. */
