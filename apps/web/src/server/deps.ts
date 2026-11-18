@@ -25,7 +25,9 @@ let bh: ReturnType<typeof blockhashCache> | null = null;
 export const blockhash = () => (bh ??= blockhashCache(connection(), realClock));
 
 let outage: ReturnType<typeof outageFlag> | null = null;
-export const outageCache = () => (outage ??= outageFlag(getStore()));
+// Resolve the store lazily INSIDE the flag's try/catch: a missing/unreachable DB must read as "no outage", never break
+// the hot path (found in the hosted test: getStore() threw before the try → every swipe declined).
+export const outageCache = () => (outage ??= outageFlag({ getSetting: (k) => getStore().getSetting(k) }));
 
 let engine: ReturnType<typeof createAsaEngine> | null = null;
 export function asaEngine() {

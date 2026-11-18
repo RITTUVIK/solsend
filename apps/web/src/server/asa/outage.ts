@@ -6,6 +6,7 @@ export const OUTAGE_TTL_MS = 5_000;
 export const isOutageValue = (v: string | null) => v === "1" || v === "true" || v === "on";
 
 export function outageFlag(store: Pick<Store, "getSetting">, now: () => number = Date.now) {
+  // NOTE: callers must pass a store whose getSetting may throw synchronously or reject — both are caught below.
   let cache: { value: boolean; at: number } | null = null;
   return {
     async get(): Promise<boolean> {
