@@ -118,3 +118,15 @@ Source: [GATE0.md](../GATE0.md). These ran against a spike program and the publi
 |---|---|---|---|
 | T1 | A free-trial card expires **onchain**: a settle before expiry succeeds, and the same settle after expiry is rejected by Allowances `delegationExpired` (Custom 128). The ASA maps this to CARD_PAUSED "card expired (free trial ended)". | [w2-free-trial-expiry.md](evidence/w2-free-trial-expiry.md) | [`3BovUnii…`](https://explorer.solana.com/tx/3BovUniidkydXRQMBfFY9KMdv38hSsKyfsADmv12FtvpwdDAoy4mG1f8eJADSM2GZ2xjwwXg65rVRDKYTwuu3CDt?cluster=devnet) ok · [`42fhAuNK…`](https://explorer.solana.com/tx/42fhAuNKvytc4iR6sRaH9RTsRNNXqqaqskG2k4z7yf7JL7AMC5yLFTs7cN2JJJzkKQCuHEvrGC1pVgECVVJCtd8W?cluster=devnet) failed (128) |
 | T2 | Subscription card: an in-period pull is approved, and an over-period-cap pull is declined onchain (Allowances 400 → VELOCITY_EXCEEDED). One-time card: the first pull is approved and the second is declined (card Used, SolSend 6003). These used **MOCK** requests with real devnet settles. | [w2-free-trial-expiry.md](evidence/w2-free-trial-expiry.md) | full signatures are in that file |
+
+## Live rehearsal on the deployed app (2026-11-18)
+
+A real Privy login, real Lithic sandbox authorizations and devnet USDC. Every row was independently checked onchain (account state and USDC balance changes). Full table and the two bugs found and fixed: [rehearsal-2026-11-18.md](evidence/rehearsal-2026-11-18.md).
+
+| # | Claim | Proof |
+|---|---|---|
+| R2 | **Live** free-trial expiry: a real Lithic authorization after the trial ended was declined by Allowances `delegationExpired` (128). No USDC moved. | [`3q4HQCQf…`](https://explorer.solana.com/tx/3q4HQCQfRUkiSCgrzykYLMCozJrbAtW9LzAQsXXB2kbUcwiBsc1fjBfYvTHo8UguX4DPrxSV4mcTfq2khezLw4md?cluster=devnet) |
+| R4 | $12 approved only after the settle confirmed (915 ms). Wallet −12, treasury +12. | [`2QT4k4cK…`](https://explorer.solana.com/tx/2QT4k4cKpZiZKCRRPpVyEaMTCU6qibDfwQj9wqoq5fgp5NwaLnrjqHW2tY3TcuaCCHKXZ3A6K29bUttAnDYvzBee?cluster=devnet) |
+| R5 | The Temu card's number at Amazon was declined onchain (SolSend 6005). No USDC moved. | [`ko4XZjax…`](https://explorer.solana.com/tx/ko4XZjaxq6btWc4mnojTe1VzPvf9p8KBkfZpkEE6t3JNdyJJNZDfdTaD2H6otsReMQjFWajat1uVoxKKzMfvLTP?cluster=devnet) |
+| R6 | $45 against $28 remaining was declined onchain (Allowances 300). No USDC moved. | [`b6sGxACn…`](https://explorer.solana.com/tx/b6sGxACnkkYBm9Lnm9huRqgZ1iNn4A4bjFwAg7zm4PRBFgHrv5a5LZBamJbDDaRidtcdYi8wK5bHXPz2S66r7s9?cluster=devnet) |
+| R7 | Void refunded exactly $1.14, once, to the owner's own USDC account. | [`63fBvpBw…`](https://explorer.solana.com/tx/63fBvpBwpFd8cr2iaZoeSaiK5DfJpMhHKA6cqURAJnincqicdhUU4KX1tmvhjp3t1VzZG795pFKFwKg2h76d7mB?cluster=devnet) |
