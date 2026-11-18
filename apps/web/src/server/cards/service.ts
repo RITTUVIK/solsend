@@ -62,14 +62,18 @@ export async function prepareCard(deps: CardDeps, owner: string, req: z.infer<ty
   const limitBase = centsToBase(req.limitCents);
   const periodSecs = req.kind === "SUBSCRIPTION" ? BigInt(req.periodDays!) * 86_400n : null;
   const fp = deps.feePayer.publicKey;
+  const nowSecs = BigInt(Math.floor(deps.clock.now() / 1000));
+  // Free-trial cards: the Allowances delegation itself expires (expiry_ts; 0 = none). After it, every pull fails
+  // onchain with Allowances 128 delegationExpired → ASA CARD_PAUSED "card expired (free trial ended)".
+  const trialExpiry = req.expiresInMinutes ? nowSecs + BigInt(req.expiresInMinutes) * 60n : 0n;
   const tx = await newTx(deps.rpc, fp);
   tx.add(ComputeBudgetProgram.setComputeUnitLimit({ units: CREATE_CARD_CU }));
   if (!w.delegateHealthy) tx.add(ixInitSubscriptionAuthority(ownerKey, fp)); // re-arm the SA as the ATA's delegate
   if (periodSecs === null) {
-    tx.add(ixCreateFixedDelegation({ owner: ownerKey, delegatee: pda, nonce: cardId, amount: limitBase, expiryTs: 0n, initId: w.saInitId, payer: fp }));
+    tx.add(ixCreateFixedDelegation({ owner: ownerKey, delegatee: pda, nonce: cardId, amount: limitBase, expiryTs: trialExpiry, initId: w.saInitId, payer: fp }));
   } else {
     // start_ts 0 = first period starts when the tx lands (requires an expiry; Allowances rejects start_ts in the past).
-    const expiry = BigInt(Math.floor(deps.clock.now() / 1000)) + 5n * 365n * 86_400n;
+    const expiry = trialExpiry || nowSecs + 5n * 365n * 86_400n;
     tx.add(ixCreateRecurringDelegation({ owner: ownerKey, delegatee: pda, nonce: cardId, amountPerPeriod: limitBase, periodSecs, startTs: 0n, expiryTs: expiry, initId: w.saInitId, payer: fp }));
   }
   const merchantLock = presetMerchantLock(req.merchantName);
@@ -152,7 +156,7 @@ export function toCardView(row: CardRow, c: ChainCard | undefined, nowMs: number
   const status = card ? cardStatusName(card.status) : "CLOSED";
   return {
     cardPda: row.card_pda, cardId: row.card_id, label: row.label, merchantName: row.merchant_name, kind: row.kind, status, issueState: row.issue_state,
-    expiresAt: null, expired: false, // TODO(W2): read the delegation expiry_ts (onchain) for free-trial cards
+    ...delegationExpiry(c, nowMs),
     lithic: { cardToken: row.lithic_card_token, lastFour: row.lithic_last_four, state: null },
     limit: {
       type: recurring ? "per_period" : "lifetime", totalBase: row.limit_base,
@@ -166,8 +170,15 @@ export function toCardView(row: CardRow, c: ChainCard | undefined, nowMs: number
   };
 }
 
-/** A card can pay only if issued AND onchain Active AND its delegation is live (F3 step 5). */
-export const isUsable = (v: TCardView) => v.issueState === "issued" && v.status === "ACTIVE" && v.delegationLive;
+/** Onchain delegation expiry (both fixed + recurring carry expiry_ts; 0 = none). `expired` = now ≥ expiry. */
+export function delegationExpiry(c: ChainCard | undefined, nowMs: number): { expiresAt: string | null; expired: boolean } {
+  const ts = c?.delegation?.expiryTs ?? 0n;
+  if (ts <= 0n) return { expiresAt: null, expired: false };
+  return { expiresAt: new Date(Number(ts) * 1000).toISOString(), expired: BigInt(Math.floor(nowMs / 1000)) >= ts };
+}
+
+/** A card can pay only if issued AND onchain Active AND its delegation is live and not expired (F3 step 5). */
+export const isUsable = (v: TCardView) => v.issueState === "issued" && v.status === "ACTIVE" && v.delegationLive && !v.expired;
 
 // ── F8: freeze / unfreeze / close (owner-signed PreparedTx) ──────────────────────────────────────────
 export async function ownedCard(store: Store, owner: string, cardPdaStr: string): Promise<CardRow> {

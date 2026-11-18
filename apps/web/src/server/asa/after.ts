@@ -11,6 +11,20 @@ import { confirmSignature, type Clock, type Rpc } from "../solana/rpc";
 import { reconcileAuthorization, type ReconcileDeps } from "../reconcile/reconciler";
 import { reasonForRow, reasonText } from "./errors";
 import type { AsaDecision } from "./engine";
+import type { CardRef } from "../solana/records";
+import { readChainCards, remainingBase } from "../cards/chain";
+
+/** Remaining spend after a settle: a USED (one-time) card has 0; otherwise the delegation's remaining (period-aware). */
+export async function remainingAfterSettle(deps: Pick<AfterDeps, "rpc">, card: CardRef, nowMs: number): Promise<string | null> {
+  try {
+    const [c] = await readChainCards(deps.rpc, [{ owner: card.owner, cardId: card.cardId }]);
+    if (!c?.card) return null;
+    if (c.card.status === 2 /* USED */) return "0";
+    return c.delegationLive ? remainingBase(c.delegation, BigInt(Math.floor(nowMs / 1000))).toString() : "0";
+  } catch {
+    return null; // best effort: QuickNode enrichment can still fill it
+  }
+}
 
 export type AfterDeps = ReconcileDeps & { rpc: Rpc; store: Store; lithic: Pick<LithicApi, "getTransaction" | "setCardState">; clock: Clock; lateWatchMs?: number };
 
@@ -64,10 +78,13 @@ async function persist(deps: AfterDeps, d: AsaDecision, repliedAt: string, dedup
     settle_signature: d.signature, confirmed_at: d.confirmedAt, replied_at: repliedAt, timings: d.timings,
     reconcile_action: reconcileAction, ...(prev ? {} : { lithic_final_status: null, refund_signature: null }),
   });
+  // After an APPROVED settle (already confirmed), read the card + delegation once so Activity shows the remaining
+  // limit without QuickNode. Runs after the row write (Demo Merchant polls the row) and never affects the reply.
+  const remaining = d.result === "APPROVED" && d.card ? await remainingAfterSettle(deps, d.card, deps.clock.now()) : null;
   await deps.store.insertFeedEvent({
     owner_wallet: d.card?.owner.toBase58() ?? null, card_pda: d.card?.pda.toBase58() ?? null,
     kind: d.result === "APPROVED" ? "authorization_approved" : "authorization_declined",
-    amount_base: d.amountBase > 0n ? d.amountBase.toString() : (BigInt(d.amountCents) * 10_000n).toString(), remaining_base: null,
+    amount_base: d.amountBase > 0n ? d.amountBase.toString() : (BigInt(d.amountCents) * 10_000n).toString(), remaining_base: remaining,
     signature: d.signature, lithic_token: d.token, merchant: d.merchant.descriptor, reason: reasonText(d.reason), source: "lithic", slot: null,
   });
 }
