@@ -111,5 +111,5 @@ Longer answers are in [PITCH.md](PITCH.md). Short versions:
 - That a real purchase happened at Temu, Amazon, Netflix or Corner Cafe.
 - That card-network settlement is live, or that anything runs on mainnet.
 - That the screenshots are live captures (they are mock mode).
-- That the free-trial expiry proof came from a Lithic run (it was a MOCK-ASA run against real devnet).
+- That the free-trial expiry proof came from a Lithic run. It was a direct program-level devnet test (settlement-authority signed, no card network involved).
 - Any number not in [EVIDENCE.md](EVIDENCE.md) or the evidence files.
