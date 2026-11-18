@@ -19,7 +19,7 @@ SolSend is a **burner card per store with onchain caps, funded straight from you
 - **Existing self-custodial Solana cards use one SPL delegation per wallet** [2][4][5]. A leak or a breached store exposes the whole delegation. SolSend uses **one allowance per card**, so the blast radius is the sum of your caps: the most anyone can ever pull.
 - **The issuer is not your custodian.** Solflare's card paused when Kulipa wound down, but the money stayed in wallets [3]. That precedent is the argument for not pre-funding. SolSend's revoke-all goes to the Allowances program directly, so it works even if SolSend is gone.
 - **Burner cards are not new.** Privacy.com solved them for fiat [1]. Our difference is self-custody plus caps enforced by a program instead of a company's database.
-- **Why caps onchain matter.** A cap in a provider's database is a promise. The Gnosis Pay incident [6] shows that onchain card stacks carry exploit risk of their own, which is why we build on Solana's audited Allowances program [7] and keep our own program small and reviewed (41 LiteSVM tests, two independent security reviews with all findings fixed: [audit-program-cp1](evidence/audit-program-cp1.md), [audit-backend-cp1](evidence/audit-backend-cp1.md)).
+- **Why caps onchain matter.** A cap in a provider's database is a promise. The Gnosis Pay incident [6] shows that onchain card stacks carry exploit risk of their own, which is why we build on Solana's audited Allowances program [7] and keep our own program small and reviewed (41 LiteSVM tests, two adversarial AI-assisted security reviews with all findings fixed: [audit-program-cp1](evidence/audit-program-cp1.md), [audit-backend-cp1](evidence/audit-backend-cp1.md)).
 
 ## The consumer pain
 
