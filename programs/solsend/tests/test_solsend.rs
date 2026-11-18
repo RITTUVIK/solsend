@@ -35,6 +35,7 @@ fn initialize_config_is_a_singleton_and_rejects_negative_idle() {
     let mut svm = new_svm();
     let admin = Keypair::new();
     svm.airdrop(&admin.pubkey(), 10_000_000_000).unwrap();
+    set_upgrade_authority(&mut svm, Some(&admin.pubkey()));
     let mint = Pubkey::new_unique();
     put_mint(&mut svm, mint);
     let args = InitializeConfigArgs { settlement_authority: admin.pubkey(), treasury_destination: admin.pubkey(), per_tx_max: 0, idle_secs: -1 };
@@ -245,7 +246,7 @@ fn settle_fixed_happy_path_exact_deltas_record_and_event() {
     assert_eq!(fixed_remaining(&e.svm, &del), 40 * USDC - 23_170_000, "delegation cap decremented by Allowances");
     assert!(e.svm.get_balance(&e.settler.pubkey()).unwrap() < settler_sol, "settler pays the record rent");
 
-    let rec = read_record(&e.svm, &record_pda(&card, &h(1)));
+    let rec = read_record(&e.svm, &record_pda(&h(1)));
     assert_eq!((rec.card, rec.auth_hash, rec.amount, rec.refunded, rec.created_ts), (card, h(1), 23_170_000, 0, START_TS + 60));
     let c = read_card(&e.svm, &card);
     assert_eq!(c.merchant_lock, MERCHANT_A, "merchant locked on first settle");
@@ -274,7 +275,7 @@ fn duplicate_auth_hash_never_settles_twice_even_after_30_days() {
     let del = e.delegation(1);
     ok(e.settle(1, 5 * USDC, h(9), MERCHANT_A), "first settle");
     let before = (e.balances(), fixed_remaining(&e.svm, &del));
-    let rec_before = e.svm.get_account(&record_pda(&card, &h(9))).unwrap();
+    let rec_before = e.svm.get_account(&record_pda(&h(9))).unwrap();
 
     fails_with(e.settle(1, 5 * USDC, h(9), MERCHANT_A), SYSTEM_ERR_ALREADY_IN_USE, "same auth, same amount");
     fails_with(e.settle(1, 7 * USDC, h(9), MERCHANT_A), SYSTEM_ERR_ALREADY_IN_USE, "same auth, different amount");
@@ -284,7 +285,7 @@ fn duplicate_auth_hash_never_settles_twice_even_after_30_days() {
     fails_with(e.settle(1, 5 * USDC, h(9), MERCHANT_A), SYSTEM_ERR_ALREADY_IN_USE, "same auth after +395 days");
 
     assert_eq!(before, (e.balances(), fixed_remaining(&e.svm, &del)), "no second pull, cap untouched");
-    assert_eq!(rec_before, e.svm.get_account(&record_pda(&card, &h(9))).unwrap(), "record unchanged");
+    assert_eq!(rec_before, e.svm.get_account(&record_pda(&h(9))).unwrap(), "record unchanged");
     let c = read_card(&e.svm, &card);
     assert_eq!((c.total_settled, c.settle_count), (5 * USDC, 1));
 }
@@ -292,13 +293,13 @@ fn duplicate_auth_hash_never_settles_twice_even_after_30_days() {
 #[test]
 fn over_cap_fails_with_allowances_300_and_moves_nothing() {
     let mut e = setup();
-    let card = e.fixed_card(1, KIND_STORE_LOCKED, 40 * USDC);
+    e.fixed_card(1, KIND_STORE_LOCKED, 40 * USDC);
     let del = e.delegation(1);
     ok(e.settle(1, 23_170_000, h(1), MERCHANT_A), "settle 23.17");
     let before = (e.balances(), fixed_remaining(&e.svm, &del));
     fails_with(e.settle(1, 16_830_001, h(2), MERCHANT_A), ALLOWANCES_ERR_EXCEEDS_FIXED, "1 base unit over the remaining cap");
     assert_eq!(before, (e.balances(), fixed_remaining(&e.svm, &del)));
-    assert!(e.svm.get_account(&record_pda(&card, &h(2))).is_none(), "no record for a declined settle");
+    assert!(e.svm.get_account(&record_pda(&h(2))).is_none(), "no record for a declined settle");
 
     let t = ok(e.settle(1, 16_830_000, h(3), MERCHANT_A), "exactly the remaining cap");
     assert_eq!(events::<solsend::CardSettled>(&t.logs)[0].remaining_allowance, 0);
@@ -403,7 +404,7 @@ fn frozen_card_cannot_settle_until_owner_unfreezes() {
     fails_with(r, anchor_err(AnchorErrorCode::ConstraintSeeds), "settler unfreezes");
     let t = ok(e.owner_send(ix_unfreeze(&e.owner.pubkey(), card)), "owner unfreezes");
     assert_eq!(events::<solsend::CardUnfrozen>(&t.logs)[0].card, card);
-    fails_with(e.owner_send(ix_unfreeze(&e.owner.pubkey(), card)), sol(SolsendError::NotAuthorized), "unfreeze an active card");
+    ok(e.owner_send(ix_unfreeze(&e.owner.pubkey(), card)), "re-activating an active card is allowed (resets the idle timer)");
     ok(e.settle(1, USDC, h(1), MERCHANT_A), "settle after unfreeze");
 
     // the settlement authority CAN freeze (reduce-only)
@@ -477,7 +478,8 @@ fn one_time_card_is_used_after_first_settle() {
     let card = e.fixed_card(1, KIND_ONE_TIME, 25 * USDC);
     let t = ok(e.settle(1, 12 * USDC, h(1), MERCHANT_A), "one-time settle");
     let ev = &events::<solsend::CardSettled>(&t.logs)[0];
-    assert_eq!((ev.status_after, ev.remaining_allowance), (STATUS_USED, 13 * USDC));
+    assert_eq!((ev.status_after, ev.remaining_allowance), (STATUS_USED, 0), "a Used card reports no spending power (L3)");
+    assert_eq!(fixed_remaining(&e.svm, &e.delegation(1)), 13 * USDC, "the unspent delegation remainder is unreachable");
     assert_eq!(read_card(&e.svm, &card).status, STATUS_USED);
     fails_with(e.settle(1, USDC, h(2), MERCHANT_A), sol(SolsendError::CardNotActive), "second settle on a used card");
     fails_with(e.owner_send(ix_freeze(&e.owner.pubkey(), card)), sol(SolsendError::CardNotActive), "freeze a used card");
@@ -521,8 +523,6 @@ fn zero_amounts_rejected() {
     fails_with(e.settle(1, 0, h(1), MERCHANT_A), sol(SolsendError::ZeroAmount), "settle 0");
     ok(e.settle(1, USDC, h(2), MERCHANT_A), "settle");
     fails_with(e.refund(1, 0, h(2)), sol(SolsendError::ZeroAmount), "refund 0");
-    let ix = ix_admin_withdraw(&e.admin.pubkey(), &e.mint, e.destination, 0);
-    fails_with(e.admin_send(ix), sol(SolsendError::ZeroAmount), "withdraw 0");
 }
 
 #[test]
@@ -571,7 +571,7 @@ fn refund_bounded_partial_plus_remainder() {
     let t = ok(e.refund(1, 3 * USDC, h(1)), "refund the remainder");
     assert_eq!(events::<solsend::CardRefunded>(&t.logs)[0].record_refunded, 5 * USDC);
     assert_eq!(e.balances(), (OWNER_START, 0));
-    let rec = read_record(&e.svm, &record_pda(&card, &h(1)));
+    let rec = read_record(&e.svm, &record_pda(&h(1)));
     assert_eq!((rec.amount, rec.refunded), (5 * USDC, 5 * USDC));
     let c = read_card(&e.svm, &card);
     assert_eq!((c.total_settled, c.total_refunded), (5 * USDC, 5 * USDC));
@@ -585,10 +585,10 @@ fn refund_bounded_partial_plus_remainder() {
 #[test]
 fn fully_refunded_record_persists_and_blocks_refund_and_resettle() {
     let mut e = setup();
-    let card = e.fixed_card(1, KIND_STORE_LOCKED, 40 * USDC);
+    e.fixed_card(1, KIND_STORE_LOCKED, 40 * USDC);
     ok(e.settle(1, 5 * USDC, h(1), MERCHANT_A), "settle 5");
     ok(e.refund(1, 5 * USDC, h(1)), "full refund");
-    let rec = record_pda(&card, &h(1));
+    let rec = record_pda(&h(1));
     let snapshot = e.svm.get_account(&rec).unwrap();
     fails_with(e.refund(1, 1, h(1)), sol(SolsendError::RefundExceedsSettled), "refund a fully refunded record");
     e.warp(30 * DAY);
@@ -615,9 +615,9 @@ fn refund_to_a_different_token_account_is_rejected() {
     // a record belongs to one card: card 2's refund cannot drain card 1's record
     e.fixed_card(2, KIND_STORE_LOCKED, 40 * USDC);
     let mut a = refund_accounts(&e.settler.pubkey(), &e.owner.pubkey(), &e.mint, 2, &h(1));
-    a.settlement_record = record_pda(&e.card(1), &h(1));
+    a.settlement_record = record_pda(&h(1));
     let r = send(&mut e.svm, &[ix_refund_with(a, 5 * USDC, h(1))], &s, &[]);
-    assert!(r.is_err(), "cross-card record must be rejected");
+    fails_with(r, anchor_err(AnchorErrorCode::ConstraintHasOne), "card 2 refunding card 1's record");
     assert_eq!(token_amount(&e.svm, &e.mallory_ata()), 0);
     assert_eq!(e.balances(), (OWNER_START - 5 * USDC, 5 * USDC));
 }
@@ -671,19 +671,13 @@ fn unauthorized_signers_rejected_on_every_privileged_ix() {
     fails_with(e.mallory_send(ix_close_card(&m, card)), anchor_err(AnchorErrorCode::ConstraintSeeds), "close_card");
     ok(e.owner_send(ix_freeze(&owner, card)), "owner freezes");
     fails_with(e.mallory_send(ix_unfreeze(&m, card)), anchor_err(AnchorErrorCode::ConstraintSeeds), "unfreeze_card");
-    let ix = ix_admin_withdraw(&m, &mint, e.destination, USDC);
-    fails_with(e.mallory_send(ix), sol(SolsendError::NotAdmin), "admin_withdraw");
     // the admin is not the settlement authority, and the owner is not the admin
     let ix = ix_settle_with(settle_accounts(&e.admin.pubkey(), &owner, &mint, 1, &h(3)), USDC, h(3), MERCHANT_A);
     fails_with(e.admin_send(ix), sol(SolsendError::NotSettlementAuthority), "admin settles");
-    let ix = ix_admin_withdraw(&owner, &mint, e.destination, USDC);
-    fails_with(e.owner_send(ix), sol(SolsendError::NotAdmin), "owner withdraws");
-    // the settlement authority cannot close cards or withdraw
+    // the settlement authority cannot close cards
     let s = e.settler.insecure_clone();
     let r = send(&mut e.svm, &[ix_close_card(&s.pubkey(), card)], &s, &[]);
     fails_with(r, anchor_err(AnchorErrorCode::ConstraintSeeds), "settler close_card");
-    let r = send(&mut e.svm, &[ix_admin_withdraw(&s.pubkey(), &mint, e.destination, USDC)], &s, &[]);
-    fails_with(r, sol(SolsendError::NotAdmin), "settler admin_withdraw");
     // a missing signature is rejected even with the right pubkey
     let mut ix = ix_set_paused(&e.admin.pubkey(), true);
     ix.accounts[0].is_signer = false;
@@ -691,26 +685,6 @@ fn unauthorized_signers_rejected_on_every_privileged_ix() {
 
     assert_eq!(before, (e.balances(), token_amount(&e.svm, &e.mallory_ata())), "no funds moved");
     assert!(!read_config(&e.svm).paused);
-}
-
-#[test]
-fn admin_withdraw_only_to_treasury_destination() {
-    let mut e = setup();
-    e.fixed_card(1, KIND_STORE_LOCKED, 40 * USDC);
-    ok(e.settle(1, 9 * USDC, h(1), MERCHANT_A), "settle 9");
-    let ix = ix_admin_withdraw(&e.admin.pubkey(), &e.mint, e.mallory_ata(), USDC);
-    fails_with(e.admin_send(ix), sol(SolsendError::InvalidDestination), "withdraw to mallory");
-    let ix = ix_admin_withdraw(&e.admin.pubkey(), &e.mint, e.owner_ata, USDC);
-    fails_with(e.admin_send(ix), sol(SolsendError::InvalidDestination), "withdraw to a user");
-    assert_eq!(token_amount(&e.svm, &e.mallory_ata()), 0);
-
-    ok(e.admin_send(ix_admin_withdraw(&e.admin.pubkey(), &e.mint, e.destination, 4 * USDC)), "withdraw 4 to destination");
-    assert_eq!(token_amount(&e.svm, &e.destination), 4 * USDC);
-    assert_eq!(token_amount(&e.svm, &e.treasury_ata), 5 * USDC);
-    let r = e.admin_send(ix_admin_withdraw(&e.admin.pubkey(), &e.mint, e.destination, 5 * USDC + 1));
-    fails_with(r, 1, "overdraw the treasury (SPL insufficient funds)");
-    ok(e.admin_send(ix_admin_withdraw(&e.admin.pubkey(), &e.mint, e.destination, 5 * USDC)), "withdraw the rest");
-    assert_eq!((token_amount(&e.svm, &e.destination), token_amount(&e.svm, &e.treasury_ata)), (9 * USDC, 0));
 }
 
 // ═══ derivations ═════════════════════════════════════════════════════════════
