@@ -7,6 +7,7 @@
 //   3. $0 AUTHORIZATION (card verification), no settle                     → "zero_amount_verification"
 // Everything else declines: program errors (mapped), unknown errors, the hard deadline, exceptions.
 // The engine never throws and never approves after the deadline. Pure: rpc/keys/clock injected.
+import "server-only";
 import bs58 from "bs58";
 import { ComputeBudgetProgram, Transaction, type Keypair } from "@solana/web3.js";
 import { AsaRequestZ, centsToBase, ixSettle, toHex, type AsaRequest, type AsaResult } from "@solsend/shared";
@@ -56,13 +57,35 @@ export type AsaDecision = {
 
 export type AsaOutcome =
   | { status: 401; body: { error: string }; reason: string; decision: null }
-  | { status: 200; body: { result: AsaResult }; decision: AsaDecision; deduped: boolean };
+  | { status: 200; body: { result: AsaResult }; decision: AsaDecision; deduped: boolean; webhookId: string };
+
+/** Replay guard (audit L2): webhook-ids seen in the last 10 min, bounded LRU. */
+export const REPLAY_WINDOW_MS = 10 * 60_000;
+export const REPLAY_MAX_IDS = 5_000;
+
+/** In-flight fingerprint (audit H1): a same-token request must match EVERY field that changes the decision. */
+export function requestFingerprint(req: AsaRequest): string {
+  return JSON.stringify([req.status, amountCents(req), req.amounts?.cardholder?.currency ?? "", req.card.token, req.card.state ?? "", merchantIdentity(req.merchant) ?? ""]);
+}
 
 type Ctx = { signature: string | null; settleSent: boolean; card: CardRef | null; sentAt?: number; /** set synchronously when the deadline reply is taken: nothing may be SENT after it */ closed: boolean };
 
 export function createAsaEngine(deps: AsaDeps) {
   const { clock } = deps;
-  const inflight = new Map<string, Promise<AsaDecision>>();
+  type Inflight = { p: Promise<AsaDecision>; fp: string; done: boolean };
+  const inflight = new Map<string, Inflight>();
+  const seenIds = new Map<string, { token: string; at: number }>(); // insertion order = LRU order
+
+  /** true if this webhook-id was already seen in the window (and records it otherwise). */
+  function seen(id: string, token: string): { token: string } | null {
+    const now = clock.now();
+    const hit = seenIds.get(id);
+    if (hit && now - hit.at < REPLAY_WINDOW_MS) return hit;
+    seenIds.delete(id);
+    seenIds.set(id, { token, at: now });
+    while (seenIds.size > REPLAY_MAX_IDS) seenIds.delete(seenIds.keys().next().value!);
+    return null;
+  }
 
   function base(req: Partial<AsaRequest> | null, token: string): Omit<AsaDecision, "result" | "reason" | "timings"> {
     const cents = amountCents(req);
@@ -138,9 +161,9 @@ export function createAsaEngine(deps: AsaDeps) {
         let rec = null;
         try { rec = await readSettlementRecord(deps.rpc, card.pda, authHash); } catch { /* retry */ }
         if (rec) {
-          return rec.amount === amountBase
-            ? out("APPROVED", "duplicate_already_settled", { amountBase, timings: { ...timings, total_ms: elapsed() } })
-            : out("SUSPECTED_FRAUD", "duplicate_amount_mismatch", { amountBase, timings: { ...timings, total_ms: elapsed() } });
+          // audit M1: approve ONLY an exact, unrefunded redelivery (a refunded record means the USDC went back).
+          if (rec.amount === amountBase && rec.refunded === 0n) return out("APPROVED", "duplicate_already_settled", { amountBase, timings: { ...timings, total_ms: elapsed() } });
+          return out("SUSPECTED_FRAUD", rec.amount !== amountBase ? "duplicate_amount_mismatch" : "duplicate_refunded", { amountBase, timings: { ...timings, total_ms: elapsed() } });
         }
         await clock.sleep(150);
       }
@@ -185,24 +208,45 @@ export function createAsaEngine(deps: AsaDeps) {
         if (!parsed) {
           const tok = (() => { try { const t = (JSON.parse(rawBody) as { token?: unknown }).token; return typeof t === "string" ? t : ""; } catch { return ""; } })();
           const d: AsaDecision = { ...base(null, tok), result: "SUSPECTED_FRAUD", reason: "bad_request", timings: { total_ms: Math.round(clock.now() - receivedAt) } };
-          return { status: 200, body: { result: d.result }, decision: d, deduped: false };
+          return { status: 200, body: { result: d.result }, decision: d, deduped: false, webhookId: v.id };
         }
-        // Same token on this instance → same decision promise. Cross-instance duplicates are still
-        // single-settled by the onchain SettlementRecord (atomic idempotency, invariant 2).
-        let p = inflight.get(parsed.token);
-        const deduped = !!p;
-        if (!p) {
-          p = decideWithDeadline(parsed, receivedAt);
-          inflight.set(parsed.token, p);
-          const tok = parsed.token;
-          void p.finally(() => setTimeout(() => inflight.delete(tok), 60_000).unref?.());
+        const quick = (reason: string): AsaDecision => ({ ...base(parsed, parsed!.token), result: "SUSPECTED_FRAUD", reason, timings: { total_ms: Math.round(clock.now() - receivedAt) } });
+        // audit L2: a repeated webhook-id gets the in-flight decision if the first delivery is still deciding,
+        // otherwise it declines `replay` (never a second settle attempt from a replayed request).
+        const replayOf = seen(v.id, parsed.token);
+        if (replayOf) {
+          const cur = inflight.get(replayOf.token);
+          if (cur && !cur.done && replayOf.token === parsed.token) {
+            const d = await cur.p;
+            return { status: 200, body: { result: d.result }, decision: d, deduped: true, webhookId: v.id };
+          }
+          const d = quick("replay");
+          return { status: 200, body: { result: d.result }, decision: d, deduped: true, webhookId: v.id };
         }
-        const d = await p;
-        return { status: 200, body: { result: d.result }, decision: d, deduped };
+        // Same token on this instance → same decision promise, but ONLY for an identical request (audit H1):
+        // a different amount/status/card/merchant under the same token declines `inflight_mismatch` and never
+        // inherits a cached APPROVED. Cross-instance duplicates are still single-settled by the onchain
+        // SettlementRecord + the exact-amount/unrefunded duplicate rule (invariant 2).
+        const fp = requestFingerprint(parsed);
+        const cur = inflight.get(parsed.token);
+        if (cur) {
+          if (cur.fp !== fp) {
+            const d = quick("inflight_mismatch");
+            return { status: 200, body: { result: d.result }, decision: d, deduped: true, webhookId: v.id };
+          }
+          const d = await cur.p;
+          return { status: 200, body: { result: d.result }, decision: d, deduped: true, webhookId: v.id };
+        }
+        const entry: Inflight = { p: decideWithDeadline(parsed, receivedAt), fp, done: false };
+        inflight.set(parsed.token, entry);
+        const tok = parsed.token;
+        void entry.p.finally(() => { entry.done = true; setTimeout(() => { if (inflight.get(tok) === entry) inflight.delete(tok); }, 60_000).unref?.(); });
+        const d = await entry.p;
+        return { status: 200, body: { result: d.result }, decision: d, deduped: false, webhookId: v.id };
       } catch {
         // Never throw: an unexpected failure declines (fail-closed).
         const d: AsaDecision = { ...base(null, ""), result: "SUSPECTED_FRAUD", reason: "handler_error", timings: { total_ms: Math.round(clock.now() - receivedAt) } };
-        return { status: 200, body: { result: d.result }, decision: d, deduped: false };
+        return { status: 200, body: { result: d.result }, decision: d, deduped: false, webhookId: headers.get("webhook-id") ?? "" };
       }
     },
   };

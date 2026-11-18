@@ -43,7 +43,7 @@ export async function POST(req: Request): Promise<Response> {
   }
   console.log(`[asa] ${d.result} ${d.reason} token=${d.token} total_ms=${d.timings.total_ms}${d.signature ? ` sig=${d.signature}` : ""}${d.confirmedAt ? ` confirmed_at=${d.confirmedAt}` : ""} replied_at=${repliedAt}${out.deduped ? " (inflight dedupe)" : ""}`);
   try {
-    waitUntil(afterAsaReply(reconcileDeps(), d, repliedAt, { deduped: out.deduped }).catch(() => {}));
+    waitUntil(afterAsaReply(reconcileDeps(), d, repliedAt, { deduped: out.deduped, webhookId: out.webhookId }).catch(() => {}));
   } catch { /* persistence is best effort; correctness lives onchain + in the reconciler */ }
   return Response.json(out.body);
 }

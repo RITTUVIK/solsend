@@ -1,9 +1,11 @@
 // Reconciler executor (CP1 F5). Port of spikes/src/asa/reconcile.ts, driven by Lithic status.
 // Refunds go ONLY through the program's `refund` (to card.source_token_account, capped at
 // record.amount − record.refunded onchain). Refunds NEVER restore the card's allowance.
-import { ComputeBudgetProgram, PublicKey, Transaction, type Keypair } from "@solana/web3.js";
+import "server-only";
+import { ComputeBudgetProgram, PublicKey, Transaction, type Keypair, type TransactionInstruction } from "@solana/web3.js";
+import { createAssociatedTokenAccountIdempotentInstruction } from "@solana/spl-token";
 import bs58 from "bs58";
-import { LITHIC_TERMINAL_DECLINE, SOLSEND_PROGRAM_ID, decodeSettlementRecord, fromHex, ixRefund, toHex, type AuthorizationRow, type LithicTransaction } from "@solsend/shared";
+import { LITHIC_TERMINAL_DECLINE, SOLSEND_PROGRAM_ID, USDC_MINT, decodeSettlementRecord, fromHex, ixRefund, toHex, usdcAta, type AuthorizationRow, type LithicTransaction } from "@solsend/shared";
 import type { Store } from "../store";
 import type { LithicApi } from "../lithic/client";
 import { authCommitment } from "../lib/commitments";
@@ -15,6 +17,8 @@ import { decideReconcile, REFUND_FEED_REASON, type LithicStatus, type RuleOutput
 export type ReconcileDeps = {
   rpc: Rpc; settler: Keypair; store: Store; lithic: Pick<LithicApi, "getTransaction">; clock: Clock;
   blockhash: () => Promise<string>;
+  /** Pays rent to restore a closed owner USDC ATA before a refund (M3). Optional in tests. */
+  feePayer?: Keypair;
 };
 export type ReconcileResult = { token: string; outcome: RuleOutput["action"] | "skipped" | "error"; tag: string; refundSignature?: string; lithicStatus: LithicStatus };
 
@@ -28,81 +32,118 @@ export async function fetchLithicStatus(lithic: Pick<LithicApi, "getTransaction"
   }
 }
 
-async function resolveCard(deps: ReconcileDeps, cardPdaStr: string): Promise<CardRef | null> {
+type ResolvedCard = CardRef & { source: PublicKey };
+async function resolveCard(deps: ReconcileDeps, cardPdaStr: string): Promise<ResolvedCard | null> {
   const pda = new PublicKey(cardPdaStr);
-  const row = await deps.store.getCard(cardPdaStr).catch(() => null);
-  if (row) return { pda, owner: new PublicKey(row.owner_wallet), cardId: BigInt(row.card_id) };
-  const onchain = await readCard(deps.rpc, pda);
-  return onchain ? { pda, owner: onchain.owner, cardId: onchain.cardId } : null;
+  const onchain = await readCard(deps.rpc, pda); // chain is authoritative for the refund destination
+  return onchain ? { pda, owner: onchain.owner, cardId: onchain.cardId, source: onchain.sourceTokenAccount } : null;
 }
 
-const patchRow = (store: Store, row: AuthorizationRow, patch: Partial<AuthorizationRow>) => {
-  const { updated_at: _u, ...rest } = row;
-  return store.upsertAuthorization({ ...rest, ...patch });
-};
+/** L1: write ONLY the changed fields (never `{...staleRow, ...patch}`, which could clobber concurrent writers). */
+const patchRow = (store: Store, token: string, patch: Partial<AuthorizationRow>) => store.upsertAuthorization({ lithic_token: token, ...patch });
+
+/** M2/M3 retry policy: attempt n (1-based) waits min(2^(n-1) x 15 s, 30 min); after 8 -> anomaly_refund_failing. */
+export const MAX_RECONCILE_ATTEMPTS = 8;
+export const backoffMs = (attempts: number) => Math.min(2 ** Math.max(0, attempts - 1) * 15_000, 30 * 60_000);
+/** "wait" outcomes are re-checked later instead of holding the head of the sweep (not counted as attempts). */
+const WAIT_DELAY_MS: Record<string, number> = { lithic_pending: 60_000, not_found_grace: 15_000, lithic_status_unknown: 30_000 };
+
+async function markRetry(deps: ReconcileDeps, row: AuthorizationRow, e: unknown, lithicStatus: LithicStatus): Promise<ReconcileResult> {
+  const token = row.lithic_token;
+  const attempts = (row.reconcile_attempts ?? 0) + 1;
+  const failing = attempts >= MAX_RECONCILE_ATTEMPTS;
+  const err = safeErr(e, 200);
+  console.error(`[reconcile] attempt ${attempts} failed token=${token}: ${err}${failing ? " -> anomaly_refund_failing" : ""}`);
+  await patchRow(deps.store, token, {
+    reconcile_action: failing ? "anomaly_refund_failing" : null, reconcile_attempts: attempts,
+    next_attempt_at: failing ? null : new Date(deps.clock.now() + backoffMs(attempts)).toISOString(), last_error: err,
+    ...(lithicStatus && lithicStatus !== "NOT_FOUND" ? { lithic_final_status: lithicStatus } : {}),
+  }).catch(() => {});
+  return { token, outcome: failing ? "anomaly" : "error", tag: failing ? "anomaly_refund_failing" : `retry_${attempts}:${safeErr(e, 80)}`, lithicStatus };
+}
 
 /**
  * Reconcile ONE authorization. `knownStatus` (from a verified events webhook) skips the Lithic lookup.
- * Idempotent: a concurrent second refund is rejected onchain (RefundExceedsSettled).
+ * Idempotent: a concurrent second refund is rejected onchain (RefundExceedsSettled). Any failure (refund tx,
+ * RPC read, DB) takes the retry path: reconcile_action NULL + backoff, so the sweep retries it later. Never throws.
  */
 export async function reconcileAuthorization(deps: ReconcileDeps, row: AuthorizationRow, knownStatus?: string): Promise<ReconcileResult> {
+  const st: { lithicStatus: LithicStatus } = { lithicStatus: knownStatus ?? null };
+  try {
+    return await reconcileInner(deps, row, st);
+  } catch (e) {
+    return markRetry(deps, row, e, st.lithicStatus);
+  }
+}
+
+async function reconcileInner(deps: ReconcileDeps, row: AuthorizationRow, st: { lithicStatus: LithicStatus }): Promise<ReconcileResult> {
   const token = row.lithic_token;
   if (!row.card_pda) {
-    await patchRow(deps.store, row, { reconcile_action: "none_no_card" });
+    await patchRow(deps.store, token, { reconcile_action: "none_no_card" });
     return { token, outcome: "done", tag: "none_no_card", lithicStatus: null };
   }
   const expectedHash = toHex(authCommitment(token));
   if (row.auth_hash && row.auth_hash !== expectedHash) {
-    await patchRow(deps.store, row, { reconcile_action: "anomaly_auth_hash_mismatch" });
+    await patchRow(deps.store, token, { reconcile_action: "anomaly_auth_hash_mismatch" });
     return { token, outcome: "anomaly", tag: "anomaly_auth_hash_mismatch", lithicStatus: null };
   }
   const card = await resolveCard(deps, row.card_pda);
   if (!card) {
-    await patchRow(deps.store, row, { reconcile_action: "none_card_missing" });
+    await patchRow(deps.store, token, { reconcile_action: "none_card_missing" });
     return { token, outcome: "done", tag: "none_card_missing", lithicStatus: null };
   }
   const authHash = fromHex(expectedHash);
-  let lithicStatus: LithicStatus = knownStatus ?? null;
-  if (!lithicStatus && row.lithic_final_status && (LITHIC_TERMINAL_DECLINE.has(row.lithic_final_status) || row.lithic_final_status === "SETTLED")) lithicStatus = row.lithic_final_status;
-  if (!lithicStatus) lithicStatus = (await fetchLithicStatus(deps.lithic, token)).status;
+  if (!st.lithicStatus && row.lithic_final_status && (LITHIC_TERMINAL_DECLINE.has(row.lithic_final_status) || row.lithic_final_status === "SETTLED")) st.lithicStatus = row.lithic_final_status;
+  if (!st.lithicStatus) st.lithicStatus = (await fetchLithicStatus(deps.lithic, token)).status;
+  const lithicStatus = st.lithicStatus;
   const record = await readSettlementRecord(deps.rpc, card.pda, authHash);
   const ageSecs = (deps.clock.now() - Date.parse(row.created_at)) / 1000;
   const rule = decideReconcile({ decision: row.decision, lithicStatus, record, ageSecs });
   const statusPatch = lithicStatus && lithicStatus !== "NOT_FOUND" ? { lithic_final_status: lithicStatus } : {};
 
   if (rule.action === "wait") {
-    if (statusPatch.lithic_final_status && statusPatch.lithic_final_status !== row.lithic_final_status) await patchRow(deps.store, row, statusPatch);
+    const delay = WAIT_DELAY_MS[rule.why] ?? 30_000;
+    await patchRow(deps.store, token, { ...statusPatch, ...(row.reconcile_action === null ? { next_attempt_at: new Date(deps.clock.now() + delay).toISOString() } : {}) });
     return { token, outcome: "wait", tag: rule.why, lithicStatus };
   }
   if (rule.action === "done" || rule.action === "anomaly") {
-    await patchRow(deps.store, row, { ...statusPatch, reconcile_action: rule.tag });
+    await patchRow(deps.store, token, { ...statusPatch, reconcile_action: rule.tag, next_attempt_at: null });
     if (rule.action === "anomaly") console.warn(`[reconcile] ANOMALY ${rule.tag} token=${token}`);
     return { token, outcome: rule.action, tag: rule.tag, lithicStatus };
   }
 
-  // refund the remainder (capped onchain at record.amount − record.refunded)
-  try {
-    const sig = await sendRefund(deps, card, authHash, rule.amount);
-    await patchRow(deps.store, row, { ...statusPatch, reconcile_action: "refunded", refund_signature: sig });
-    await deps.store.insertFeedEvent({
-      owner_wallet: card.owner.toBase58(), card_pda: card.pda.toBase58(), kind: "refunded", amount_base: rule.amount.toString(), remaining_base: null,
-      signature: sig, lithic_token: token, merchant: row.merchant_descriptor, reason: `${REFUND_FEED_REASON} (Lithic ${lithicStatus})`, source: "reconciler", slot: null,
-    }).catch(() => false);
-    return { token, outcome: "refund", tag: "refunded", refundSignature: sig, lithicStatus };
-  } catch (e) {
-    console.error(`[reconcile] refund failed token=${token}: ${safeErr(e)}`);
-    if (statusPatch.lithic_final_status) await patchRow(deps.store, row, statusPatch).catch(() => {});
-    return { token, outcome: "error", tag: `refund_failed:${safeErr(e, 80)}`, lithicStatus };
-  }
+  // refund the remainder (capped onchain at record.amount - record.refunded). Errors -> retry path (caller).
+  const sig = await sendRefund(deps, card, authHash, rule.amount);
+  await patchRow(deps.store, token, { ...statusPatch, reconcile_action: "refunded", refund_signature: sig, next_attempt_at: null, last_error: null });
+  await deps.store.insertFeedEvent({
+    owner_wallet: card.owner.toBase58(), card_pda: card.pda.toBase58(), kind: "refunded", amount_base: rule.amount.toString(), remaining_base: null,
+    signature: sig, lithic_token: token, merchant: row.merchant_descriptor, reason: `${REFUND_FEED_REASON} (Lithic ${lithicStatus})`, source: "reconciler", slot: null,
+  }).catch(() => false);
+  return { token, outcome: "refund", tag: "refunded", refundSignature: sig, lithicStatus };
 }
 
-/** Send `refund` signed + paid by the settlement authority; resolves only once CONFIRMED with err null. */
-export async function sendRefund(deps: Pick<ReconcileDeps, "rpc" | "settler" | "clock" | "blockhash">, card: CardRef, authHash: Uint8Array, amount: bigint): Promise<string> {
+/**
+ * Send `refund` signed + paid by the settlement authority; resolves only once CONFIRMED with err null.
+ * M3: if the destination (card.source_token_account) no longer exists AND equals usdcAta(owner), prepend an
+ * idempotent ATA create paid by the fee payer, so a closed ATA can never block a refund. Any other missing
+ * destination is never created (the refund then fails -> retry/anomaly).
+ */
+export async function sendRefund(deps: Pick<ReconcileDeps, "rpc" | "settler" | "clock" | "blockhash" | "feePayer">, card: CardRef & { source?: PublicKey }, authHash: Uint8Array, amount: bigint): Promise<string> {
+  const pre: TransactionInstruction[] = [];
+  if (card.source) {
+    const dest = await deps.rpc.getAccountInfo(card.source, "confirmed");
+    if (!dest) {
+      if (!card.source.equals(usdcAta(card.owner))) throw new Error("refund destination missing and is not the owner's USDC ATA");
+      if (!deps.feePayer) throw new Error("refund destination ATA missing (no fee payer configured to restore it)");
+      pre.push(createAssociatedTokenAccountIdempotentInstruction(deps.feePayer.publicKey, card.source, card.owner, USDC_MINT));
+    }
+  }
   const tx = new Transaction({ feePayer: deps.settler.publicKey, recentBlockhash: await deps.blockhash() }).add(
-    ComputeBudgetProgram.setComputeUnitLimit({ units: 60_000 }),
+    ComputeBudgetProgram.setComputeUnitLimit({ units: pre.length ? 90_000 : 60_000 }),
+    ...pre,
     ixRefund({ settler: deps.settler.publicKey, owner: card.owner, cardId: card.cardId, amount, authHash }),
   );
-  tx.sign(deps.settler);
+  if (pre.length) tx.sign(deps.settler, deps.feePayer!); else tx.sign(deps.settler);
   const raw = tx.serialize();
   const sig = bs58.encode(tx.signature!);
   await deps.rpc.sendRawTransaction(raw, { skipPreflight: false, preflightCommitment: "confirmed", maxRetries: 0 });
@@ -138,16 +179,12 @@ export async function recoverMissingRow(deps: ReconcileDeps, token: string, card
   return reconcileAuthorization(deps, (await deps.store.getAuthorization(token))!);
 }
 
-/** Cron / manual sweep of `reconcile_action IS NULL` rows (oldest first). Sequential to respect RPC limits. */
+/** Cron / manual sweep of due `reconcile_action IS NULL` rows (backoff-aware order). Sequential to respect RPC limits. */
 export async function sweep(deps: ReconcileDeps, opts: { olderThanSecs?: number; limit?: number } = {}) {
   const rows = await deps.store.listUnreconciled(opts.olderThanSecs ?? 15, opts.limit ?? 20);
   const results: ReconcileResult[] = [];
   for (const row of rows) {
-    try {
-      results.push(await reconcileAuthorization(deps, row));
-    } catch (e) {
-      results.push({ token: row.lithic_token, outcome: "error", tag: safeErr(e, 80), lithicStatus: null });
-    }
+    results.push(await reconcileAuthorization(deps, row)); // never throws: failures take the retry path
   }
   return results;
 }

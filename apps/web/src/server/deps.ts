@@ -42,7 +42,7 @@ export function asaEngine() {
 }
 
 export function reconcileDeps(): AfterDeps {
-  return { rpc: connection(), settler: settlementAuthority(), store: getStore(), lithic: lithic(), clock: realClock, blockhash: () => blockhash().get() };
+  return { rpc: connection(), settler: settlementAuthority(), feePayer: feePayerKey(), store: getStore(), lithic: lithic(), clock: realClock, blockhash: () => blockhash().get() };
 }
 
 export const feePayer = () => feePayerKey();

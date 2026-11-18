@@ -1,3 +1,4 @@
+import "server-only";
 // Lithic `card_transaction.updated` events → reconciler (CP1 F5). Same HMAC scheme as ASA, keyed with the
 // event subscription's own whsec_ secret; deduped on webhook-id via webhook_receipts.
 import { LithicTransactionZ, LITHIC_TERMINAL_DECLINE, toHex, type AuthorizationRow, type LithicTransaction } from "@solsend/shared";
@@ -39,8 +40,7 @@ export async function applyTransactionUpdate(deps: ReconcileDeps, tx: LithicTran
   if (!row) return recordWithoutAsa(deps, tx);
   if (SKIP(row.reconcile_action)) {
     if (row.lithic_final_status !== tx.status) {
-      const { updated_at: _u, ...rest } = row;
-      await deps.store.upsertAuthorization({ ...rest, lithic_final_status: tx.status });
+      await deps.store.upsertAuthorization({ lithic_token: row.lithic_token, lithic_final_status: tx.status }); // patch only (L1)
     }
     return { token: tx.token, outcome: "skipped", tag: row.reconcile_action ?? "" };
   }
@@ -57,6 +57,7 @@ async function recordWithoutAsa(deps: ReconcileDeps, tx: LithicTransaction) {
     merchant_descriptor: merchantDescriptor(tx), acceptor_id: null, decision: declined ? (tx.result && tx.result !== "APPROVED" ? tx.result : "DECLINED") : "NO_ASA",
     reason: declined ? `${SAFETY_LIMIT_REASON}${detail ? ` (${detail})` : ""}` : "Lithic transaction without an ASA request (anomaly)", settle_signature: null, confirmed_at: null, replied_at: null,
     timings: {}, lithic_final_status: tx.status, reconcile_action: declined ? "none_lithic_declined" : "anomaly_no_asa_request", refund_signature: null,
+    reconcile_attempts: 0, next_attempt_at: null, last_error: null,
   };
   await deps.store.upsertAuthorization(row);
   if (declined && card) {
