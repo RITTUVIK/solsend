@@ -65,6 +65,11 @@ export const EmbedSessionResponse = z.object({
   iframeUrl: z.string().url(), expiresAt: z.string(),
   /** Per-field Lithic hosted iframes (sandbox). All render inside Lithic's origin; values never reach our servers. */
   iframes: z.object({ pan: z.string().url(), cvv: z.string().url(), expMonth: z.string().url(), expYear: z.string().url() }).partial().optional(),
+  /** Modern Lithic flow: the short-lived, single-use embed session for the official `lithic-embed` SDK, which mounts
+   *  Lithic's iframes MASKED and reveals them via `toggleMasking()` (postMessage to Lithic's origin). Owner-only bearer
+   *  capability: never log or persist it. Absent for the legacy HMAC flow (which renders unmasked) and mock mode. */
+  session: z.string().min(1).optional(),
+  flow: z.enum(["session", "legacy_hmac", "mock"]).optional(),
 });
 
 // ── Activity feed ────────────────────────────────────────────────────────────────────────

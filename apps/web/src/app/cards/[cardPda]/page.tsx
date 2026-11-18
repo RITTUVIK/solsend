@@ -13,14 +13,16 @@ import { CardVisual, LimitBar } from "@/components/CardVisual";
 import { FeedList, LiveDot } from "@/components/FeedList";
 import { Stepper } from "@/components/Stepper";
 import { ErrorNote, Icon, InfoDisclosure, ProofRow, Sheet, Skeleton, Spinner } from "@/components/ui";
+import { LithicSecureFields } from "@/components/LithicSecureFields";
 
 type Act = "freeze" | "unfreeze" | "close";
 const ACT_DONE: Record<Act, string> = { freeze: "Card frozen. Nothing can be charged until you unfreeze it.", unfreeze: "Card unfrozen and ready to use.", close: "Card closed. Its allowance was revoked onchain." };
 const LOCK_INFO = "Enforced onchain: each payment must match the store ID the card network reports for this card. SolSend's server relays that ID; Solana enforces the lock and the cap.";
 
-/** Card back: Lithic's hosted iframes render the number/expiry/CVV inside Lithic's origin. We only hold the URLs. */
+/** Card back: Lithic's hosted iframes render the number/expiry/CVV inside Lithic's origin. We only hold the session/URLs.
+ *  Modern flow → official SDK (frames start MASKED; the SDK reveals them in-frame). Mock → per-field frames. Legacy → one frame. */
 function CardBack({ session, onHide }: { session: z.infer<typeof api.EmbedSessionResponse>; onHide: () => void }) {
-  const f = session.iframes ?? {};
+  const f = session.flow === "legacy_hmac" ? {} : (session.iframes ?? {});
   const frame = (k: "pan" | "cvv" | "expMonth" | "expYear", label: string, cls = "") => f[k] ? (
     <div className={cls}>
       <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-white/60">{label}</p>
@@ -29,7 +31,9 @@ function CardBack({ session, onHide }: { session: z.infer<typeof api.EmbedSessio
   ) : null;
   return (
     <div className="anim-born rounded-[20px] bg-[#141416] p-4 text-white shadow-[0_14px_32px_-14px_rgb(11_12_14/.55)] ring-1 ring-white/10" data-testid="embed-fields">
-      {Object.keys(f).length > 0 ? (
+      {session.flow === "session" && session.session ? (
+        <LithicSecureFields session={session.session} />
+      ) : Object.keys(f).length > 0 ? (
         <div className="grid grid-cols-3 gap-2.5">
           {frame("pan", "Card number", "col-span-3")}
           {frame("expMonth", "Exp. month")}

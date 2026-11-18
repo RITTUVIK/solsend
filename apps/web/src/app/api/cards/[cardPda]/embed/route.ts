@@ -31,8 +31,10 @@ export async function POST(req: Request, ctx: { params: Promise<{ cardPda: strin
     if (row.issue_state !== "issued" || !row.lithic_card_token) throw new HttpError(409, "card is not issued yet", "not_issued");
     if (!(await deps.store.rateLimit(`embed:${wallet}`, 600, 20))) throw new HttpError(429, "too many card reveals", "rate_limited");
     const s = await deps.lithic.createEmbed(row.lithic_card_token, { targetOrigin: targetOrigin(req), ttlSecs: EMBED_TTL_SECS, nowMs: Date.now() });
-    const body = api.EmbedSessionResponse.parse({ iframeUrl: s.iframeUrl, expiresAt: s.expiresAt });
-    return Response.json({ ...body, iframes: s.iframes, flow: s.flow, sandbox: true }, { headers: { "cache-control": "no-store" } });
+    // Modern flow: the browser SDK (lithic-embed) needs the session itself to mount Lithic's iframes and reveal them
+    // (they render MASKED until toggleMasking()). Same owner-only bearer capability as the iframe URLs; never logged.
+    const body = api.EmbedSessionResponse.parse({ iframeUrl: s.iframeUrl, expiresAt: s.expiresAt, iframes: s.iframes, flow: s.flow, ...(s.session ? { session: s.session } : {}) });
+    return Response.json({ ...body, sandbox: true }, { headers: { "cache-control": "no-store" } });
   } catch (e) {
     return errorResponse(e);
   }

@@ -21,13 +21,15 @@ export function humanError(e: unknown): string {
       case "intent_expired": return "That request timed out before it was signed. Please try again.";
       case "tx_expired": return "The network moved on before you signed. Please try again.";
       case "setup_required": return "Your wallet needs a one-time setup before it can make cards.";
+      case "nothing_to_revoke": return "There's nothing left to revoke: no card has a live allowance onchain.";
     }
     if (e.status === 0) return e.message;
     if (e.status >= 500) return "SolSend hit a snag on our side. Nothing was lost. Try again in a moment.";
     return e.message || "Something went wrong. Please try again.";
   }
   if (e instanceof Error && e.message) {
-    if (/reject|denied|cancel/i.test(e.message)) return "Signing was cancelled. Nothing was sent.";
+    // Privy: "The user rejected the request." / "User exited flow" / "User exited the modal before submitting the transaction".
+    if (/reject|denied|cancel|user exited/i.test(e.message)) return "Signing was cancelled. Nothing was sent.";
     return e.message;
   }
   return "Something went wrong. Please try again.";

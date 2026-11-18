@@ -46,10 +46,17 @@ export function SessionPublisher({ value, children }: { value: Session; children
 const MOCK_KEY = "solsend.mock.session";
 const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
+/** Mock wallet signing mode (localStorage `solsend.mock.sign`): "auto" (default) approves after a beat; "manual" waits for
+ *  a click on Approve/Reject, so tests can exercise cancellation and prove the approval window is reachable. */
+export const MOCK_SIGN_KEY = "solsend.mock.sign";
+const MOCK_BLOCKED_MS = 4000;
+type PendingSign = { id: number; settle: (ok: boolean, why?: string) => void };
+
 export function MockSessionProvider({ children }: { children: ReactNode }) {
   const [email, setEmail] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [open, setOpen] = useState(false);
+  const [sign, setSign] = useState<PendingSign | null>(null);
   useEffect(() => {
     try { setEmail(localStorage.getItem(MOCK_KEY)); } catch { /* ignore */ }
     setReady(true);
@@ -59,14 +66,47 @@ export function MockSessionProvider({ children }: { children: ReactNode }) {
     login: () => setOpen(true),
     logout: async () => { try { localStorage.removeItem(MOCK_KEY); } catch { /* ignore */ } setEmail(null); },
     getAccessToken: async () => (email ? "mock-access-token" : null),
-    signTx: async (wire) => { await wait(350); return wire; },
+    // Like Privy, the mock wallet opens an approval window (a normal fixed element, NOT a top-layer dialog), so a modal
+    // <dialog> left open by the app covers it exactly as it would cover Privy's (bug found in the 2026-11-18 rehearsal).
+    signTx: (wire) => new Promise<Uint8Array>((resolve, reject) => {
+      const id = Date.now();
+      setSign({ id, settle: (ok, why) => { setSign(null); if (ok) resolve(wire); else reject(new Error(why ?? "The user rejected the request.")); } });
+    }),
     signMsg: async () => { await wait(250); return crypto.getRandomValues(new Uint8Array(64)); },
   }), [ready, email]);
   return (
     <SessionPublisher value={value}>
       {children}
       {open && <MockLogin onDone={(e) => { try { localStorage.setItem(MOCK_KEY, e); } catch { /* ignore */ } setEmail(e); setOpen(false); }} onClose={() => setOpen(false)} />}
+      {sign && <MockWalletPrompt key={sign.id} pending={sign} />}
     </SessionPublisher>
+  );
+}
+
+/** Mock wallet approval window. Auto mode approves only if the window is actually reachable (no app modal dialog is open
+ *  over it); otherwise it fails loudly, like a user stuck behind an overlay would. */
+function MockWalletPrompt({ pending }: { pending: PendingSign }) {
+  const approveRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    approveRef.current?.focus();
+    let mode = "auto";
+    try { mode = localStorage.getItem(MOCK_SIGN_KEY) ?? "auto"; } catch { /* ignore */ }
+    if (mode === "manual") return;
+    const covered = () => !!document.querySelector("dialog:modal");
+    const t = setTimeout(() => { if (!covered()) pending.settle(true); }, 350);
+    const blocked = setTimeout(() => pending.settle(false, "Mock wallet: the approval window was covered by a modal dialog and could not be reached."), MOCK_BLOCKED_MS);
+    return () => { clearTimeout(t); clearTimeout(blocked); };
+  }, [pending]);
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-[90] mx-auto mb-4 w-[min(360px,calc(100%-32px))] rounded-[20px] bg-surface p-4 shadow-2xl ring-1 ring-line" role="dialog" aria-modal="false" aria-labelledby="mock-wallet-title" data-testid="mock-wallet">
+      <span className="chip px-2 text-mock ring-1 ring-mock-line">MOCK WALLET</span>
+      <p id="mock-wallet-title" className="mt-2 text-[17px] font-semibold">Approve transaction?</p>
+      <p className="mt-0.5 text-[13px] text-ink-3">Solana devnet · signed in your browser</p>
+      <div className="mt-3 flex gap-2">
+        <button type="button" className="btn-secondary flex-1" onClick={() => pending.settle(false)} data-testid="mock-wallet-reject">Reject</button>
+        <button ref={approveRef} type="button" className="btn-primary flex-1" onClick={() => pending.settle(true)} data-testid="mock-wallet-approve">Approve</button>
+      </div>
+    </div>
   );
 }
 

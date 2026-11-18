@@ -47,6 +47,9 @@ importers:
       jose:
         specifier: 6.2.15
         version: 6.2.15
+      lithic-embed:
+        specifier: 0.1.0-beta.1
+        version: 0.1.0-beta.1
       next:
         specifier: 15.5.29
         version: 15.5.29(@playwright/test@1.64.1)(@types/node@22.20.5)(react-dom@19.1.10(react@19.1.10))(react@19.1.10)
@@ -3269,6 +3272,9 @@ packages:
   lit@3.3.0:
     resolution: {integrity: sha512-DGVsqsOIHBww2DqnuZzW7QsuCdahp50ojuDaBPC7jUDRpYoH0z7kHBBYZewRzer75FwtrkmkKk7iOAwSaWdBmw==}
 
+  lithic-embed@0.1.0-beta.1:
+    resolution: {integrity: sha512-OclvlcY68CDVDfPyS6NMgYTveUAMhes4cmPmt1H4Tkf8++yh6CcBzVfU1mgJMRCNjWLaeVrUdNgb+I32aFP0Gw==}
+
   locate-path@5.0.0:
     resolution: {integrity: sha512-t7hw9pI+WvuwNJXwk5zVHpyhIqzg2qTlklJOf0mVxGSbe3Fp2VieZcduNYjaLDoy6p9uGpQEGWG87WpMKlNq8g==}
     engines: {node: '>=8'}
@@ -3885,6 +3891,9 @@ packages:
 
   strip-literal@3.1.0:
     resolution: {integrity: sha512-8r3mkIM/2+PpjHoOtiAW8Rg3jJLHaV7xPwG+YRGrv6FP0wwk/toTpATxWYOW0BKdWwl82VT2tFYi5DlROa0Mxg==}
+
+  style-observer@0.1.2:
+    resolution: {integrity: sha512-VdGkVx7dGqEzosau63CI33vRJsAGKPJCXyS9f5ze7gFbgsXm0wt5liXUNB9+YjyfhMyD+iTwNa7sM4cvpP3N9Q==}
 
   styled-components@6.6.0:
     resolution: {integrity: sha512-drKKsqvDBxVRn4ySU67iQ5nQBuo/1xyYeBfdhDde112PkqrS3+95KPnpDs5hFRcmrW+q6+gbyywYYYR14oWFtw==}
@@ -9288,6 +9297,11 @@ snapshots:
       lit-element: 4.2.2
       lit-html: 3.3.3
 
+  lithic-embed@0.1.0-beta.1:
+    dependencies:
+      csstype: 3.2.3
+      style-observer: 0.1.2
+
   locate-path@5.0.0:
     dependencies:
       p-locate: 4.1.0
@@ -10004,6 +10018,8 @@ snapshots:
   strip-literal@3.1.0:
     dependencies:
       js-tokens: 9.0.1
+
+  style-observer@0.1.2: {}
 
   styled-components@6.6.0(react-dom@19.1.10(react@19.1.10))(react@19.1.10):
     dependencies:

@@ -26,7 +26,8 @@ export function lithicCardConfig(kind: CardKindName, limitCents: number) {
 }
 
 export type IssuedCard = { token: string; lastFour: string | null; state: string | null };
-export type EmbedSession = { iframeUrl: string; iframes: { pan: string; cvv: string; expMonth: string; expYear: string }; expiresAt: string; flow: "session" | "legacy_hmac" };
+/** `session` (modern flow only) is the raw single-use embed session for the browser SDK — a bearer capability: never log it. */
+export type EmbedSession = { iframeUrl: string; iframes: { pan: string; cvv: string; expMonth: string; expYear: string }; expiresAt: string; flow: "session" | "legacy_hmac"; session?: string };
 
 export interface LithicApi {
   createCard(p: { kind: CardKindName; limitCents: number; memo: string; tags: Record<string, string> }): Promise<IssuedCard>;
@@ -104,7 +105,7 @@ export class LithicClient implements LithicApi {
     if (r.status < 300 && typeof r.json.session === "string") {
       const u = (type: string) => `${this.base}/v1/embed?session=${encodeURIComponent(r.json.session as string)}&type=${type}`;
       const iframes = { pan: u("PAN"), cvv: u("CVV"), expMonth: u("EXP_MONTH"), expYear: u("EXP_YEAR") };
-      return { iframeUrl: iframes.pan, iframes, expiresAt, flow: "session" };
+      return { iframeUrl: iframes.pan, iframes, expiresAt, flow: "session", session: r.json.session as string };
     }
     if (r.status !== 404 && r.status !== 405) this.fail("create embed session", r);
     const legacy = legacyEmbedUrl(this.base, this.apiKey, { token: cardToken, expiration: expiresAt, targetOrigin: opts.targetOrigin });

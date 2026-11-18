@@ -163,9 +163,31 @@ test("judge journey: login → faucet → card → approve → void → decline 
   await page.goto("/home");
   await expect(page.getByTestId("outage-balance")).toContainText("$100.00");
   await shot(page, "11-home-outage");
+  // Rehearsal bug (2026-11-18): our modal confirm <dialog> stayed open in the browser top layer and covered the wallet's
+  // approval window. Manual mock-wallet mode: the test must CLICK the wallet's buttons, which fails if anything covers them.
+  await page.evaluate(() => localStorage.setItem("solsend.mock.sign", "manual"));
+  const liveCount = async () => /(\d+) live allowance/.exec((await page.getByTestId("safety").textContent()) ?? "")?.[1] ?? null;
+  const liveBefore = await liveCount();
+  expect(Number(liveBefore)).toBeGreaterThan(0);
+  await page.getByTestId("revoke-open").click();
+  await expect(page.getByTestId("revoke-sheet")).toBeVisible();
+  await page.getByTestId("revoke-confirm").click();
+  await expect(page.getByTestId("mock-wallet")).toBeVisible();
+  expect(await page.evaluate(() => document.querySelectorAll("dialog:modal").length)).toBe(0); // nothing in the top layer
+  await expect(page.getByTestId("revoke-progress")).toHaveAttribute("data-phase", "signing");
+  await expect(page.getByTestId("revoke-progress")).toContainText("Approve the revoke in your wallet window");
+  await shot(page, "11b-revoke-wallet-approval");
+  // Cancel in the wallet → nothing sent, cards unchanged, clear retry.
+  await page.getByTestId("mock-wallet-reject").click();
+  await expect(page.getByTestId("revoke-error")).toContainText("Signing was cancelled. Nothing was sent.");
+  await expect(page.getByTestId("revoke-error")).toContainText("Nothing was sent to Solana. Your cards are unchanged.");
+  await expect.poll(liveCount).toBe(liveBefore);
+  // Retry → approve (a real click: proves the approval window is reachable) → confirmed.
   await page.getByTestId("revoke-open").click();
   await page.getByTestId("revoke-confirm").click();
+  await page.getByTestId("mock-wallet-approve").click();
   await expect(page.getByTestId("revoke-done")).toContainText("All cards revoked");
+  await page.evaluate(() => localStorage.removeItem("solsend.mock.sign"));
   await expect(page.getByTestId("revoke-done").getByRole("link", { name: /Explorer/ })).toHaveAttribute("href", /cluster=devnet/);
   await expect(page.getByTestId("card-tile").first()).toContainText("Revoked");
   await expect(page.getByTestId("blast-amount")).toHaveText("$0.00");

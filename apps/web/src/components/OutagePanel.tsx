@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { flushSync } from "react-dom";
 import { client, humanError, signAndSubmit } from "@/client/api";
 import { usd } from "@/client/format";
 import { useAppData } from "./AppShell";
@@ -11,27 +12,37 @@ import { ErrorNote, Icon, Sheet, SigLink, Spinner } from "./ui";
  */
 export function OutagePanel({ outage = false }: { outage?: boolean }) {
   const { wallet, cards } = useAppData();
-  const [busy, setBusy] = useState(false);
+  // preparing → signing (wallet approval window open) → submitting (server cosigns as fee payer, waits for `confirmed`).
+  const [phase, setPhase] = useState<"preparing" | "signing" | "submitting" | null>(null);
+  const busy = phase !== null;
   const [confirm, setConfirm] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const [err, setErr] = useState<{ text: string; sent: boolean } | null>(null);
   const [done, setDone] = useState<{ sig: string; balance: string | null } | null>(null);
   const live = (cards.data ?? []).filter((c) => c.delegationLive && c.status !== "CLOSED" && c.issueState !== "failed").length;
 
   async function revoke() {
-    setBusy(true); setErr(null); setDone(null);
+    // Close OUR confirmation dialog BEFORE the wallet opens. A modal <dialog> sits in the browser's top layer and makes
+    // the rest of the page inert, so Privy's approval window (a normal z-indexed element) would be covered and
+    // unreachable by mouse or Tab. flushSync: the dialog is gone from the DOM before any signing starts.
+    flushSync(() => { setConfirm(false); setErr(null); setDone(null); setPhase("preparing"); });
+    let sent = false; // true once the owner-signed tx was handed to the server (it may land even if the reply is lost)
     try {
-      const r = await signAndSubmit(() => client.revokeAll());
-      setConfirm(false);
+      const r = await signAndSubmit(() => client.revokeAll(), {
+        // A fresh prepare = a new attempt (the automatic tx_expired retry only follows a send the network rejected).
+        onPrepared: () => { sent = false; setPhase("signing"); },
+        onSigned: () => { sent = true; setPhase("submitting"); },
+      });
       setDone({ sig: r.signature, balance: wallet.data?.usdcBase ?? null });
-      void cards.refresh(); void wallet.refresh();
     } catch (e) {
-      setErr(humanError(e));
+      setErr({ text: humanError(e), sent });
     } finally {
-      setBusy(false);
+      setPhase(null);
+      // Always re-read: the live count below comes from the chain (delegation accounts), never from what we assume.
+      void cards.refresh(); void wallet.refresh();
     }
   }
 
-  if (live === 0 && !done && !outage) return null;
+  if (live === 0 && !done && !err && !busy && !outage) return null;
   return (
     <section className={`rounded-[20px] p-4 ${outage ? "bg-warn-bg" : "bg-sunken/70"}`} aria-labelledby="outage-title" data-testid="safety">
       <div className="flex items-start gap-3">
@@ -45,8 +56,24 @@ export function OutagePanel({ outage = false }: { outage?: boolean }) {
         <div><p className="text-[12px] font-medium text-ink-3">Live wallet balance</p><p className="tnum text-[22px] font-semibold tracking-[-0.02em]" data-testid="outage-balance">{wallet.data ? usd(wallet.data.usdcBase) : "—"} <span className="text-[12px] font-medium text-ink-3">devnet USDC</span></p></div>
         <p className="text-[13px] font-medium text-ink-3">{live} live allowance{live === 1 ? "" : "s"}</p>
       </div>
+      {busy && (
+        <div className="mt-3 flex items-center gap-2.5 rounded-[14px] bg-surface px-3.5 py-3 text-[15px] font-medium" role="status" aria-live="polite" data-testid="revoke-progress" data-phase={phase}>
+          <Spinner />
+          {phase === "signing" ? "Approve the revoke in your wallet window" : phase === "submitting" ? "Revoking on Solana… waiting for confirmation" : "Preparing one revoke transaction…"}
+        </div>
+      )}
+      {err && !busy && (
+        <div className="mt-3 space-y-1" data-testid="revoke-error">
+          <ErrorNote>{err.text}</ErrorNote>
+          <p className="text-[13px] text-ink-2">
+            {err.sent
+              ? `We couldn't confirm the result. The count above is re-read from Solana — ${live === 0 ? "every allowance is gone, so your cards are revoked." : `${live} allowance${live === 1 ? " is" : "s are"} still live.`}`
+              : "Nothing was sent to Solana. Your cards are unchanged."}
+          </p>
+        </div>
+      )}
       {live > 0 && (
-        <button type="button" onClick={() => setConfirm(true)} disabled={busy} className="btn-danger mt-3 w-full" data-testid="revoke-open">Revoke all cards…</button>
+        <button type="button" onClick={() => setConfirm(true)} disabled={busy} className="btn-danger mt-3 w-full" data-testid="revoke-open">{err ? "Try revoking again…" : "Revoke all cards…"}</button>
       )}
       {done && (
         <div className="anim-rise mt-3 space-y-2" role="status" data-testid="revoke-done">
@@ -60,10 +87,10 @@ export function OutagePanel({ outage = false }: { outage?: boolean }) {
         <div className="space-y-4 pt-1">
           <h3 id="revoke-title" className="text-[22px] font-semibold tracking-[-0.02em]">Revoke {live} card{live === 1 ? "" : "s"}?</h3>
           <p className="text-[15px] leading-[22px] text-ink-2">One Solana transaction removes every card&apos;s allowance. It works even if SolSend and the issuer are down. Your balance doesn&apos;t move; the cards can never pull again.</p>
-          {err && <ErrorNote>{err}</ErrorNote>}
+          <p className="text-[13px] leading-5 text-ink-3">Next, your wallet asks you to approve one transaction. Nothing is revoked until you approve it.</p>
           <div className="flex flex-col gap-2">
             <button type="button" className="btn-primary w-full !bg-no !text-paper" onClick={() => void revoke()} disabled={busy} data-testid="revoke-confirm">
-              {busy ? <><Spinner />Revoking…</> : "Revoke all cards"}
+              Revoke all cards
             </button>
             <button type="button" className="btn-ghost w-full" onClick={() => setConfirm(false)} disabled={busy}>Keep my cards</button>
           </div>

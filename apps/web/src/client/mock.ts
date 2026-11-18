@@ -211,7 +211,7 @@ export async function mockRequest(req: MockReq): Promise<Res> {
     if (m[2] === "embed" && method === "POST") {
       if (card.issueState !== "issued") return err(409, "This card isn't ready yet.", "not_ready");
       return ok({
-        iframeUrl: mockEmbedUrl(card, "all"), expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+        iframeUrl: mockEmbedUrl(card, "all"), expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(), flow: "mock",
         iframes: { pan: mockEmbedUrl(card, "pan"), cvv: mockEmbedUrl(card, "cvv"), expMonth: mockEmbedUrl(card, "expMonth"), expYear: mockEmbedUrl(card, "expYear") },
       });
     }
