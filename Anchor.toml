@@ -1,0 +1,26 @@
+# SolSend program workspace. Default cluster stays localnet so `anchor test` (LiteSVM) never deploys.
+# Devnet deploy is explicit: anchor deploy --provider.cluster devnet
+skip_local_validator = true
+
+[toolchain]
+anchor_version = "1.2.2"
+solana_version = "4.1.2"
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+solsend = "GfMyGffqQA7KNUYWByEDtQKEFmHzBPTJgsuYSaruWdZp"
+
+[programs.devnet]
+solsend = "GfMyGffqQA7KNUYWByEDtQKEFmHzBPTJgsuYSaruWdZp"
+
+[provider]
+cluster = "localnet"
+wallet = "~/.config/solsend/devnet/deployer.json"
+
+[scripts]
+test = "cargo test -p solsend"
+
+[hooks]

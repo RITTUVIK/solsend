@@ -51,3 +51,12 @@ spikes/.raw/
 
 # Third-party artifacts for the Allowances spike (fetched by spikes/allowances_spike/scripts/fetch-vendor.sh)
 spikes/allowances_spike/vendor/
+
+# CP1 app build artifacts
+.next/
+.vercel/
+*.tsbuildinfo
+test-results/
+playwright-report/
+.DS_Store
+.turbo/

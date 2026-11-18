@@ -1,0 +1,14 @@
+{
+  "name": "solsend",
+  "private": true,
+  "description": "SolSend: burner cards for every store, spending straight from your Solana wallet (devnet + sandbox).",
+  "packageManager": "pnpm@10.24.0",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build:program": "NO_DNA=1 anchor build && cp target/idl/solsend.json packages/shared/idl/solsend.json",
+    "test:program": "cargo test -p solsend -- --test-threads=1",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "test": "pnpm -r --if-present test",
+    "dev": "pnpm --filter @solsend/web dev"
+  }
+}

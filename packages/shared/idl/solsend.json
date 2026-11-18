@@ -1,0 +1,1929 @@
+{
+  "address": "GfMyGffqQA7KNUYWByEDtQKEFmHzBPTJgsuYSaruWdZp",
+  "metadata": {
+    "name": "solsend",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "SolSend policy program: burner cards as Solana Subscriptions & Allowances delegations"
+  },
+  "instructions": [
+    {
+      "name": "admin_withdraw",
+      "docs": [
+        "Admin moves treasury funds ONLY to config.treasury_destination (issuer-settlement account)."
+      ],
+      "discriminator": [
+        160,
+        166,
+        147,
+        222,
+        46,
+        220,
+        75,
+        224
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury_ata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "treasury"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "usdc_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "destination",
+          "writable": true
+        },
+        {
+          "name": "usdc_mint"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "close_card",
+      "docs": [
+        "Owner closes a card (status Closed, account kept so late refunds still work). The client",
+        "includes Allowances `revoke_delegation` in the same transaction. Emits CardClosed."
+      ],
+      "discriminator": [
+        142,
+        206,
+        170,
+        182,
+        227,
+        204,
+        185,
+        115
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true,
+          "relations": [
+            "card"
+          ]
+        },
+        {
+          "name": "card",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  97,
+                  114,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              },
+              {
+                "kind": "account",
+                "path": "card.card_id",
+                "account": "Card"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "close_settlement_record",
+      "docs": [
+        "Settlement authority reclaims rent of a SettlementRecord that is fully refunded or older than",
+        "RECORD_RETENTION_SECS."
+      ],
+      "discriminator": [
+        131,
+        85,
+        140,
+        59,
+        31,
+        144,
+        48,
+        190
+      ],
+      "accounts": [
+        {
+          "name": "settlement_authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "card",
+          "relations": [
+            "settlement_record"
+          ]
+        },
+        {
+          "name": "settlement_record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  101,
+                  116,
+                  116,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "card"
+              },
+              {
+                "kind": "arg",
+                "path": "auth_hash"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "auth_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "freeze_card",
+      "docs": [
+        "Owner OR settlement authority (reduce-only) freezes an Active card. Emits CardFrozen."
+      ],
+      "discriminator": [
+        20,
+        250,
+        79,
+        215,
+        229,
+        119,
+        111,
+        254
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "docs": [
+            "Owner or the settlement authority (verified in handler)."
+          ],
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "card",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  97,
+                  114,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "card.owner",
+                "account": "Card"
+              },
+              {
+                "kind": "account",
+                "path": "card.card_id",
+                "account": "Card"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_config",
+      "docs": [
+        "Admin creates the singleton Config. `treasury_destination` is the ONLY token account that",
+        "`admin_withdraw` may ever pay (fixed at init). `per_tx_max` 0 = no per-transaction cap."
+      ],
+      "discriminator": [
+        208,
+        127,
+        21,
+        1,
+        194,
+        190,
+        196,
+        70
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "usdc_mint"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "InitializeConfigArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "refund",
+      "docs": [
+        "Settlement authority refunds part/all of ONE settled authorization from the treasury to the",
+        "card's stored source token account. Bounded: record.refunded + amount <= record.amount.",
+        "Works for any card status (refunds after freeze/close must still land). Does NOT restore the",
+        "card's consumed allowance (MVP product decision). Emits CardRefunded."
+      ],
+      "discriminator": [
+        2,
+        96,
+        183,
+        251,
+        63,
+        208,
+        46,
+        46
+      ],
+      "accounts": [
+        {
+          "name": "settlement_authority",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "card",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  97,
+                  114,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "card.owner",
+                "account": "Card"
+              },
+              {
+                "kind": "account",
+                "path": "card.card_id",
+                "account": "Card"
+              }
+            ]
+          },
+          "relations": [
+            "settlement_record"
+          ]
+        },
+        {
+          "name": "settlement_record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  101,
+                  116,
+                  116,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "card"
+              },
+              {
+                "kind": "arg",
+                "path": "auth_hash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "source_token_account",
+          "writable": true
+        },
+        {
+          "name": "treasury",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury_ata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "treasury"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "usdc_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "usdc_mint"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "auth_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "register_card",
+      "docs": [
+        "Owner registers a card whose spending power is an EXISTING Allowances delegation created in",
+        "the same transaction (delegator = owner, delegatee = this Card PDA). `payer` sponsors rent.",
+        "Must verify: delegation owned by the Allowances program; header.delegator == owner;",
+        "header.delegatee == card PDA; delegation PDA == derive(SA(owner, mint), owner, card, nonce);",
+        "delegation type matches `kind` (fixed for StoreLocked/OneTime, recurring for Subscription)."
+      ],
+      "discriminator": [
+        33,
+        25,
+        154,
+        111,
+        155,
+        31,
+        45,
+        36
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "card",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  97,
+                  114,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              },
+              {
+                "kind": "arg",
+                "path": "card_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "delegation"
+        },
+        {
+          "name": "owner_ata",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "owner"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "usdc_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "usdc_mint"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "card_id",
+          "type": "u64"
+        },
+        {
+          "name": "kind",
+          "type": "u8"
+        },
+        {
+          "name": "delegation_nonce",
+          "type": "u64"
+        },
+        {
+          "name": "label",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "set_paused",
+      "docs": [
+        "Admin kill switch: when paused, `settle` is refused (reduce-only; refunds still work)."
+      ],
+      "discriminator": [
+        91,
+        60,
+        125,
+        192,
+        176,
+        225,
+        166,
+        218
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "paused",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "set_settlement_authority",
+      "docs": [
+        "Admin rotates the settlement authority (e.g., suspected key compromise)."
+      ],
+      "discriminator": [
+        102,
+        3,
+        152,
+        158,
+        128,
+        19,
+        49,
+        61
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "new_authority",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "settle",
+      "docs": [
+        "Settlement authority pulls `amount` (USDC base units) for ONE card authorization.",
+        "Refuse when: config.paused; card not Active; per_tx_max exceeded; idle (now - max(created,last_used)",
+        "> idle_secs); merchant_hash != card.merchant_lock (lock set on first settle). Creates the",
+        "SettlementRecord (init ⇒ duplicate auth fails atomically), CPIs transfer_fixed/transfer_recurring",
+        "with the Card PDA as delegatee signer into the treasury ATA, reads the remaining allowance from",
+        "the delegation account AFTER the CPI, updates totals, OneTime ⇒ status Used, emits CardSettled."
+      ],
+      "discriminator": [
+        175,
+        42,
+        185,
+        87,
+        144,
+        131,
+        102,
+        212
+      ],
+      "accounts": [
+        {
+          "name": "settlement_authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "card",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  97,
+                  114,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "card.owner",
+                "account": "Card"
+              },
+              {
+                "kind": "account",
+                "path": "card.card_id",
+                "account": "Card"
+              }
+            ]
+          }
+        },
+        {
+          "name": "settlement_record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  101,
+                  116,
+                  116,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "card"
+              },
+              {
+                "kind": "arg",
+                "path": "auth_hash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "delegation",
+          "writable": true
+        },
+        {
+          "name": "subscription_authority"
+        },
+        {
+          "name": "source_token_account",
+          "writable": true
+        },
+        {
+          "name": "treasury",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury_ata",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "treasury"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "usdc_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "usdc_mint"
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "allowances_program",
+          "address": "De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "auth_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "merchant_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "unfreeze_card",
+      "docs": [
+        "Owner only: Frozen -> Active. Emits CardUnfrozen."
+      ],
+      "discriminator": [
+        140,
+        93,
+        9,
+        53,
+        102,
+        236,
+        29,
+        158
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true,
+          "relations": [
+            "card"
+          ]
+        },
+        {
+          "name": "card",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  97,
+                  114,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              },
+              {
+                "kind": "account",
+                "path": "card.card_id",
+                "account": "Card"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Card",
+      "discriminator": [
+        166,
+        250,
+        46,
+        230,
+        152,
+        63,
+        140,
+        182
+      ]
+    },
+    {
+      "name": "Config",
+      "discriminator": [
+        155,
+        12,
+        170,
+        224,
+        30,
+        250,
+        204,
+        130
+      ]
+    },
+    {
+      "name": "SettlementRecord",
+      "discriminator": [
+        172,
+        159,
+        67,
+        74,
+        96,
+        85,
+        37,
+        205
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "CardClosed",
+      "discriminator": [
+        142,
+        229,
+        62,
+        205,
+        74,
+        220,
+        48,
+        208
+      ]
+    },
+    {
+      "name": "CardFrozen",
+      "discriminator": [
+        169,
+        126,
+        207,
+        150,
+        188,
+        93,
+        232,
+        26
+      ]
+    },
+    {
+      "name": "CardRefunded",
+      "discriminator": [
+        212,
+        19,
+        183,
+        194,
+        172,
+        112,
+        247,
+        175
+      ]
+    },
+    {
+      "name": "CardRegistered",
+      "discriminator": [
+        56,
+        237,
+        149,
+        94,
+        229,
+        59,
+        166,
+        88
+      ]
+    },
+    {
+      "name": "CardSettled",
+      "discriminator": [
+        34,
+        206,
+        169,
+        204,
+        178,
+        170,
+        227,
+        94
+      ]
+    },
+    {
+      "name": "CardUnfrozen",
+      "discriminator": [
+        178,
+        254,
+        65,
+        116,
+        53,
+        84,
+        204,
+        217
+      ]
+    },
+    {
+      "name": "ConfigUpdated",
+      "discriminator": [
+        40,
+        241,
+        230,
+        122,
+        11,
+        19,
+        198,
+        194
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "DelegationMismatch",
+      "msg": "delegation does not match the card's Allowances delegation"
+    },
+    {
+      "code": 6001,
+      "name": "InvalidDelegation",
+      "msg": "delegation account is not a valid Allowances delegation for this owner/card/kind"
+    },
+    {
+      "code": 6002,
+      "name": "InvalidKind",
+      "msg": "invalid card kind"
+    },
+    {
+      "code": 6003,
+      "name": "CardNotActive",
+      "msg": "card is not active"
+    },
+    {
+      "code": 6004,
+      "name": "CardIdle",
+      "msg": "card is idle-locked"
+    },
+    {
+      "code": 6005,
+      "name": "MerchantMismatch",
+      "msg": "merchant does not match the card's merchant lock"
+    },
+    {
+      "code": 6006,
+      "name": "PerTxLimitExceeded",
+      "msg": "amount exceeds the per-transaction maximum"
+    },
+    {
+      "code": 6007,
+      "name": "Paused",
+      "msg": "settlements are paused"
+    },
+    {
+      "code": 6008,
+      "name": "NotSettlementAuthority",
+      "msg": "signer is not the settlement authority"
+    },
+    {
+      "code": 6009,
+      "name": "NotAdmin",
+      "msg": "signer is not the admin"
+    },
+    {
+      "code": 6010,
+      "name": "NotOwner",
+      "msg": "signer is not the card owner"
+    },
+    {
+      "code": 6011,
+      "name": "NotAuthorized",
+      "msg": "signer may not perform this action"
+    },
+    {
+      "code": 6012,
+      "name": "SourceMismatch",
+      "msg": "source token account does not match the card"
+    },
+    {
+      "code": 6013,
+      "name": "InvalidMint",
+      "msg": "invalid USDC mint"
+    },
+    {
+      "code": 6014,
+      "name": "InvalidDestination",
+      "msg": "destination is not the configured treasury destination"
+    },
+    {
+      "code": 6015,
+      "name": "InvalidAllowancesAccount",
+      "msg": "invalid Allowances account"
+    },
+    {
+      "code": 6016,
+      "name": "ZeroAmount",
+      "msg": "amount must be > 0"
+    },
+    {
+      "code": 6017,
+      "name": "Overflow",
+      "msg": "arithmetic overflow"
+    },
+    {
+      "code": 6018,
+      "name": "RefundExceedsSettled",
+      "msg": "refund would exceed the settled amount for this authorization"
+    },
+    {
+      "code": 6019,
+      "name": "RecordNotClosable",
+      "msg": "settlement record is not yet closable"
+    }
+  ],
+  "types": [
+    {
+      "name": "Card",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "card_id",
+            "type": "u64"
+          },
+          {
+            "name": "kind",
+            "type": "u8"
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "delegation",
+            "type": "pubkey"
+          },
+          {
+            "name": "delegation_nonce",
+            "type": "u64"
+          },
+          {
+            "name": "source_token_account",
+            "docs": [
+              "The ONLY refund destination (owner's USDC ATA at registration)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "label",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "merchant_lock",
+            "docs": [
+              "sha256(card-network merchant acceptor id) of the first settled merchant; zero = not yet locked."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "created_ts",
+            "type": "i64"
+          },
+          {
+            "name": "last_used_ts",
+            "type": "i64"
+          },
+          {
+            "name": "total_settled",
+            "type": "u64"
+          },
+          {
+            "name": "total_refunded",
+            "type": "u64"
+          },
+          {
+            "name": "settle_count",
+            "type": "u32"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CardClosed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "card",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CardFrozen",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "card",
+            "type": "pubkey"
+          },
+          {
+            "name": "by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CardRefunded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "card",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "auth_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "record_refunded",
+            "type": "u64"
+          },
+          {
+            "name": "destination",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CardRegistered",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "card",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "card_id",
+            "type": "u64"
+          },
+          {
+            "name": "kind",
+            "type": "u8"
+          },
+          {
+            "name": "delegation",
+            "type": "pubkey"
+          },
+          {
+            "name": "label",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "CardSettled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "card",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "remaining_allowance",
+            "type": "u64"
+          },
+          {
+            "name": "auth_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "merchant_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "total_settled",
+            "type": "u64"
+          },
+          {
+            "name": "status_after",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CardUnfrozen",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "card",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Config",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "settlement_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "usdc_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury_destination",
+            "type": "pubkey"
+          },
+          {
+            "name": "per_tx_max",
+            "type": "u64"
+          },
+          {
+            "name": "idle_secs",
+            "type": "i64"
+          },
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "treasury_bump",
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ConfigUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "settlement_authority",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InitializeConfigArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "settlement_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury_destination",
+            "type": "pubkey"
+          },
+          {
+            "name": "per_tx_max",
+            "type": "u64"
+          },
+          {
+            "name": "idle_secs",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SettlementRecord",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "card",
+            "type": "pubkey"
+          },
+          {
+            "name": "auth_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "refunded",
+            "type": "u64"
+          },
+          {
+            "name": "created_ts",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}
