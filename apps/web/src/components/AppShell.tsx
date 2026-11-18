@@ -62,7 +62,7 @@ function ToastHost() {
           {t.sig && (
             <a href={explorerTx(t.sig)} target="_blank" rel="noreferrer" aria-label={t.linkLabel ?? "View on Solana Explorer (devnet)"}
               className="mt-1 inline-flex min-h-8 items-center gap-2 text-[13px] font-medium text-paper/80 hover:text-paper">
-              <OnchainGlyph className="h-4 w-4" />Recorded on Solana devnet <code className="font-mono text-[12px] opacity-80">{shortId(t.sig, 4)}</code><Icon name="ext" className="h-3.5 w-3.5" />
+              <OnchainGlyph className="h-4 w-4" /><span className="whitespace-nowrap">On Solana</span> <code className="whitespace-nowrap font-mono text-[12px] opacity-80">{shortId(t.sig, 4)}</code><Icon name="ext" className="h-3.5 w-3.5" />
               {isMockSig(t.sig) && <MockTag />}
             </a>
           )}
