@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  GITLEAKS_VERSION: "8.21.2"
+  # sha256 of gitleaks_8.21.2_linux_x64.tar.gz (from the release's checksums file)
+  GITLEAKS_SHA256: "5bc41815076e6ed6ef8fbecc9d9b75bcae31f39029ceb55da08086315316e3ba"
+
+jobs:
+  web:
+    name: Install, typecheck, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.24.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Shared package tests
+        run: pnpm --filter @solsend/shared test
+      - name: Shared typecheck
+        run: pnpm --filter @solsend/shared typecheck
+
+      - name: Web typecheck
+        run: pnpm --filter @solsend/web typecheck
+      - name: Web tests
+        run: pnpm --filter @solsend/web test
+
+      - name: QuickNode filter is up to date and passes its self-test
+        run: |
+          pnpm --filter @solsend/scripts qn:build-filter
+          git diff --exit-code -- infra/quicknode/filter.dist.js
+          pnpm --filter @solsend/scripts qn:selftest
+      - name: Scripts typecheck
+        run: pnpm --filter @solsend/scripts typecheck
+
+      - name: Web build (mock env, no real credentials)
+        run: pnpm --filter @solsend/web build
+        env:
+          SOLANA_RPC_URL: https://api.devnet.solana.com
+          SETTLEMENT_AUTHORITY_SECRET_KEY: "[0]"
+          FEE_PAYER_SECRET_KEY: "[0]"
+          LITHIC_API_KEY: ci-mock-lithic-key
+          LITHIC_ASA_SECRET: whsec_mockmockmockmock
+          PRIVY_APP_ID: ci-mock-privy-app
+          NEXT_PUBLIC_PRIVY_APP_ID: ci-mock-privy-app
+          DEMO_MERCHANT_ENABLED: "0"
+          NEXT_TELEMETRY_DISABLED: "1"
+
+  gitleaks:
+    name: Secret scan (gitleaks CLI)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install pinned gitleaks
+        run: |
+          curl -sSfL -o gitleaks.tgz "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tgz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/gl" && tar -xzf gitleaks.tgz -C "$RUNNER_TEMP/gl" gitleaks
+          echo "$RUNNER_TEMP/gl" >> "$GITHUB_PATH"
+      - name: Scan history and working tree
+        run: gitleaks git --redact --no-banner --config .gitleaks.toml --verbose .
+
+  # Program LiteSVM tests need the real Allowances .so (`solana program dump`) and a Rust toolchain: intentionally
+  # not run in CI to keep minutes low. Run locally: pnpm test:program (see docs/DEPLOY.md).

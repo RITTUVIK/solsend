@@ -1,0 +1,30 @@
+name: Reconcile
+
+# Calls POST /api/reconcile on the deployed app (F5 safety net: refunds late settles, voids, declines).
+# Skips cleanly when APP_URL / RECONCILE_CRON_SECRET repo secrets are not set. Minutes are tiny (one curl).
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    env:
+      APP_URL: ${{ secrets.APP_URL }}
+      RECONCILE_CRON_SECRET: ${{ secrets.RECONCILE_CRON_SECRET }}
+    steps:
+      - name: Call /api/reconcile
+        run: |
+          if [ -z "$APP_URL" ] || [ -z "$RECONCILE_CRON_SECRET" ]; then
+            echo "APP_URL / RECONCILE_CRON_SECRET not set: skipping"
+            exit 0
+          fi
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 60 -X POST \
+            -H "Authorization: Bearer ${RECONCILE_CRON_SECRET}" "${APP_URL%/}/api/reconcile")
+          echo "reconcile HTTP ${code}"
+          [ "$code" -ge 200 ] && [ "$code" -lt 300 ]
