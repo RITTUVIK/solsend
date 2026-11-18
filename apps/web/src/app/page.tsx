@@ -60,8 +60,8 @@ function DemoLoop() {
 
 const STEPS = [
   { icon: "drop", title: "Get test USDC", body: "Sign in with an email. We create a Solana wallet and drop in free devnet dollars." },
-  { icon: "card", title: "Make a card per store", body: "“Temu, $40 total.” “Netflix free trial, $15.49 a month, expires in 7 days.” Each is an onchain allowance with a hard cap." },
-  { icon: "chain", title: "Swipe — settled onchain first", body: "Your USDC stays in your wallet until a swipe. Each purchase settles on Solana before the card network is told yes." },
+  { icon: "card", title: "Make a card per store", body: "“Temu, $40 total.” “Netflix free trial, $15.49 a month, expires in 7 days.” Each card has a hard limit that Solana enforces." },
+  { icon: "chain", title: "Pay — the money moves first", body: "Your USDC stays in your wallet until a swipe. Each purchase settles on Solana before the card network is told yes." },
 ] as const;
 
 export default function Landing() {
@@ -98,7 +98,7 @@ export default function Landing() {
 
       <section aria-labelledby="how" className="mt-14 scroll-mt-12" id="how">
         <h2 id="how-h" className="text-[22px] font-semibold tracking-[-0.02em]"><span id="how-title">How it works</span></h2>
-        <ol className="-mx-4 mt-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0">
+        <ol className="-mx-4 mt-4 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0">
           {STEPS.map((st, i) => (
             <li key={st.title} className="surface w-[78%] shrink-0 snap-start sm:w-auto">
               <div className="flex items-center gap-2">

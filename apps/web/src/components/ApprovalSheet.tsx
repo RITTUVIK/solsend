@@ -7,6 +7,7 @@ import { FEED_POLL_MS } from "@/client/config";
 import { usePoll } from "@/client/hooks";
 import { declineCopy, declineStory, sandboxName, usd, type CardView, type DeclineFix } from "@/client/format";
 import { voidErrorCopy, voidPurchase, type Voided } from "@/client/void";
+import { QN_LATE_MS, QN_WATCH_MS, streamedBy } from "@/client/stream";
 import { AllowanceFlow, WalletDelta } from "./AllowanceFlow";
 import { CardVisual } from "./CardVisual";
 import { ErrorNote, Icon, ProofField, ProofRow, QuickNodeBadge, Sheet, Spinner } from "./ui";
@@ -47,8 +48,22 @@ export function ApprovalSheet({ attempt, walletNow, onClose, onFix, onVoided }: 
     return () => clearTimeout(t);
   }, [attempt]);
 
+  // QuickNode evidence: claim "streamed" only once the webhook's delivery for THIS settle is recorded in the feed.
+  const settleSig = approved ? res?.settleSignature ?? null : null;
+  const [qnPhase, setQnPhase] = useState<"watch" | "late" | "stopped">("watch");
+  useEffect(() => {
+    setQnPhase("watch");
+    if (!settleSig) return;
+    const late = setTimeout(() => setQnPhase("late"), QN_LATE_MS);
+    const stop = setTimeout(() => setQnPhase("stopped"), QN_WATCH_MS);
+    return () => { clearTimeout(late); clearTimeout(stop); };
+  }, [settleSig]);
   const refundPending = !!v && !v.refundSignature;
-  const feed = usePoll(() => client.feed(attempt?.card.cardPda), FEED_POLL_MS, refundPending && !!attempt);
+  const [qnSeen, setQnSeen] = useState(false);
+  useEffect(() => { setQnSeen(false); }, [settleSig]);
+  const watchQn = !!settleSig && !qnSeen && qnPhase !== "stopped";
+  const feed = usePoll(() => client.feed(attempt?.card.cardPda), FEED_POLL_MS, (refundPending || watchQn) && !!attempt);
+  useEffect(() => { if (!qnSeen && streamedBy(feed.data, settleSig)) setQnSeen(true); }, [feed.data, settleSig, qnSeen]);
   const fromFeed = feed.data?.find((r) => r.kind === "refunded" && r.lithicToken === res?.lithicToken && r.signature);
   const refundSig = v?.refundSignature ?? fromFeed?.signature ?? null;
 
@@ -138,7 +153,13 @@ export function ApprovalSheet({ attempt, walletNow, onClose, onFix, onVoided }: 
                 <details className="text-[13px] text-ink-3"><summary className="cursor-pointer font-medium">Card network details</summary><dl className="mt-2 space-y-2"><ProofDetails res={res} /></dl></details>
               </div>
             )}
-            {approved && <div className="flex justify-end"><QuickNodeBadge label="Settlement streamed by QuickNode" /></div>}
+            {settleSig && (
+              <div className="flex justify-end" aria-live="polite" data-testid="qn-evidence" data-state={qnSeen ? "delivered" : qnPhase === "watch" ? "pending" : "not_delivered"}>
+                {qnSeen ? <QuickNodeBadge label="Settlement streamed by QuickNode" />
+                  : qnPhase === "watch" ? <span className="inline-flex h-6 items-center gap-1.5 rounded-full bg-sunken px-2.5 text-[11px] font-semibold text-ink-3"><Spinner className="h-3 w-3" />Waiting for QuickNode Stream…</span>
+                  : <span className="inline-flex h-6 items-center gap-1.5 rounded-full bg-sunken px-2.5 text-[11px] font-semibold text-ink-3"><span className="h-1.5 w-1.5 rounded-full bg-ink-3" aria-hidden="true" />Not streamed yet · QuickNode Stream may be paused</span>}
+              </div>
+            )}
 
             {approved && v && (
               <ol className="space-y-2 rounded-[16px] bg-sunken p-3.5 text-[14px]" data-testid="void-done" role="status">

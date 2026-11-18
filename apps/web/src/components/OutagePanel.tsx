@@ -28,7 +28,7 @@ export function OutagePanel({ outage = false }: { outage?: boolean }) {
   const frozen = onchain.filter((c) => !isExpired(c) && c.status === "FROZEN").length;
   const otherIdle = live - canPull - expired - frozen;
   const breakdown = live === canPull ? null : [
-    `${canPull} live card${canPull === 1 ? "" : "s"}`,
+    `${canPull} live`,
     expired > 0 && `${expired} expired`, frozen > 0 && `${frozen} frozen`, otherIdle > 0 && `${otherIdle} inactive`,
   ].filter(Boolean).join(", ");
 
@@ -67,7 +67,7 @@ export function OutagePanel({ outage = false }: { outage?: boolean }) {
       <div className="mt-4 flex items-end justify-between gap-3 rounded-[14px] bg-surface px-3.5 py-3">
         <div><p className="text-[12px] font-medium text-ink-3">Live wallet balance</p><p className="tnum text-[22px] font-semibold tracking-[-0.02em]" data-testid="outage-balance">{wallet.data ? usd(wallet.data.usdcBase) : "—"} <span className="text-[12px] font-medium text-ink-3">devnet USDC</span></p></div>
         <p className="text-right text-[13px] font-medium text-ink-3" data-testid="allowance-count">
-          {live} allowance{live === 1 ? "" : "s"} onchain
+          {live} card{live === 1 ? "" : "s"} to revoke
           {breakdown && <span className="block text-[12px] font-normal">{breakdown}</span>}
         </p>
       </div>
@@ -87,7 +87,7 @@ export function OutagePanel({ outage = false }: { outage?: boolean }) {
           <ErrorNote>{err.text}</ErrorNote>
           <p className="text-[13px] text-ink-2">
             {err.sent
-              ? `We couldn't confirm the result. The count above is re-read from Solana — ${live === 0 ? "every allowance is gone, so your cards are revoked." : `${live} allowance${live === 1 ? " is" : "s are"} still live.`}`
+              ? `We couldn't confirm the result. The count above is re-read from Solana — ${live === 0 ? "every card is revoked." : `${live} card${live === 1 ? " is" : "s are"} still live.`}`
               : "Nothing was sent to Solana. Your cards are unchanged."}
           </p>
         </div>

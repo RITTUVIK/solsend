@@ -44,15 +44,15 @@ export function CardVisual({ card, showLimit = false, idle = false, born = false
       <div className={`relative aspect-[1.586] w-full overflow-hidden ${mini ? "rounded-[10px]" : "rounded-[16px]"} text-white shadow-[0_1px_0_rgb(255_255_255/.2)_inset,0_10px_22px_-12px_rgb(11_12_14/.55)] ${className}`} data-status={status}>
         <div className={`card-noise card-sheen absolute inset-0 rounded-[inherit] ${dead ? "opacity-75 grayscale" : status === "Frozen" ? "saturate-[.55]" : ""}`} style={{ background: art.background }} aria-hidden="true" />
         {art.accentBar && <div className="absolute inset-x-0 bottom-0 h-[2px]" style={{ background: art.accentBar }} aria-hidden="true" />}
-        <div className={`relative flex h-full flex-col justify-between ${mini ? "p-2" : "p-3"}`}>
+        <div className={`card-ink relative flex h-full flex-col justify-between ${mini ? "p-2" : "p-3"}`}>
           <div className="flex items-start justify-between gap-2">
             <span className={`grid shrink-0 place-items-center rounded-[7px] bg-white/18 font-bold ring-1 ring-white/25 ${mini ? "h-5 w-5 text-[11px]" : "h-7 w-7 text-[14px]"}`} aria-hidden="true">{art.monogram}</span>
-            {!mini && showLimit && !dead && <p className="tnum text-right text-[14px] font-semibold leading-4">{usd(card.limit.remainingBase)}<span className="block text-[10px] font-medium text-white/85">left</span></p>}
+            {!mini && showLimit && !dead && <p className="tnum text-right text-[14px] font-semibold leading-4">{usd(card.limit.remainingBase)}<span className="block text-[10px] font-medium text-white">left</span></p>}
             {!mini && (dead || status === "Frozen") && <span className="rounded bg-black/40 px-1.5 text-[10px] font-bold uppercase tracking-[0.1em]">{status}</span>}
           </div>
           <div className="flex items-end justify-between gap-1">
             <p className={`tnum font-mono font-medium tracking-[0.1em] ${mini ? "text-[9px]" : "text-[12px]"}`}>•••• {card.lithic.lastFour ?? "••••"}</p>
-            {!mini && <Icon name={KIND_ICON[card.kind]} className="h-3.5 w-3.5 text-white/85" strokeWidth={2.2} />}
+            {!mini && <Icon name={KIND_ICON[card.kind]} className="h-3.5 w-3.5 text-white" strokeWidth={2.2} />}
           </div>
         </div>
         {!mini && <span className="sr-only">{card.label}, {sandboxName(card.merchantName)}, {status}</span>}
@@ -67,22 +67,22 @@ export function CardVisual({ card, showLimit = false, idle = false, born = false
       {born && <div className="card-sweep pointer-events-none absolute inset-0 rounded-[inherit]" aria-hidden="true" />}
       {status === "Setting up" && <div className="skeleton !absolute inset-0 !rounded-[inherit] !bg-transparent" aria-hidden="true" />}
 
-      <div className="relative flex h-full flex-col justify-between p-[clamp(14px,5.2cqw,22px)]">
+      <div className="card-ink relative flex h-full flex-col justify-between p-[clamp(14px,5.2cqw,22px)]">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2.5">
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-white/18 text-[17px] font-bold ring-1 ring-white/25 backdrop-blur-sm" aria-hidden="true">{art.monogram}</span>
             <div className="min-w-0">
               <p className="truncate text-[15px] font-semibold leading-5 tracking-[-0.01em]">{card.label}</p>
-              <p className="truncate text-[13px] font-medium leading-4 text-white/90">{sandboxName(card.merchantName)}</p>
+              <p className="truncate text-[13px] font-medium leading-4 text-white">{sandboxName(card.merchantName)}</p>
             </div>
           </div>
           {showLimit && !dead ? (
             <div className="shrink-0 text-right">
               <p className="tnum text-[17px] font-semibold leading-5 tracking-[-0.02em]">{usd(card.limit.remainingBase)}</p>
-              <p className="text-[12px] font-medium leading-4 text-white/85">left of {usd(card.limit.totalBase)}</p>
+              <p className="text-[12px] font-medium leading-4 text-white">left of {usd(card.limit.totalBase)}</p>
             </div>
           ) : (status === "Setting up" || warnRing) ? null : (
-            <span className="shrink-0 pt-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/80">Sandbox</span>
+            <span className="shrink-0 pt-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-white">Sandbox</span>
           )}
         </div>
 
@@ -92,8 +92,8 @@ export function CardVisual({ card, showLimit = false, idle = false, born = false
             <p className="tnum font-mono text-[clamp(14px,4.6cqw,18px)] font-medium tracking-[0.12em]">•••• {card.lithic.lastFour ?? "••••"}</p>
           </div>
           <div className="shrink-0 text-right">
-            <p className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-white/90"><Icon name={KIND_ICON[card.kind]} className="h-3.5 w-3.5" strokeWidth={2.2} />{KIND_LABEL[card.kind]}</p>
-            {showLimit && !dead && <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/75">Sandbox</p>}
+            <p className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-white"><Icon name={KIND_ICON[card.kind]} className="h-3.5 w-3.5" strokeWidth={2.2} />{KIND_LABEL[card.kind]}</p>
+            {showLimit && !dead && <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/90">Sandbox</p>}
           </div>
         </div>
       </div>

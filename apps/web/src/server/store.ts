@@ -246,5 +246,3 @@ export function getStore(): Store {
   }
   return store;
 }
-/** Tests only. */
-export const __setStoreForTests = (s: Store | null) => { store = s; };

@@ -125,6 +125,8 @@ test("judge journey: login → faucet → card → approve → void → decline 
   await expect(result).toContainText("Remaining on this card");
   await expect(result.getByTestId("remaining")).toContainText("$28.00");
   await expect(result.getByTestId("wallet-delta")).toContainText("$88.00");
+  await expect(page.getByTestId("qn-evidence")).toHaveAttribute("data-state", "delivered");
+  await expect(page.getByTestId("qn-evidence")).toContainText("Settlement streamed by QuickNode");
   await shot(page, "06-approved");
 
   // Void → refund → exact message; limit stays used
@@ -146,6 +148,7 @@ test("judge journey: login → faucet → card → approve → void → decline 
   await page.goto("/activity");
   await expect(page.getByTestId("feed-row").first()).toBeVisible();
   await expect(page.getByText("Streamed by QuickNode").first()).toBeVisible();
+  await expect(page.getByTestId("stream-status")).toHaveAttribute("data-state", "delivered");
   await expect(page.getByText(/Temu \(sandbox\)/).first()).toBeVisible();
   await shot(page, "09-activity");
 
@@ -166,7 +169,7 @@ test("judge journey: login → faucet → card → approve → void → decline 
   // Rehearsal bug (2026-11-18): our modal confirm <dialog> stayed open in the browser top layer and covered the wallet's
   // approval window. Manual mock-wallet mode: the test must CLICK the wallet's buttons, which fails if anything covers them.
   await page.evaluate(() => localStorage.setItem("solsend.mock.sign", "manual"));
-  const liveCount = async () => /(\d+) allowances? onchain/.exec((await page.getByTestId("allowance-count").textContent()) ?? "")?.[1] ?? null;
+  const liveCount = async () => /(\d+) cards? to revoke/.exec((await page.getByTestId("allowance-count").textContent()) ?? "")?.[1] ?? null;
   const liveBefore = await liveCount();
   expect(Number(liveBefore)).toBeGreaterThan(0);
   await page.getByTestId("revoke-open").click();
@@ -298,7 +301,7 @@ test("free-trial card: expiry chip, then expired card is declined with free-tria
   await expect(page.getByTestId("card-tile").first()).toContainText("Expired", { timeout: 10_000 });
   await expect(page.getByTestId("blast-amount")).toHaveText("$0.00");
   // Rehearsal question: home's "live cards" (can pull) vs the Safety card's allowance count (still onchain, revocable).
-  await expect(page.getByTestId("allowance-count")).toHaveText("1 allowance onchain0 live cards, 1 expired");
+  await expect(page.getByTestId("allowance-count")).toHaveText("1 card to revoke0 live, 1 expired");
   await shot(page, "18a-expired-allowance-count");
   await page.getByTestId("card-tile").first().click();
   await expect(page.getByTestId("expired-note")).toBeVisible();
@@ -341,6 +344,40 @@ test("void from the Activity feed (and the store page) after navigating away", a
   await expect(page.locator('[data-testid="feed-row"][data-kind="purchase"][data-refunded="true"]')).toHaveCount(1);
   await expect(page.getByTestId("row-void-btn")).toHaveCount(0);
   await shot(page, "17-void-from-activity");
+});
+
+test("QuickNode stream paused: no streamed claim anywhere; purchases still show their onchain settlement", async ({ page }) => {
+  await page.clock.install();
+  await page.addInitScript(() => localStorage.setItem("solsend.mock.stream", "paused"));
+  await login(page);
+  await page.getByTestId("faucet-btn").click();
+  await expect(page.getByTestId("faucet-done")).toBeVisible();
+  await createCard(page);
+  await created(page);
+  await page.getByTestId("open-card").click();
+  await page.getByTestId("spend").click();
+  await pay(page, "TEMU", "12");
+  await expect(page.getByTestId("result")).toHaveAttribute("data-decision", "APPROVED");
+  await expect(page.getByTestId("qn-evidence")).toHaveAttribute("data-state", "pending");
+  await expect(page.getByTestId("qn-evidence")).toContainText("Waiting for QuickNode Stream");
+  await page.clock.fastForward("00:16");
+  await expect(page.getByTestId("qn-evidence")).toHaveAttribute("data-state", "not_delivered");
+  await expect(page.getByTestId("qn-evidence")).toContainText("Not streamed yet");
+  await expect(page.getByText("Settlement streamed by QuickNode")).toHaveCount(0);
+  await shot(page, "19-stream-paused-sheet");
+  await closeSheet(page);
+  await page.goto("/activity");
+  await expect(page.getByTestId("feed-row").first()).toBeVisible();
+  await expect(page.getByTestId("stream-status")).toHaveAttribute("data-state", "not_delivered");
+  await expect(page.getByText("Streamed by QuickNode")).toHaveCount(0);
+  // The approval row carries the settle signature (approved only after it confirmed), so the purchase is not "settling".
+  const purchase = page.locator('[data-testid="feed-row"][data-kind="purchase"]').first();
+  await expect(purchase).toContainText("$28.00 left on card");
+  await expect(purchase).not.toContainText("settling");
+  await purchase.getByRole("button").first().click();
+  await expect(page.getByTestId("feed-detail")).toContainText("QuickNode delivery not received");
+  await expect(page.getByTestId("feed-detail").getByRole("link", { name: /View settlement/ })).toHaveAttribute("href", /cluster=devnet/);
+  await shot(page, "20-stream-paused-activity");
 });
 
 test("status page renders health checks", async ({ page }) => {

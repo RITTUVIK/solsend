@@ -23,6 +23,8 @@ export const useAppData = (): AppData => {
   return c;
 };
 
+/** Card pages (/cards/new, /cards/<pda>) live under Wallet. */
+const isActive = (path: string, href: string) => path === href || (href === "/home" && path.startsWith("/cards"));
 const NAV = [
   { href: "/home", label: "Wallet", icon: "wallet" },
   { href: "/merchant", label: "Demo store", icon: "store" },
@@ -91,8 +93,8 @@ export function AppShell({ children, wide = false }: { children: ReactNode; wide
         </div>
         <nav aria-label="Primary" className="hidden gap-1 rounded-full bg-sunken p-1 sm:flex">
           {NAV.map((n) => (
-            <Link key={n.href} href={n.href} aria-current={path === n.href ? "page" : undefined}
-              className={`rounded-full px-3.5 py-1.5 text-[14px] font-medium transition ${path === n.href ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"}`}>{n.label}</Link>
+            <Link key={n.href} href={n.href} aria-current={isActive(path, n.href) ? "page" : undefined}
+              className={`rounded-full px-3.5 py-1.5 text-[14px] font-medium transition ${isActive(path, n.href) ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"}`}>{n.label}</Link>
           ))}
         </nav>
         {s.authenticated && (
@@ -117,9 +119,9 @@ export function AppShell({ children, wide = false }: { children: ReactNode; wide
         <ul className="mx-auto flex max-w-2xl">
           {NAV.map((n) => (
             <li key={n.href} className="flex-1">
-              <Link href={n.href} aria-current={path === n.href ? "page" : undefined}
-                className={`flex min-h-[60px] flex-col items-center justify-center gap-0.5 text-[11px] font-semibold ${path === n.href ? "text-ink" : "text-ink-3"}`}>
-                <Icon name={n.icon} className="h-[22px] w-[22px]" strokeWidth={path === n.href ? 2.2 : 1.8} />{n.label}
+              <Link href={n.href} aria-current={isActive(path, n.href) ? "page" : undefined}
+                className={`flex min-h-[60px] flex-col items-center justify-center gap-0.5 text-[11px] font-semibold ${isActive(path, n.href) ? "text-ink" : "text-ink-3"}`}>
+                <Icon name={n.icon} className="h-[22px] w-[22px]" strokeWidth={isActive(path, n.href) ? 2.2 : 1.8} />{n.label}
               </Link>
             </li>
           ))}

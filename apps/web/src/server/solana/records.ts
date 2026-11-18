@@ -1,7 +1,7 @@
 // SettlementRecord / Card readers at `confirmed` commitment, plus the card ↔ Lithic tags mapping.
 import { PublicKey } from "@solana/web3.js";
 import { CardTagsZ, SOLSEND_PROGRAM_ID, cardPda, decodeCard, decodeSettlementRecord, settlementRecordPda, type CardAccount } from "@solsend/shared";
-import { getAccountsChunked, type Clock, type Rpc } from "./rpc";
+import type { Rpc } from "./rpc";
 
 export type RecordView = { amount: bigint; refunded: bigint };
 export type CardRef = { pda: PublicKey; owner: PublicKey; cardId: bigint };
@@ -14,11 +14,6 @@ export const recordAddress = (_card: PublicKey, authHash: Uint8Array): PublicKey
 export async function readSettlementRecord(rpc: Pick<Rpc, "getAccountInfo">, card: PublicKey, authHash: Uint8Array): Promise<RecordView | null> {
   const acc = await rpc.getAccountInfo(recordAddress(card, authHash), "confirmed");
   return acc ? decodeRecordAccount(acc, card) : null;
-}
-
-export async function readSettlementRecords(rpc: Pick<Rpc, "getMultipleAccountsInfo">, items: { card: PublicKey; authHash: Uint8Array }[], clock?: Clock): Promise<(RecordView | null)[]> {
-  const accs = await getAccountsChunked(rpc, items.map((i) => recordAddress(i.card, i.authHash)), "confirmed", clock);
-  return accs.map((a, i) => (a ? decodeRecordAccount(a, items[i]!.card) : null));
 }
 
 function decodeRecordAccount(acc: { owner: PublicKey; data: Uint8Array }, card: PublicKey): RecordView | null {

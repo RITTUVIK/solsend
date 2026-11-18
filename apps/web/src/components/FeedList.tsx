@@ -5,6 +5,7 @@ import { FEED_POLL_MS } from "@/client/config";
 import { usePoll } from "@/client/hooks";
 import { sandboxName, storeName, timeAgo, usd, type FeedRow } from "@/client/format";
 import { voidErrorCopy, voidPurchase, type Voided } from "@/client/void";
+import { streamSummary } from "@/client/stream";
 import { StoreTile } from "./CardVisual";
 import { ErrorNote, Icon, ProofField, ProofRow, QuickNodeBadge, Sheet, Skeleton, Spinner } from "./ui";
 
@@ -15,6 +16,10 @@ const SOURCE: Record<FeedRow["source"], string> = {
   reconciler: "SolSend reconciler",
   app: "SolSend app",
 };
+/** A purchase's settlement: the QuickNode-delivered CardSettled row if it arrived, else the approval row itself, which
+ *  carries the same settle signature (SolSend approves only AFTER that settle confirmed, so it is onchain either way). */
+const settlement = (it: Item): FeedRow | undefined => it.settled ?? (it.approved?.signature ? it.approved : undefined);
+const NOT_STREAMED = "Confirmed by SolSend before approval · QuickNode delivery not received";
 
 /** One display item: a purchase folds its approval + onchain settlement + refund into a single row. */
 interface Item {
@@ -99,8 +104,8 @@ function PurchaseRow({ it, fresh, voidable, onOpen }: { it: Item; fresh: boolean
               <span className={`tnum shrink-0 text-[15px] font-semibold ${it.refunded ? "text-ink-3 line-through" : ""}`}>−{amount}</span>
             </span>
             <span className="flex items-center gap-1.5 text-[13px] text-ink-3">
-              {it.settled?.signature && <span className="h-2 w-2 shrink-0 rounded-[2px] bg-onchain" aria-hidden="true" />}
-              <span className="truncate">{it.refunded ? `Refunded +${amount} · onchain` : it.settled ? `Settled onchain${it.settled.remainingBase != null ? ` · ${usd(it.settled.remainingBase)} left` : ""}` : "Approved · settling…"}</span>
+              {settlement(it)?.signature && <span className="h-2 w-2 shrink-0 rounded-[2px] bg-onchain" aria-hidden="true" />}
+              <span className="truncate">{it.refunded ? `Refunded +${amount}` : settlement(it) ? (settlement(it)!.remainingBase != null ? `${usd(settlement(it)!.remainingBase)} left on card` : "Paid") : "Approved · settling…"}</span>
               <time dateTime={it.at} className="ml-auto shrink-0">{timeAgo(it.at)}</time>
             </span>
           </span>
@@ -108,7 +113,7 @@ function PurchaseRow({ it, fresh, voidable, onOpen }: { it: Item; fresh: boolean
       </div>
       {showVoid && (
         <div className="pb-1 pl-[60px]">
-          <button type="button" onClick={() => setSheet(true)} disabled={vo.busy} className="pick !px-3.5 !text-[13px]" data-testid="row-void-btn">{vo.busy ? <><Spinner className="h-3 w-3" />Voiding…</> : "Void (sandbox store)"}</button>
+          <button type="button" onClick={() => setSheet(true)} disabled={vo.busy} className="pick !px-3.5 !text-[13px]" data-testid="row-void-btn">{vo.busy ? <><Spinner className="h-3 w-3" />Voiding…</> : "Simulate store refund"}</button>
           {vo.err && <p className="mt-1.5 text-[13px] text-no" role="alert">{vo.err}</p>}
         </div>
       )}
@@ -139,6 +144,9 @@ const EVENT: Partial<Record<FeedRow["kind"], { title: (r: FeedRow) => string; ic
   authorization_approved: { title: (r) => `Approved at ${sandboxName(storeName(r.merchant))}`, icon: "check", tone: "bg-ok-bg text-ok" },
 };
 
+/** Plain-language row subtitles; the violet dot marks onchain evidence and the detail sheet holds the proof. */
+const EVENT_SUB: Partial<Record<FeedRow["kind"], string>> = { registered: "Limit set", settled: "Paid", refunded: "Returned to your wallet", authorization_approved: "Approved" };
+
 function EventRow({ it, fresh, onOpen }: { it: Item; fresh: boolean; onOpen: () => void }) {
   const r = it.row;
   const e = EVENT[r.kind]!;
@@ -154,7 +162,7 @@ function EventRow({ it, fresh, onOpen }: { it: Item; fresh: boolean; onOpen: () 
           </span>
           <span className="flex items-center gap-1.5 text-[13px] text-ink-3">
             {r.signature && <span className="h-2 w-2 shrink-0 rounded-[2px] bg-onchain" aria-hidden="true" />}
-            <span className={`truncate ${declined ? "text-no" : ""}`}>{declined ? r.reason ?? "Declined" : r.kind === "faucet" ? "Devnet test money" : r.signature ? "Recorded onchain" : SOURCE[r.source]}</span>
+            <span className={`truncate ${declined ? "text-no" : ""}`}>{declined ? r.reason ?? "Declined" : r.kind === "faucet" ? "Test money" : r.signature ? EVENT_SUB[r.kind] ?? "Confirmed" : SOURCE[r.source]}</span>
             <time dateTime={r.at} className="ml-auto shrink-0">{timeAgo(r.at)}</time>
           </span>
         </span>
@@ -180,19 +188,19 @@ function DetailSheet({ it, onClose }: { it: Item | null; onClose: () => void }) 
           {r.amountBase != null && <p className="tnum ml-auto text-[22px] font-semibold">{usd(r.amountBase)}</p>}
         </div>
         {r.reason && <p className="rounded-[14px] bg-sunken p-3 text-[14px] text-ink-2">{r.reason}</p>}
-        {purchase && it.settled?.signature && (
-          <ProofRow sig={it.settled.signature} title="Settled on Solana" linkLabel="View settlement on Explorer (devnet)" defaultOpen
+        {purchase && settlement(it)?.signature && (
+          <ProofRow sig={settlement(it)!.signature!} title="Settled on Solana" linkLabel="View settlement on Explorer (devnet)" defaultOpen
             details={<>
               {r.lithicToken && <ProofField k="Card network">Lithic sandbox · auth <code className="break-all font-mono text-[12px]">{r.lithicToken}</code></ProofField>}
-              {it.settled.remainingBase != null && <ProofField k="Left on card">{usd(it.settled.remainingBase)}</ProofField>}
+              {settlement(it)!.remainingBase != null && <ProofField k="Left on card">{usd(settlement(it)!.remainingBase)}</ProofField>}
               <ProofField k="Commitment"><code className="font-mono text-[12px]">sha256(&apos;solsend:auth:v1:&apos; + token)</code>, shown in the CardSettled event. The token itself is not written onchain.</ProofField>
-              <ProofField k="Seen by">{SOURCE[it.settled.source]}</ProofField>
+              <ProofField k="Seen by">{it.settled ? SOURCE[it.settled.source] : NOT_STREAMED}</ProofField>
             </>} />
         )}
         {purchase && it.refunded?.signature && <ProofRow sig={it.refunded.signature} title="Refund on Solana" linkLabel="Refund transaction (devnet)" />}
         {!purchase && r.signature && <ProofRow sig={r.signature} title={r.kind === "authorization_declined" ? "Rejected onchain" : "Recorded on Solana"} />}
         {!purchase && !r.signature && r.kind === "authorization_declined" && <p className="text-[13px] text-ink-3">No onchain transaction — stopped by the card network before reaching Solana.</p>}
-        <div className="flex items-center justify-between gap-2 text-[13px] text-ink-3"><span>{SOURCE[(it.settled ?? r).source]}</span>{(it.settled ?? r).source === "quicknode" && <QuickNodeBadge />}</div>
+        <div className="flex items-center justify-between gap-2 text-[13px] text-ink-3"><span>{purchase && !it.settled ? NOT_STREAMED : SOURCE[(it.settled ?? r).source]}</span>{(it.settled ?? r).source === "quicknode" && <QuickNodeBadge />}</div>
         <button type="button" className="btn-secondary w-full" onClick={onClose}>Close</button>
       </div>
     </Sheet>
@@ -200,7 +208,7 @@ function DetailSheet({ it, onClose }: { it: Item | null; onClose: () => void }) 
 }
 
 /** Live feed: polls GET /api/feed every 1.5 s. Rows that appear after the first load animate in. */
-export function FeedList({ cardPda, limit = 50, empty }: { cardPda?: string; limit?: number; empty?: string }) {
+export function FeedList({ cardPda, limit = 50, empty, showStream = false }: { cardPda?: string; limit?: number; empty?: string; showStream?: boolean }) {
   const { data, error, loading, refresh } = usePoll(() => client.feed(cardPda), FEED_POLL_MS);
   const seen = useRef<Set<string> | null>(null);
   const [open, setOpen] = useState<Item | null>(null);
@@ -229,6 +237,7 @@ export function FeedList({ cardPda, limit = 50, empty }: { cardPda?: string; lim
 
   return (
     <section aria-label="Live activity">
+      {showStream && data && <StreamLine rows={data} />}
       {error && <div className="mb-2"><ErrorNote onRetry={() => void refresh()}>{error}</ErrorNote></div>}
       {loading && !data ? (
         <div className="space-y-2" aria-hidden="true">{[0, 1, 2].map((i) => <div key={i} className="flex items-center gap-3 px-2 py-2.5"><Skeleton className="h-10 w-10 !rounded-[10px]" /><div className="flex-1 space-y-1.5"><Skeleton className="h-4 w-2/3" /><Skeleton className="h-3 w-1/3" /></div></div>)}</div>
@@ -248,6 +257,25 @@ export function FeedList({ cardPda, limit = 50, empty }: { cardPda?: string; lim
       )}
       <DetailSheet it={open} onClose={() => setOpen(null)} />
     </section>
+  );
+}
+
+/** Activity-level QuickNode status, derived only from recorded deliveries (never assumed). */
+function StreamLine({ rows }: { rows: FeedRow[] }) {
+  const [, tick] = useState(0);
+  useEffect(() => { const t = setInterval(() => tick((n) => n + 1), 5_000); return () => clearInterval(t); }, []);
+  const s = streamSummary(rows);
+  const recent = s.lastDeliveryAt != null && Date.now() - Date.parse(s.lastDeliveryAt) < 10 * 60_000;
+  const text = s.state === "delivered" ? `Streamed by QuickNode · last event ${timeAgo(s.lastDeliveryAt!)}`
+    : s.state === "pending" ? "Waiting for the QuickNode Stream…"
+    : s.state === "not_delivered" ? "QuickNode Stream paused or delayed · newest rows come from SolSend's server"
+    : "QuickNode Stream · no onchain events yet";
+  return (
+    <p className="flex items-center gap-1.5 px-2 pb-1 pt-2 text-[12px] font-semibold text-ink-2" aria-live="polite" data-testid="stream-status" data-state={s.state}>
+      {s.state === "pending" ? <Spinner className="h-3 w-3" />
+        : <span className="relative flex h-1.5 w-1.5">{s.state === "delivered" && recent && <span className="dot-ping absolute inline-flex h-full w-full rounded-full bg-mint" />}<span className={`relative inline-flex h-1.5 w-1.5 rounded-full ${s.state === "delivered" ? "bg-mint" : "bg-ink-3"}`} /></span>}
+      {text}
+    </p>
   );
 }
 

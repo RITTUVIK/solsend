@@ -1,5 +1,3 @@
-import type { CSSProperties } from "react";
-
 /** Per-store card art. CSS only, no trademarks: monogram letters + brand-adjacent palettes, always shown with "(sandbox)". */
 export interface CardArt { key: string; monogram: string; background: string; accentBar?: string; swatch: string }
 
@@ -14,7 +12,9 @@ export function cardArt(merchantName: string): CardArt {
   if (k === "temu" || k === "temu (sandbox)") {
     return {
       key: "temu", monogram: "T", swatch: "#F2410F",
-      background: "repeating-linear-gradient(135deg, rgb(255 255 255 / .06) 0 1px, transparent 1px 7px), radial-gradient(120% 90% at 100% 0%, rgb(255 190 120 / .35), transparent 55%), linear-gradient(140deg, #FF7A1A 0%, #F2410F 55%, #C8102E 100%)",
+      // Contrast pass (final review): deeper orange plus soft scrims behind the top and bottom text bands, so white text
+      // holds up on a projector; the highlight under the amount is reduced. Still unmistakably orange.
+      background: "repeating-linear-gradient(135deg, rgb(255 255 255 / .05) 0 1px, transparent 1px 7px), linear-gradient(180deg, rgb(70 12 0 / .22) 0%, transparent 36%, transparent 68%, rgb(70 12 0 / .2) 100%), radial-gradient(120% 90% at 100% 0%, rgb(255 190 120 / .14), transparent 55%), linear-gradient(140deg, #EE6410 0%, #DA3D0C 55%, #B5102A 100%)",
     };
   }
   if (k === "amazon" || k === "amazon (sandbox)") {
@@ -36,7 +36,6 @@ export function cardArt(merchantName: string): CardArt {
   };
 }
 
-export const artStyle = (a: CardArt): CSSProperties => ({ background: a.background });
 
 /** Map a demo-store enum (TEMU, AMAZON, …) to the art key's merchant name. */
 export const STORE_ART_NAME: Record<string, string> = { TEMU: "Temu", AMAZON: "Amazon", NETFLIX: "Netflix", OTHER_STORE: "Corner Cafe" };

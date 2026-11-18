@@ -54,9 +54,16 @@ function save(): void {
   try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* ignore */ }
 }
 export function mockWallet(): string { return load().wallet; }
-export function mockReset(): void { state = fresh(); save(); }
 
-function pushFeed(s: State, r: Partial<api.TFeedRow> & { kind: api.TFeedRow["kind"]; source: api.TFeedRow["source"] }): api.TFeedRow {
+/** Test switch (localStorage `solsend.mock.stream` = "paused"): no QuickNode deliveries, like the real stream outside demos. */
+export const MOCK_STREAM_KEY = "solsend.mock.stream";
+const streamPaused = (): boolean => { try { return localStorage.getItem(MOCK_STREAM_KEY) === "paused"; } catch { return false; } };
+
+function pushFeed(s: State, r: Partial<api.TFeedRow> & { kind: api.TFeedRow["kind"]; source: api.TFeedRow["source"] }): api.TFeedRow | null {
+  if (r.source === "quicknode" && streamPaused()) {
+    if (r.kind === "settled") return null; // the CardSettled delivery never arrives; the approval row stands alone
+    r = { ...r, source: r.kind === "refunded" ? "reconciler" : "app" };
+  }
   const row: api.TFeedRow = {
     id: crypto.randomUUID(), cardPda: null, at: new Date().toISOString(), amountBase: null, remainingBase: null, signature: null,
     explorer: null, lithicToken: null, merchant: null, reason: null, sandbox: true, ...r,
@@ -279,7 +286,7 @@ function applyIntent(s: State, i: MIntent, signature: string): void {
     case "unfreeze": if (c) { c.status = "ACTIVE"; c.idle = false; pushFeed(s, { kind: "unfrozen", source: "quicknode", cardPda: c.cardPda, signature }); } break;
     case "close": if (c) { c.status = "CLOSED"; c.delegationLive = false; pushFeed(s, { kind: "closed", source: "quicknode", cardPda: c.cardPda, signature }); } break;
     case "revoke_all":
-      for (const x of s.cards) if (x.delegationLive) { x.delegationLive = false; pushFeed(s, { kind: "closed", source: "quicknode", cardPda: x.cardPda, signature, reason: "Allowance revoked by owner" }); }
+      for (const x of s.cards) if (x.delegationLive) { x.delegationLive = false; pushFeed(s, { kind: "closed", source: "app", cardPda: x.cardPda, signature, reason: "Allowance revoked by owner" }); }
       break;
   }
 }
@@ -324,7 +331,8 @@ async function checkout(s: State, body: unknown): Promise<Res> {
   c.remainingBase -= amountBase; c.settledBase += amountBase; c.lockedTo = merchant; s.usdc -= amountBase;
   if (c.kind === "ONE_TIME") c.status = "USED";
   s.auths.push({ token, cardPda, amountBase, merchant, voided: false });
-  pushFeed(s, { kind: "authorization_approved", source: "lithic", cardPda, amountBase: String(amountBase), lithicToken: token, merchant });
+  // Mirrors the real ASA after-hook: the approval row carries the confirmed settle signature and the remaining limit.
+  pushFeed(s, { kind: "authorization_approved", source: "lithic", cardPda, amountBase: String(amountBase), remainingBase: String(c.remainingBase), signature, lithicToken: token, merchant });
   pushFeed(s, { kind: "settled", source: "quicknode", cardPda, amountBase: String(amountBase), remainingBase: String(c.remainingBase), signature, lithicToken: token, merchant });
   save();
   return ok({ lithicToken: token, decision: "APPROVED", lithicResult: "APPROVED", reason: null, settleSignature: signature, explorer: explorerTx(signature), remainingBase: String(c.remainingBase), latencyMs, label: "SANDBOX" });

@@ -18,7 +18,7 @@ export function Stepper({ card, stage, onRetry, retrying, failure }: { card: Car
 
   return (
     <ol className="space-y-0.5" aria-label="Card setup progress">
-      <Step n={1} state={s1} title="Allowance on Solana" sub={sub1}>
+      <Step n={1} state={s1} title={s1 === "done" ? "Limit set" : "Setting your limit"} sub={sub1}>
         {card?.registerSignature && <div className="mt-2"><SigLink sig={card.registerSignature} title="Allowance on Solana" /></div>}
       </Step>
       <Step n={2} state={s2} title="Issuing sandbox card" sub={s2 === "active" ? "Asking the sandbox issuer for a card number…" : null} warn={st === "lithic_failed"}>

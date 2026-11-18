@@ -28,7 +28,7 @@ const ICONS: Record<string, string> = {
   info: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-11v6m0-9v.01",
   arrow: "M5 12h14M13 6l6 6-6 6",
   back: "M19 12H5M11 6l-6 6 6 6",
-  more: "M5 12h.01M12 12h.01M19 12h.01",
+  more: "M3.5 12a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0-3 0M10.5 12a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0-3 0M17.5 12a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0-3 0",
   clock: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-13v4l3 2",
   eye: "M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Zm10 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z",
   wallet: "M4 7a2 2 0 0 1 2-2h12v4M4 7v10a2 2 0 0 0 2 2h14V9H6a2 2 0 0 1-2-2Zm12 7h.01",
@@ -51,11 +51,6 @@ export function Spinner({ className = "h-4 w-4" }: { className?: string }) {
 export function MockBadge({ className = "" }: { className?: string }) {
   if (!MOCK) return null;
   return <span className={`chip px-2 text-mock ring-1 ring-mock-line ${className}`} title="Running against in-browser fixtures. Signatures are fake and not on devnet.">MOCK DATA</span>;
-}
-
-/** One local sandbox mark per surface (the global banner covers the rest). */
-export function SandboxChip({ children = "Sandbox" }: { children?: ReactNode }) {
-  return <span className="sandbox-chip">{children}</span>;
 }
 
 export function MockTag() {

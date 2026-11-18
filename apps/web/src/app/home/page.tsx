@@ -39,7 +39,7 @@ function Faucet({ primary, hideWhenFunded = false }: { primary: boolean; hideWhe
       {got && (
         <div className="anim-rise mt-3 space-y-2" role="status" data-testid="faucet-done">
           <p className="text-[15px] text-ink-2">Received <strong className="text-ink">{usd(got.amount)}</strong> devnet test USDC.</p>
-          <SigLink sig={got.sig} title="Faucet transfer" />
+          <SigLink sig={got.sig} title="Test money added" />
         </div>
       )}
     </div>
@@ -100,8 +100,8 @@ function Checklist() {
     <section className="surface !py-1" aria-label="Get started">
       <ol className="divide-y divide-line">
         <Step n={1} done={funded} active={current === 1} title="Get test USDC" sub="Free devnet dollars, no real value." keep><Faucet primary hideWhenFunded={funded} /></Step>
-        <Step n={2} done={ready} active={current === 2} title="Set up your wallet" sub="One free signature lets it grant card allowances.">{!ready && <WalletSetup compact />}</Step>
-        <Step n={3} done={false} active={current === 3} title="Create your first card" sub="Locked to one store, capped onchain.">
+        <Step n={2} done={ready} active={current === 2} title="Turn on cards" sub="One free approval. Your money stays in your wallet.">{!ready && <WalletSetup compact />}</Step>
+        <Step n={3} done={false} active={current === 3} title="Create your first card" sub="Locked to one store, with a hard limit.">
           <Link href="/cards/new" className="btn-primary w-full" data-testid="checklist-create">Create a card</Link>
         </Step>
       </ol>

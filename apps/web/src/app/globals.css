@@ -165,7 +165,7 @@ body {
 /* ── Native <dialog> sheets (A7: focus trap + Escape for free) ───────────────────────────── */
 dialog.sheet { margin: 0; padding: 0; border: 0; max-width: none; max-height: none; background: transparent; color: var(--ink); }
 dialog.sheet::backdrop { background: var(--scrim); animation: fade .2s var(--ease-out) both; }
-dialog.sheet[open] { position: fixed; inset: auto 0 0 0; width: 100%; }
+dialog.sheet[open] { position: fixed; inset: auto 0 0 0; width: 100%; overflow: visible; } /* the body scrolls; the dialog must not clip its shadow */
 dialog.sheet[open] > .sheet-body { animation: sheet-up .32s var(--ease-out) both; }
 @media (min-width: 1024px) {
   dialog.sheet.sheet-side[open] { inset: 0 0 0 auto; width: 440px; height: 100dvh; }
@@ -181,9 +181,11 @@ dialog.sheet[open] > .sheet-body { animation: sheet-up .32s var(--ease-out) both
 }
 .card-sheen::after {
   content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
-  background: linear-gradient(115deg, rgb(255 255 255 / .22) 0%, rgb(255 255 255 / 0) 38%), linear-gradient(0deg, rgb(255 255 255 / 0), rgb(255 255 255 / 0));
+  background: linear-gradient(115deg, rgb(255 255 255 / .15) 0%, rgb(255 255 255 / 0) 34%), linear-gradient(0deg, rgb(255 255 255 / 0), rgb(255 255 255 / 0));
   box-shadow: inset 0 1px 0 rgb(255 255 255 / .22);
 }
+/* Text on card art: a soft shadow keeps white type legible on bright art and projectors (decorative cards only). */
+.card-ink { text-shadow: 0 1px 2px rgb(0 0 0 / .22), 0 0 10px rgb(0 0 0 / .1); }
 .card-sweep { background-image: linear-gradient(105deg, transparent 30%, rgb(255 255 255 / .35) 50%, transparent 70%); background-size: 60% 100%; background-repeat: no-repeat; animation: sheen .8s .2s var(--ease-out) both; }
 
 /* A12: reduced motion — no travel, no loops; crossfades only */

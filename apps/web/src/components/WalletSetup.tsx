@@ -24,11 +24,11 @@ export function WalletSetup({ onDone, compact = false }: { onDone?: () => void; 
 
   return (
     <section className={compact ? "" : "surface"} aria-labelledby="setup-h" data-testid="wallet-setup">
-      {!compact && (
+      {!compact && !sig && (
         <div className="flex items-start gap-3">
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] bg-sunken text-ink"><Icon name="shield" className="h-5 w-5" /></span>
           <div>
-            <h2 id="setup-h" className="text-[17px] font-semibold tracking-[-0.01em]">{sig ? "Wallet ready for cards" : "Set up your wallet for cards"}</h2>
+            <h2 id="setup-h" className="text-[17px] font-semibold tracking-[-0.01em]">Set up your wallet for cards</h2>
             <p className="mt-0.5 text-[15px] leading-[22px] text-ink-2">One signature, free — we pay the fees. It lets your wallet grant spending allowances. Your USDC stays yours.</p>
           </div>
         </div>
@@ -41,8 +41,8 @@ export function WalletSetup({ onDone, compact = false }: { onDone?: () => void; 
       )}
       {err && <div className="mt-3"><ErrorNote onRetry={() => void go()}>{err}</ErrorNote></div>}
       {sig && (
-        <div className="anim-rise mt-3 space-y-2" role="status" data-testid="setup-done">
-          <p className="flex items-center gap-2 text-[15px] font-semibold text-ink"><span className="grid h-5 w-5 place-items-center rounded-full bg-ok text-white"><Icon name="check" className="h-3 w-3" strokeWidth={3} /></span>Wallet ready for cards.</p>
+        <div className={`anim-rise space-y-2 ${compact ? "mt-3" : ""}`} role="status" data-testid="setup-done">
+          <p id={compact ? undefined : "setup-h"} className="flex items-center gap-2 text-[15px] font-semibold text-ink"><span className="grid h-5 w-5 place-items-center rounded-full bg-ok text-white"><Icon name="check" className="h-3 w-3" strokeWidth={3} /></span>Wallet ready for cards.</p>
           <SigLink sig={sig} title="Setup on Solana" />
         </div>
       )}
