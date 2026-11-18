@@ -3,13 +3,13 @@
 // record.amount − record.refunded onchain). Refunds NEVER restore the card's allowance.
 import { ComputeBudgetProgram, PublicKey, Transaction, type Keypair } from "@solana/web3.js";
 import bs58 from "bs58";
-import { LITHIC_TERMINAL_DECLINE, SOLSEND_PROGRAM_ID, decodeSettlementRecord, fromHex, ixRefund, settlementRecordPda, toHex, type AuthorizationRow, type LithicTransaction } from "@solsend/shared";
+import { LITHIC_TERMINAL_DECLINE, SOLSEND_PROGRAM_ID, decodeSettlementRecord, fromHex, ixRefund, toHex, type AuthorizationRow, type LithicTransaction } from "@solsend/shared";
 import type { Store } from "../store";
 import type { LithicApi } from "../lithic/client";
 import { authCommitment } from "../lib/commitments";
 import { safeErr } from "../lib/safe";
 import { confirmSignature, rebroadcast, type Clock, type Rpc } from "../solana/rpc";
-import { readCard, readSettlementRecord, type CardRef } from "../solana/records";
+import { readCard, readSettlementRecord, recordAddress, type CardRef } from "../solana/records";
 import { decideReconcile, REFUND_FEED_REASON, type LithicStatus, type RuleOutput } from "./rules";
 
 export type ReconcileDeps = {
@@ -127,7 +127,7 @@ export async function recoverMissingRow(deps: ReconcileDeps, token: string, card
   const existing = await deps.store.getAuthorization(token);
   if (existing) return reconcileAuthorization(deps, existing);
   const pda = new PublicKey(cardPdaStr);
-  const acc = await deps.rpc.getAccountInfo(settlementRecordPda(pda, authCommitment(token)), "confirmed");
+  const acc = await deps.rpc.getAccountInfo(recordAddress(pda, authCommitment(token)), "confirmed");
   const rec = acc && acc.owner.equals(SOLSEND_PROGRAM_ID) ? decodeSettlementRecord(acc.data) : null;
   if (!rec || !rec.card.equals(pda)) return { token, outcome: "skipped", tag: "no_onchain_record", lithicStatus: null };
   await deps.store.upsertAuthorization({

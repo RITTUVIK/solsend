@@ -84,7 +84,7 @@ export function reasonText(reason: string): string {
     per_tx_limit_exceeded: "Over the per-transaction maximum",
     card_not_active: "Card is frozen, used or closed",
     settlements_paused: "Settlements are paused by the admin",
-    card_idle: "Card idle-locked",
+    card_idle: "Card idle — unfreeze to reactivate",
     delegation_closed_or_missing: "Allowance revoked or missing",
     merchant_mismatch: "Card is locked to a different store",
     issuer_outage: "Issuer outage: all cards paused",

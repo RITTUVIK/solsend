@@ -5,7 +5,9 @@ import { MemoryStore } from "../store";
 import { realClock } from "../solana/rpc";
 import { MockRpc, encodeCard, encodeFixedDelegation } from "../__test__/mockRpc";
 import type { LithicApi } from "../lithic/client";
-import { isUsable, recoverAndList, toCardView } from "./service";
+import { isUsable, presetMerchantLock, recoverAndList, toCardView } from "./service";
+import { DEMO_MERCHANTS, toHex } from "@solsend/shared";
+import { merchantCommitment } from "../lib/commitments";
 import { lithicCardConfig } from "../lithic/client";
 
 function setup(lithicFails = false) {
@@ -77,5 +79,14 @@ describe("Lithic card config (amendment 4)", () => {
     expect(lithicCardConfig("STORE_LOCKED", 2000)).toEqual({ type: "VIRTUAL", spend_limit: 4000, spend_limit_duration: "FOREVER" });
     expect(lithicCardConfig("ONE_TIME", 500)).toEqual({ type: "SINGLE_USE", spend_limit: 1000, spend_limit_duration: "TRANSACTION" });
     expect(lithicCardConfig("SUBSCRIPTION", 1599)).toEqual({ type: "VIRTUAL", spend_limit: 3198, spend_limit_duration: "MONTHLY" });
+  });
+});
+
+describe("preset merchant lock (W1 upgrade prep)", () => {
+  it("Temu/Amazon/Netflix lock to the preset acceptor id commitment; other stores lock on first use", () => {
+    expect(toHex(presetMerchantLock("Temu")!)).toBe(toHex(merchantCommitment(DEMO_MERCHANTS.TEMU.acceptorId)));
+    expect(toHex(presetMerchantLock(" amazon (SANDBOX) ")!)).toBe(toHex(merchantCommitment(DEMO_MERCHANTS.AMAZON.acceptorId)));
+    expect(presetMerchantLock("NETFLIX")).not.toBeNull();
+    expect(presetMerchantLock("Corner Shop")).toBeNull();
   });
 });

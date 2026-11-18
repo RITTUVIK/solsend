@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import { ComputeBudgetProgram, PublicKey, Transaction, type Keypair } from "@solana/web3.js";
 import { createAssociatedTokenAccountIdempotentInstruction } from "@solana/spl-token";
 import {
-  ALLOWANCES_PROGRAM_ID, CARD_KIND, SOLSEND_PROGRAM_ID, USDC_MINT, api, cardDelegation, cardPda, cardStatusName, centsToBase,
+  ALLOWANCES_PROGRAM_ID, CARD_KIND, DEMO_MERCHANTS, SOLSEND_PROGRAM_ID, USDC_MINT, api, cardDelegation, cardPda, cardStatusName, centsToBase,
   ixCloseCard, ixCreateFixedDelegation, ixCreateRecurringDelegation, ixFreezeCard, ixInitSubscriptionAuthority, ixRegisterCard, ixUnfreezeCard,
   usdcAta, type CardRow,
 } from "@solsend/shared";
@@ -13,6 +13,7 @@ import { HttpError } from "../auth";
 import type { Store } from "../store";
 import type { LithicApi } from "../lithic/client";
 import { safeErr } from "../lib/safe";
+import { merchantCommitment } from "../lib/commitments";
 import { tagsFor } from "../solana/records";
 import { getAccountsChunked, type Clock, type Rpc } from "../solana/rpc";
 import { createIntent, INTENT_TTL_MS, type IntentKind } from "../tx/intents";
@@ -35,6 +36,14 @@ const randomCardId = (): bigint => {
 async function newTx(rpc: Rpc, feePayer: PublicKey) {
   const { blockhash, lastValidBlockHeight } = await rpc.getLatestBlockhash("confirmed");
   return new Transaction({ feePayer, blockhash, lastValidBlockHeight });
+}
+
+/** Lead note (W1 upgrade): a card for a Demo Merchant preset is merchant-locked FROM CREATION to that preset's
+ *  acceptor id (a leaked card can't be used anywhere else, even on first use). Anything else → null = lock on first use. */
+const PRESET_BY_NAME: Record<string, keyof typeof DEMO_MERCHANTS> = { temu: "TEMU", amazon: "AMAZON", netflix: "NETFLIX" };
+export function presetMerchantLock(merchantName: string): Uint8Array | null {
+  const key = PRESET_BY_NAME[merchantName.trim().toLowerCase().replace(/\s*\(sandbox\)$/, "")];
+  return key ? merchantCommitment(DEMO_MERCHANTS[key].acceptorId) : null;
 }
 
 // ── F3 step 1: prepare ─────────────────────────────────────────────────────────────────────────────
@@ -62,6 +71,8 @@ export async function prepareCard(deps: CardDeps, owner: string, req: z.infer<ty
     const expiry = BigInt(Math.floor(deps.clock.now() / 1000)) + 5n * 365n * 86_400n;
     tx.add(ixCreateRecurringDelegation({ owner: ownerKey, delegatee: pda, nonce: cardId, amountPerPeriod: limitBase, periodSecs, startTs: 0n, expiryTs: expiry, initId: w.saInitId, payer: fp }));
   }
+  const merchantLock = presetMerchantLock(req.merchantName);
+  void merchantLock; // W1 upgrade (one line): add `merchantLock: merchantLock ?? undefined` to ixRegisterCard below.
   tx.add(ixRegisterCard({ owner: ownerKey, payer: fp, cardId, kind: CARD_KIND[req.kind], label: req.label }));
 
   await deps.store.insertCard({

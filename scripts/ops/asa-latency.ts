@@ -6,7 +6,8 @@
 //        [--dup] [--status AUTHORIZATION] [--token <replay an existing token>] [--verify] [--out file.json]
 import { randomUUID } from "node:crypto";
 import { writeFileSync } from "node:fs";
-import { cardPda, settlementRecordPda, toHex } from "../../packages/shared/src/index";
+import { cardPda, toHex } from "../../packages/shared/src/index";
+import { recordAddress } from "../../apps/web/src/server/solana/records";
 import { PublicKey } from "../../apps/web/node_modules/@solana/web3.js/lib/index.cjs.js";
 import { authCommitment } from "../../apps/web/src/server/lib/commitments";
 import { signLikeLithic } from "../../apps/web/src/server/lithic/webhook";
@@ -67,7 +68,7 @@ const decisions = rows.reduce<Record<string, number>>((m, r) => ((m[r.result] = 
 let onchain: { records_found: number; amounts: string[] } | null = null;
 if (flag("verify")) {
   const rpc = env.get("SOLANA_RPC_URL")!;
-  const keys = rows.map((r) => settlementRecordPda(pda, authCommitment(r.token)).toBase58());
+  const keys = rows.map((r) => recordAddress(pda, authCommitment(r.token)).toBase58());
   const found: string[] = [];
   for (let i = 0; i < keys.length; i += 5) {
     const j = await (await fetch(rpc, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getMultipleAccounts", params: [keys.slice(i, i + 5), { encoding: "base64", commitment: "confirmed" }] }) })).json() as { result?: { value: ({ data: [string, string] } | null)[] } };

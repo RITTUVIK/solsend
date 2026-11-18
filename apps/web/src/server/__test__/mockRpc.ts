@@ -1,7 +1,8 @@
 // Test-only: an in-memory stand-in for the devnet RPC surface (`Rpc`) + SolSend account encoders.
 import bs58 from "bs58";
 import { Keypair, PublicKey, type AccountInfo, type SignatureResult } from "@solana/web3.js";
-import { ALLOWANCES_PROGRAM_ID, IDL, SOLSEND_PROGRAM_ID, concat, i64le, u64le, settlementRecordPda } from "@solsend/shared";
+import { ALLOWANCES_PROGRAM_ID, IDL, SOLSEND_PROGRAM_ID, concat, i64le, u64le } from "@solsend/shared";
+import { recordAddress } from "../solana/records";
 import type { Rpc } from "../solana/rpc";
 
 type Status = { err: SignatureResult["err"] };
@@ -67,7 +68,7 @@ export function encodeRecord(card: PublicKey, authHash: Uint8Array, amount: bigi
 }
 
 export function putRecord(rpc: MockRpc, card: PublicKey, authHash: Uint8Array, amount: bigint, refunded = 0n) {
-  rpc.setAccount(settlementRecordPda(card, authHash), SOLSEND_PROGRAM_ID, encodeRecord(card, authHash, amount, refunded));
+  rpc.setAccount(recordAddress(card, authHash), SOLSEND_PROGRAM_ID, encodeRecord(card, authHash, amount, refunded));
 }
 
 export function encodeCard(p: { owner: PublicKey; cardId: bigint; kind?: number; status?: number; delegation: PublicKey; source: PublicKey; totalSettled?: bigint; merchantLock?: Uint8Array }) {

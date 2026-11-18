@@ -31,7 +31,7 @@ export async function POST(req: Request): Promise<Response> {
   const tx = intake.tx;
   console.log(`[events] ${intake.eventType} token=${tx.token} status=${tx.status}`);
   waitUntil(applyTransactionUpdate(deps, tx)
-    .then((r) => console.log(`[events] reconciled token=${r.token} ${r.outcome} ${r.tag}`))
+    .then((r) => console.log(`[events] reconciled token=${r.token} ${r.outcome} ${r.tag}${"refundSignature" in r && r.refundSignature ? ` refund=${r.refundSignature}` : ""}`))
     .catch((e) => console.error(`[events] reconcile failed token=${tx.token}: ${safeErr(e)} (cron will retry)`)));
   return Response.json({ ok: true });
 }

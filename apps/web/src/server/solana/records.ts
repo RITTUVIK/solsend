@@ -6,13 +6,17 @@ import { getAccountsChunked, type Clock, type Rpc } from "./rpc";
 export type RecordView = { amount: bigint; refunded: bigint };
 export type CardRef = { pda: PublicKey; owner: PublicKey; cardId: bigint };
 
+/** THE ONLY place the SettlementRecord address is derived (ASA duplicate rule, reconciler, recovery, tests, ops).
+ *  W1 upgrade (lead note): seeds become ["settle", auth_hash] → change this line to `settlementRecordPda(authHash)`. */
+export const recordAddress = (card: PublicKey, authHash: Uint8Array): PublicKey => settlementRecordPda(card, authHash);
+
 export async function readSettlementRecord(rpc: Pick<Rpc, "getAccountInfo">, card: PublicKey, authHash: Uint8Array): Promise<RecordView | null> {
-  const acc = await rpc.getAccountInfo(settlementRecordPda(card, authHash), "confirmed");
+  const acc = await rpc.getAccountInfo(recordAddress(card, authHash), "confirmed");
   return acc ? decodeRecordAccount(acc, card) : null;
 }
 
 export async function readSettlementRecords(rpc: Pick<Rpc, "getMultipleAccountsInfo">, items: { card: PublicKey; authHash: Uint8Array }[], clock?: Clock): Promise<(RecordView | null)[]> {
-  const accs = await getAccountsChunked(rpc, items.map((i) => settlementRecordPda(i.card, i.authHash)), "confirmed", clock);
+  const accs = await getAccountsChunked(rpc, items.map((i) => recordAddress(i.card, i.authHash)), "confirmed", clock);
   return accs.map((a, i) => (a ? decodeRecordAccount(a, items[i]!.card) : null));
 }
 
