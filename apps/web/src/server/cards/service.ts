@@ -72,8 +72,7 @@ export async function prepareCard(deps: CardDeps, owner: string, req: z.infer<ty
     tx.add(ixCreateRecurringDelegation({ owner: ownerKey, delegatee: pda, nonce: cardId, amountPerPeriod: limitBase, periodSecs, startTs: 0n, expiryTs: expiry, initId: w.saInitId, payer: fp }));
   }
   const merchantLock = presetMerchantLock(req.merchantName);
-  void merchantLock; // W1 upgrade (one line): add `merchantLock: merchantLock ?? undefined` to ixRegisterCard below.
-  tx.add(ixRegisterCard({ owner: ownerKey, payer: fp, cardId, kind: CARD_KIND[req.kind], label: req.label }));
+  tx.add(ixRegisterCard({ owner: ownerKey, payer: fp, cardId, kind: CARD_KIND[req.kind], label: req.label, merchantLock: merchantLock ?? undefined }));
 
   await deps.store.insertCard({
     card_pda: pda.toBase58(), owner_wallet: owner, card_id: cardId.toString(), kind: req.kind, label: req.label, merchant_name: req.merchantName,

@@ -20,7 +20,7 @@ import { safeErr } from "../lib/safe";
 /** Statuses we settle (amendment 3a). Everything else declines without a settle. */
 export const SETTLE_STATUSES = new Set(["AUTHORIZATION", "FINANCIAL_AUTHORIZATION"]);
 /** Measured on devnet (see docs/evidence/w2-backend.md); override with SETTLE_CU_LIMIT. */
-export const DEFAULT_SETTLE_CU_LIMIT = 70_000; // fixed-delegation settle measured 41,830 CU on devnet (sig 2kPLyG75…)
+export const DEFAULT_SETTLE_CU_LIMIT = 80_000; // Upgrade 1 (opt-level z) settle measured 53.2k–56.2k CU on devnet (w1-program-devnet.md)
 
 export type AsaDeps = {
   rpc: Rpc;

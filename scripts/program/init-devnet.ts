@@ -11,9 +11,9 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
-  SOLSEND_PROGRAM_ID, USDC_MINT, configPda, decodeConfig, ixInitializeConfig, ixSetSettlementAuthority, treasuryAta, treasuryPda, usdcAta,
+  SOLSEND_PROGRAM_ID, USDC_MINT, configPda, decodeConfig, ixSetSettlementAuthority, treasuryAta, treasuryPda, usdcAta,
 } from "../../packages/shared/src/index.js";
-import { STATE_DIR, connect, explorer, loadKeypair, plain, sendTx, spl, web3 } from "./lib.js";
+import { STATE_DIR, connect, explorer, ixInitializeConfigV2, loadKeypair, plain, sendTx, spl, web3 } from "./lib.js";
 
 const EXPECTED = {
   settlementAuthority: "eLqvkHwL9KCuk9ZgLUVXSLo3cn6ybH8MTiYGXe3DzUu",
@@ -62,7 +62,8 @@ async function main() {
   const cfgAddr = configPda();
   let cfgInfo = await connection.getAccountInfo(cfgAddr);
   if (!cfgInfo) {
-    const ix = ixInitializeConfig({ admin: admin.publicKey, settlementAuthority: settler, treasuryDestination: adminAta, perTxMax: PER_TX_MAX, idleSecs: IDLE_SECS });
+    // Upgrade 1: only the program upgrade authority (the deployer) can initialize (front-run guard).
+    const ix = ixInitializeConfigV2({ admin: admin.publicKey, settlementAuthority: settler, treasuryDestination: adminAta, perTxMax: PER_TX_MAX, idleSecs: IDLE_SECS });
     const r = await sendTx(connection, [ix], admin);
     if (!r.ok) throw new Error(`initialize_config failed: ${JSON.stringify(r.err)} ${r.logs.slice(-5).join(" | ")}`);
     console.log(`initialize_config: ${explorer(r.signature)}  CU ${r.computeUnits}`);

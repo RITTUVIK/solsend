@@ -14,7 +14,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type * as Web3 from "../../packages/shared/node_modules/@solana/web3.js";
 import type * as SplToken from "../../packages/shared/node_modules/@solana/spl-token";
-import { DEVNET_GENESIS_HASH, decodeSolsendEventsFromLogs, toHex } from "../../packages/shared/src/index.js";
+import {
+  ALLOWANCES_PROGRAM_ID, DEVNET_GENESIS_HASH, SOLSEND_PROGRAM_ID, USDC_MINT, allowancesEventAuthority, buildSolsendIx, cardDelegation, cardPda, configPda,
+  decodeSolsendEventsFromLogs, label32, subscriptionAuthorityPda, toHex, treasuryAta, treasuryPda, usdcAta, utf8,
+} from "../../packages/shared/src/index.js";
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const sharedRequire = createRequire(path.join(ROOT, "packages/shared/package.json"));
@@ -152,4 +155,47 @@ export async function tokenBalance(connection: Web3.Connection, ata: Web3.Public
   const info = await connection.getAccountInfo(ata, "confirmed");
   if (!info) return null;
   return spl.unpackAccount(ata, info).amount;
+}
+
+// ── Current-contract builders (program "Upgrade 1" IDL) ─────────────────────
+// packages/shared's high-level wrappers predate Upgrade 1 (record seeds, register_card's merchant_lock,
+// initialize_config's program/program_data). Until the lead updates them, these build the same
+// instructions with the shared IDL codec (`buildSolsendIx`), so encoding still comes from the IDL.
+const BPF_LOADER_UPGRADEABLE = new web3.PublicKey("BPFLoaderUpgradeab1e11111111111111111111111");
+const pda = (seeds: Uint8Array[], program: Web3.PublicKey) => web3.PublicKey.findProgramAddressSync(seeds, program)[0];
+
+/** SettlementRecord PDA = ["settle", auth_hash] (no card): one pull per authorization across all cards. */
+export const settlementRecordPdaV2 = (authHash: Uint8Array) => pda([utf8("settle"), authHash], SOLSEND_PROGRAM_ID);
+/** The SolSend ProgramData account (initialize_config front-run guard). */
+export const programDataPda = () => pda([SOLSEND_PROGRAM_ID.toBytes()], BPF_LOADER_UPGRADEABLE);
+
+export function ixInitializeConfigV2(p: { admin: Web3.PublicKey; settlementAuthority: Web3.PublicKey; treasuryDestination: Web3.PublicKey; perTxMax: bigint; idleSecs: bigint }) {
+  return buildSolsendIx("initialize_config",
+    { args: { settlementAuthority: p.settlementAuthority, treasuryDestination: p.treasuryDestination, perTxMax: p.perTxMax, idleSecs: p.idleSecs } },
+    { admin: p.admin, config: configPda(), treasury: treasuryPda(), usdcMint: USDC_MINT, systemProgram: web3.SystemProgram.programId,
+      program: SOLSEND_PROGRAM_ID, programData: programDataPda() });
+}
+
+/** `merchantLock` all zeros (default) = lock on first settle; non-zero = pre-locked at registration. */
+export function ixRegisterCardV2(p: { owner: Web3.PublicKey; payer: Web3.PublicKey; cardId: bigint; kind: number; label: string; merchantLock?: Uint8Array }) {
+  return buildSolsendIx("register_card",
+    { cardId: p.cardId, kind: p.kind, delegationNonce: p.cardId, label: label32(p.label), merchantLock: p.merchantLock ?? new Uint8Array(32) },
+    { owner: p.owner, payer: p.payer, config: configPda(), card: cardPda(p.owner, p.cardId), delegation: cardDelegation(p.owner, p.cardId),
+      ownerAta: usdcAta(p.owner), usdcMint: USDC_MINT, systemProgram: web3.SystemProgram.programId });
+}
+
+export function ixSettleV2(p: { settler: Web3.PublicKey; owner: Web3.PublicKey; cardId: bigint; amount: bigint; authHash: Uint8Array; merchantHash: Uint8Array }) {
+  return buildSolsendIx("settle",
+    { amount: p.amount, authHash: p.authHash, merchantHash: p.merchantHash },
+    { settlementAuthority: p.settler, config: configPda(), card: cardPda(p.owner, p.cardId), settlementRecord: settlementRecordPdaV2(p.authHash),
+      delegation: cardDelegation(p.owner, p.cardId), subscriptionAuthority: subscriptionAuthorityPda(p.owner), sourceTokenAccount: usdcAta(p.owner),
+      treasury: treasuryPda(), treasuryAta: treasuryAta(), usdcMint: USDC_MINT, eventAuthority: allowancesEventAuthority(),
+      allowancesProgram: ALLOWANCES_PROGRAM_ID, tokenProgram: spl.TOKEN_PROGRAM_ID, associatedTokenProgram: spl.ASSOCIATED_TOKEN_PROGRAM_ID,
+      systemProgram: web3.SystemProgram.programId });
+}
+
+export function ixRefundV2(p: { settler: Web3.PublicKey; owner: Web3.PublicKey; cardId: bigint; amount: bigint; authHash: Uint8Array }) {
+  return buildSolsendIx("refund", { amount: p.amount, authHash: p.authHash },
+    { settlementAuthority: p.settler, config: configPda(), card: cardPda(p.owner, p.cardId), settlementRecord: settlementRecordPdaV2(p.authHash),
+      sourceTokenAccount: usdcAta(p.owner), treasury: treasuryPda(), treasuryAta: treasuryAta(), usdcMint: USDC_MINT, tokenProgram: spl.TOKEN_PROGRAM_ID });
 }

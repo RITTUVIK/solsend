@@ -7,8 +7,9 @@ export type RecordView = { amount: bigint; refunded: bigint };
 export type CardRef = { pda: PublicKey; owner: PublicKey; cardId: bigint };
 
 /** THE ONLY place the SettlementRecord address is derived (ASA duplicate rule, reconciler, recovery, tests, ops).
- *  W1 upgrade (lead note): seeds become ["settle", auth_hash] → change this line to `settlementRecordPda(authHash)`. */
-export const recordAddress = (card: PublicKey, authHash: Uint8Array): PublicKey => settlementRecordPda(card, authHash);
+ *  Program Upgrade 1: seeds are ["settle", auth_hash] — one record per authorization across ALL cards. `card` is kept in
+ *  the signature because readers still require record.card == card (a record for another card never approves here). */
+export const recordAddress = (_card: PublicKey, authHash: Uint8Array): PublicKey => settlementRecordPda(authHash);
 
 export async function readSettlementRecord(rpc: Pick<Rpc, "getAccountInfo">, card: PublicKey, authHash: Uint8Array): Promise<RecordView | null> {
   const acc = await rpc.getAccountInfo(recordAddress(card, authHash), "confirmed");

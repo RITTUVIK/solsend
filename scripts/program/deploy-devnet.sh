@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # Deploy (or upgrade) the SolSend program on DEVNET and verify the deployed bytes.
-#   NO_DNA=1 anchor build && scripts/program/deploy-devnet.sh
+#   CARGO_PROFILE_RELEASE_OPT_LEVEL=z NO_DNA=1 anchor build && scripts/program/deploy-devnet.sh
+# Since Upgrade 1 the deployed artifact is built with opt-level "z" (size-optimised: 227 KB vs 264 KB)
+# so an upgrade buffer fits the devnet SOL budget; tests run against that exact target/deploy/solsend.so.
+# An upgrade needs buffer rent (~1.16 SOL, refunded to the payer after the upgrade) on the deployer and
+# never auto-extends: a binary larger than the existing ProgramData capacity is refused here.
 # Program keypair: target/deploy/solsend-keypair.json (copy of ~/.config/solsend/devnet/solsend-program-keypair.json).
 # Deployer + upgrade authority: ~/.config/solsend/devnet/deployer.json. Uses the public devnet RPC (no secrets).
 set -euo pipefail
@@ -21,10 +25,19 @@ SO="$ROOT/target/deploy/solsend.so"
 echo "deployer: $(solana-keygen pubkey "$DEPLOYER")  balance: $(solana balance -u "$URL" -k "$DEPLOYER")"
 echo "program:  $PROGRAM_ID  size: $(wc -c <"$SO" | tr -d ' ') bytes  rent: $(solana rent -u "$URL" "$(wc -c <"$SO" | tr -d ' ')" | awk '{print $3, $4}')"
 
+# Upgrade: the new binary must fit the allocated ProgramData (no `solana program extend` spend).
+if solana program show -u "$URL" "$PROGRAM_ID" >/dev/null 2>&1; then
+  CAP=$(solana program show -u "$URL" "$PROGRAM_ID" | awk "/Data Length/ {print \$3}")
+  LEN=$(wc -c <"$SO" | tr -d " ")
+  echo "upgrade: new $LEN bytes, ProgramData capacity $CAP bytes"
+  [ "$LEN" -le "$CAP" ] || { echo "binary exceeds ProgramData capacity; extend explicitly first" >&2; exit 1; }
+fi
+
 solana program deploy -u "$URL" \
   --keypair "$DEPLOYER" \
   --upgrade-authority "$DEPLOYER" \
   --program-id "$PROGRAM_KP" \
+  --no-auto-extend \
   "$SO"
 
 solana program show -u "$URL" "$PROGRAM_ID"

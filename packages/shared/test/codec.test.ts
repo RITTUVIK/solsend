@@ -25,7 +25,7 @@ describe("IDL contract matches CP0b-proven values", () => {
     const card = cardPda(owner, 5n);
     expect(ix.keys[0]!.pubkey.equals(settler) && ix.keys[0]!.isSigner).toBe(true);
     expect(ix.keys[2]!.pubkey.equals(card)).toBe(true);
-    expect(ix.keys[3]!.pubkey.equals(settlementRecordPda(card, h))).toBe(true);
+    expect(ix.keys[3]!.pubkey.equals(settlementRecordPda(h))).toBe(true);
     expect(ix.keys[4]!.pubkey.equals(cardDelegation(owner, 5n))).toBe(true);
     expect(ix.keys[5]!.pubkey.equals(subscriptionAuthorityPda(owner))).toBe(true);
     expect(ix.keys.length).toBe(IDL.instructions.find((i) => i.name === "settle")!.accounts.length);
@@ -33,7 +33,9 @@ describe("IDL contract matches CP0b-proven values", () => {
   it("refund + register builders encode", () => {
     const owner = Keypair.generate().publicKey;
     expect(ixRefund({ settler: owner, owner, cardId: 1n, amount: 1n, authHash: new Uint8Array(32) }).data.length).toBe(8 + 8 + 32);
-    expect(ixRegisterCard({ owner, payer: owner, cardId: 1n, kind: 0, label: "Temu" }).data.length).toBe(8 + 8 + 1 + 8 + 32);
+    expect(ixRegisterCard({ owner, payer: owner, cardId: 1n, kind: 0, label: "Temu" }).data.length).toBe(8 + 8 + 1 + 8 + 32 + 32);
+    const lock = new Uint8Array(32).fill(5);
+    expect([...ixRegisterCard({ owner, payer: owner, cardId: 1n, kind: 0, label: "Temu", merchantLock: lock }).data.slice(-32)]).toEqual([...lock]);
   });
   it("events decode from logs, scoped to our program only", () => {
     const card = Keypair.generate().publicKey, owner = Keypair.generate().publicKey;

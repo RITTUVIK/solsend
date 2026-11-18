@@ -7,6 +7,7 @@
 
 use std::path::PathBuf;
 
+#[allow(unused_imports)]
 pub use {
     anchor_lang::{
         error::{ErrorCode as AnchorErrorCode, ERROR_CODE_OFFSET},
@@ -75,8 +76,16 @@ pub fn treasury_pda() -> Pubkey {
 pub fn card_pda(owner: &Pubkey, card_id: u64) -> Pubkey {
     Pubkey::find_program_address(&[CARD_SEED, owner.as_ref(), &card_id.to_le_bytes()], &solsend::id()).0
 }
-pub fn record_pda(card: &Pubkey, auth: &[u8; 32]) -> Pubkey {
-    Pubkey::find_program_address(&[SETTLE_SEED, card.as_ref(), auth.as_ref()], &solsend::id()).0
+/// SettlementRecord PDA: seeded by the authorization commitment ONLY (one pull per auth, all cards).
+pub fn record_pda(auth: &[u8; 32]) -> Pubkey {
+    Pubkey::find_program_address(&[SETTLE_SEED, auth.as_ref()], &solsend::id()).0
+}
+pub fn bpf_loader_upgradeable_id() -> Pubkey {
+    Pubkey::from_str_const("BPFLoaderUpgradeab1e11111111111111111111111")
+}
+/// The SolSend ProgramData account (BPFLoaderUpgradeable PDA of the program id).
+pub fn programdata_pda() -> Pubkey {
+    Pubkey::find_program_address(&[solsend::id().as_ref()], &bpf_loader_upgradeable_id()).0
 }
 
 // ── transactions ────────────────────────────────────────────────────────────
@@ -268,11 +277,23 @@ pub fn fixed_remaining(svm: &LiteSVM, delegation: &Pubkey) -> u64 {
 
 // ── SolSend instructions ───────────────────────────────────────────────────
 pub fn ix_initialize_config(admin: &Pubkey, mint: &Pubkey, args: InitializeConfigArgs) -> Instruction {
+    ix_initialize_config_with(admin, mint, args, programdata_pda())
+}
+
+pub fn ix_initialize_config_with(admin: &Pubkey, mint: &Pubkey, args: InitializeConfigArgs, program_data: Pubkey) -> Instruction {
     Instruction::new_with_bytes(
         solsend::id(),
         &sx::InitializeConfig { args }.data(),
-        acc::InitializeConfig { admin: *admin, config: config_pda(), treasury: treasury_pda(), usdc_mint: *mint, system_program: system_program::ID }
-            .to_account_metas(None),
+        acc::InitializeConfig {
+            admin: *admin,
+            config: config_pda(),
+            treasury: treasury_pda(),
+            usdc_mint: *mint,
+            system_program: system_program::ID,
+            program: solsend::id(),
+            program_data,
+        }
+        .to_account_metas(None),
     )
 }
 
@@ -296,9 +317,25 @@ pub fn label(s: &str) -> [u8; 32] {
 
 #[allow(clippy::too_many_arguments)]
 pub fn ix_register_card(owner: &Pubkey, payer: &Pubkey, mint: &Pubkey, card_id: u64, kind: u8, nonce: u64, delegation: Pubkey, label: [u8; 32]) -> Instruction {
+    ix_register_card_locked(owner, payer, mint, card_id, kind, nonce, delegation, label, [0u8; 32])
+}
+
+/// register_card with an explicit `merchant_lock` (zero = lock on first settle).
+#[allow(clippy::too_many_arguments)]
+pub fn ix_register_card_locked(
+    owner: &Pubkey,
+    payer: &Pubkey,
+    mint: &Pubkey,
+    card_id: u64,
+    kind: u8,
+    nonce: u64,
+    delegation: Pubkey,
+    label: [u8; 32],
+    merchant_lock: [u8; 32],
+) -> Instruction {
     Instruction::new_with_bytes(
         solsend::id(),
-        &sx::RegisterCard { card_id, kind, delegation_nonce: nonce, label }.data(),
+        &sx::RegisterCard { card_id, kind, delegation_nonce: nonce, label, merchant_lock }.data(),
         acc::RegisterCard {
             owner: *owner,
             payer: *payer,
@@ -321,7 +358,7 @@ pub fn settle_accounts(settler: &Pubkey, owner: &Pubkey, mint: &Pubkey, card_id:
         settlement_authority: *settler,
         config: config_pda(),
         card,
-        settlement_record: record_pda(&card, auth),
+        settlement_record: record_pda(auth),
         delegation: derive_delegation(&sa, owner, &card, card_id),
         subscription_authority: sa,
         source_token_account: get_associated_token_address(owner, mint),
@@ -346,7 +383,7 @@ pub fn refund_accounts(settler: &Pubkey, owner: &Pubkey, mint: &Pubkey, card_id:
         settlement_authority: *settler,
         config: config_pda(),
         card,
-        settlement_record: record_pda(&card, auth),
+        settlement_record: record_pda(auth),
         source_token_account: get_associated_token_address(owner, mint),
         treasury: treasury_pda(),
         treasury_ata: get_associated_token_address(&treasury_pda(), mint),
@@ -369,23 +406,6 @@ pub fn ix_unfreeze(owner: &Pubkey, card: Pubkey) -> Instruction {
 
 pub fn ix_close_card(owner: &Pubkey, card: Pubkey) -> Instruction {
     Instruction::new_with_bytes(solsend::id(), &sx::CloseCard {}.data(), acc::OwnerCard { owner: *owner, card }.to_account_metas(None))
-}
-
-pub fn ix_admin_withdraw(admin: &Pubkey, mint: &Pubkey, destination: Pubkey, amount: u64) -> Instruction {
-    Instruction::new_with_bytes(
-        solsend::id(),
-        &sx::AdminWithdraw { amount }.data(),
-        acc::AdminWithdraw {
-            admin: *admin,
-            config: config_pda(),
-            treasury: treasury_pda(),
-            treasury_ata: get_associated_token_address(&treasury_pda(), mint),
-            destination,
-            usdc_mint: *mint,
-            token_program: spl_token::ID,
-        }
-        .to_account_metas(None),
-    )
 }
 
 // ── account readers ────────────────────────────────────────────────────────
@@ -437,6 +457,32 @@ pub struct Opts {
     pub idle_secs: i64,
 }
 
+impl Opts {
+    /// The values `scripts/program/init-devnet.ts` configured on devnet: 1000 USDC per tx, 30-day idle lock.
+    pub fn devnet() -> Self {
+        Opts { per_tx_max: 1_000 * USDC, idle_secs: 30 * DAY }
+    }
+}
+
+/// Rewrite the SolSend ProgramData upgrade authority (LiteSVM's add_program leaves it None).
+/// ProgramData metadata (bincode): tag u32 = 3 | slot u64 | Option<Pubkey> (u8 tag + 32 bytes) = 45 bytes.
+pub fn set_upgrade_authority(svm: &mut LiteSVM, authority: Option<&Pubkey>) {
+    let pd = programdata_pda();
+    let mut a = svm.get_account(&pd).expect("ProgramData");
+    assert_eq!(u32::from_le_bytes(a.data[0..4].try_into().unwrap()), 3, "ProgramData state tag");
+    match authority {
+        Some(k) => {
+            a.data[12] = 1;
+            a.data[13..45].copy_from_slice(k.as_ref());
+        }
+        None => {
+            a.data[12] = 0;
+            a.data[13..45].fill(0);
+        }
+    }
+    svm.set_account(pd, a).unwrap();
+}
+
 pub fn new_svm() -> LiteSVM {
     let mut svm = LiteSVM::new();
     let allowances = read_artifact(
@@ -460,6 +506,7 @@ pub fn setup() -> Env {
 pub fn setup_with(opts: Opts) -> Env {
     let mut svm = new_svm();
     let (admin, settler, payer, owner, mallory) = (Keypair::new(), Keypair::new(), Keypair::new(), Keypair::new(), Keypair::new());
+    set_upgrade_authority(&mut svm, Some(&admin.pubkey())); // M1: only the upgrade authority can init
     for k in [&admin, &settler, &payer, &owner, &mallory] {
         svm.airdrop(&k.pubkey(), 10_000_000_000).unwrap();
     }
@@ -522,12 +569,19 @@ impl Env {
     /// Production F3 shape: ONE tx = Allowances createDelegation (payer = fee payer) + register_card,
     /// fee payer = our fee payer, owner co-signs. Delegation nonce = card_id. Returns the tx result.
     pub fn try_create_card(&mut self, card_id: u64, kind: u8, terms: Terms) -> TxResult {
+        self.try_create_card_locked(card_id, kind, terms, [0u8; 32])
+    }
+
+    /// As `try_create_card`, with a register-time `merchant_lock` (zero = lock on first settle).
+    pub fn try_create_card_locked(&mut self, card_id: u64, kind: u8, terms: Terms, merchant_lock: [u8; 32]) -> TxResult {
         let owner = self.owner.insecure_clone();
         let payer = self.payer.insecure_clone();
         let card = self.card(card_id);
         let (create, delegation) =
             ix_create_delegation(&self.svm, &owner.pubkey(), &self.mint, &card, card_id, &terms, Some(&payer.pubkey()));
-        let register = ix_register_card(&owner.pubkey(), &payer.pubkey(), &self.mint, card_id, kind, card_id, delegation, label("test card"));
+        let register = ix_register_card_locked(
+            &owner.pubkey(), &payer.pubkey(), &self.mint, card_id, kind, card_id, delegation, label("test card"), merchant_lock,
+        );
         send(&mut self.svm, &[create, register], &payer, &[&owner])
     }
 

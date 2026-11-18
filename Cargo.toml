@@ -8,6 +8,9 @@ edition = "2021"
 rust-version = "1.89.0"
 
 [profile.release]
+# opt-level z: the deployed devnet binary (Upgrade 1) is built this way so it fits the existing ProgramData
+# allocation; keep it so `anchor build` reproduces the deployed hash (b54723af…ff58).
+opt-level = "z"
 overflow-checks = true
 lto = "fat"
 codegen-units = 1
