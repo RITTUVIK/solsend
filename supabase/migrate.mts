@@ -14,7 +14,18 @@ if (!url) { console.error("SUPABASE_DB_URL missing in spikes/.env"); process.exi
 if (!/supabase\.(co|com)/.test(url)) { console.error("refusing: SUPABASE_DB_URL is not a Supabase host"); process.exit(2); }
 const dry = process.argv.includes("--dry-run");
 
-const sql = postgres(url, { ssl: "require", max: 1, prepare: false, onnotice: () => {} });
+/** Parse a Supabase Postgres URI robustly WITHOUT requiring percent-encoding: user = up to the first ':', password =
+ *  everything up to the LAST '@' (passwords may contain @ : / ? # etc.), host:port/db after it. Never printed. */
+function parseDbUrl(raw: string) {
+  const m = /^postgres(?:ql)?:\/\/([^:]+):(.*)@([^@/:]+)(?::(\d+))?\/([^?]*)/.exec(raw.trim().replace(/^["']|["']$/g, ""));
+  if (!m) throw new Error("SUPABASE_DB_URL is not a postgres URI");
+  const pw = m[2]!;
+  let password = pw;
+  if (/%[0-9A-Fa-f]{2}/.test(pw)) { try { password = decodeURIComponent(pw); } catch { password = pw; } }
+  return { username: decodeURIComponent(m[1]!), password, host: m[3]!, port: Number(m[4] ?? 5432), database: m[5] || "postgres" };
+}
+const conn = parseDbUrl(url);
+const sql = postgres({ ...conn, ssl: "require", max: 1, prepare: false, onnotice: () => {} });
 try {
   await sql`create table if not exists public._solsend_migrations (name text primary key, sha256 text not null, applied_at timestamptz not null default now())`;
   await sql`alter table public._solsend_migrations enable row level security`;
