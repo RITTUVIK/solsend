@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@solana/web3.js": ["./node_modules/@solana/web3.js"],
+      "bs58": ["./node_modules/bs58"],
+      "zod": ["./node_modules/zod"]
+    }
+  },
+  "include": ["*.ts", "../infra/**/*.ts"]
+}

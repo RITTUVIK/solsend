@@ -1,0 +1,8 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "regions": ["iad1"],
+  "functions": {
+    "src/app/api/lithic/**": { "maxDuration": 10 },
+    "src/app/api/demo-merchant/**": { "maxDuration": 30 }
+  }
+}
