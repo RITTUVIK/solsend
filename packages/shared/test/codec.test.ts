@@ -56,3 +56,25 @@ describe("IDL contract matches CP0b-proven values", () => {
     expect(formatUsdc(23_170_000n)).toBe("23.17");
   });
 });
+
+import { authCommitmentHex, merchantCommitment, lithicCardConfig, ASA_SETTLE_STATUSES, toHex } from "../src/index.js";
+import { createHash } from "node:crypto";
+describe("security-review amendments", () => {
+  it("commitments are domain-separated sha256 (verifiable with node crypto)", async () => {
+    const t = "934ca60c-f410-47e7-ac06-41f9994d9e4b";
+    expect(await authCommitmentHex(t)).toBe(createHash("sha256").update("solsend:auth:v1:" + t).digest("hex"));
+    expect(toHex(await merchantCommitment("SOLSENDDEMOTEMU01"))).toBe(createHash("sha256").update("solsend:merchant:v1:SOLSENDDEMOTEMU01").digest("hex"));
+    expect(await authCommitmentHex(t)).not.toBe(createHash("sha256").update(t).digest("hex"));
+  });
+  it("Lithic outer limits are 2x onchain and never MERCHANT_LOCKED", () => {
+    expect(lithicCardConfig("STORE_LOCKED", 4000)).toEqual({ type: "VIRTUAL", spend_limit: 8000, spend_limit_duration: "FOREVER" });
+    expect(lithicCardConfig("ONE_TIME", 2500).type).toBe("SINGLE_USE");
+    expect(lithicCardConfig("SUBSCRIPTION", 1549).spend_limit_duration).toBe("MONTHLY");
+    expect(ASA_SETTLE_STATUSES.has("BALANCE_INQUIRY")).toBe(false);
+    expect(ASA_SETTLE_STATUSES.has("CREDIT_AUTHORIZATION")).toBe(false);
+  });
+  it("close_settlement_record builder is gone", async () => {
+    const mod = await import("../src/index.js");
+    expect("ixCloseSettlementRecord" in mod).toBe(false);
+  });
+});

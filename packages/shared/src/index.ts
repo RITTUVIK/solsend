@@ -7,5 +7,6 @@ export * from "./solsend.js";
 export * from "./allowances.js";
 export * from "./events.js";
 export * from "./lithic.js";
+export * from "./commitments.js";
 export * from "./db.js";
 export * as api from "./api.js";

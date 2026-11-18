@@ -20,6 +20,23 @@ your final report rather than editing a file you don't own.
   Install only versions at least 14 days old (`minimumReleaseAge`).
 - Devnet USDC `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`. Lithic **sandbox** only.
 
+## Amendments: security review (approved by lead, 2026-11-18)
+These supersede the flows below where they conflict.
+- **A1.** Settle transactions carry **no memo**, so the Lithic token is never onchain.
+  - `auth_hash = authCommitment(token) = sha256("solsend:auth:v1:"+token)`.
+  - `merchant_hash = merchantCommitment(acceptor_id||descriptor) = sha256("solsend:merchant:v1:"+id)`.
+  - Both live in `packages/shared/src/commitments.ts`.
+  - The QuickNode feed joins events to authorizations via `store.getAuthorizationByAuthHash`.
+  - `QnMatch` has no `memo` field.
+- **A2.** `close_settlement_record` is **removed**. SettlementRecords are permanent and act as a lifetime replay guard.
+- **A3.** Lithic cards get **outer** circuit-breaker limits from `lithicCardConfig()`: 2× the onchain limit, `SINGLE_USE` for
+  one-time cards, never `MERCHANT_LOCKED`. There is also an account daily cap of `LITHIC_ACCOUNT_DAILY_CAP_CENTS` where supported.
+- **A4.** The ASA settles only for `ASA_SETTLE_STATUSES` (`AUTHORIZATION`, `FINANCIAL_AUTHORIZATION`) in USD, with card state `OPEN`.
+  - A duplicate approves only if `record.amount == amountBase`.
+  - Everything else declines.
+- **A5.** Supabase: the server prefers `SUPABASE_SECRET_KEY` (`sb_secret_…`), with the legacy `SUPABASE_SERVICE_ROLE_KEY` as fallback.
+  Migrations run through `pnpm db:migrate` with `SUPABASE_DB_URL` (local `spikes/.env` only).
+
 ## Key flows
 
 ### F1 Login + wallet
@@ -51,7 +68,7 @@ Every authenticated route resolves `wallet` from `users`, never from the request
    - Marks the intent consumed, then sets `onchain_confirmed` and `register_signature`.
 4. The server issues the Lithic card. It does a conditional update `onchain_confirmed → lithic_pending`,
    which works as a lock, then calls `POST /v1/cards`:
-   - `type: VIRTUAL`, with **no** Lithic spend limit and no merchant lock: the chain is the only policy;
+   - `lithicCardConfig(kind, limitCents)` gives the type and outer limits (see A3);
    - `memo: "SolSend <label> (sandbox)"`;
    - `tags: {solsend_card, solsend_owner, solsend_card_id}`.
    On success it sets `issued` and `lithic_last_four`. On failure it sets `lithic_failed` with
@@ -72,8 +89,7 @@ Every authenticated route resolves `wallet` from `users`, never from the request
    `merchantHash = sha256(merchant.acceptor_id || descriptor)`.
 5. Build the tx:
    1. ComputeBudget limit (measure; the spike used 90k);
-   2. Memo `solsend:auth:<token>`;
-   3. `ixSettle`.
+   2. `ixSettle` (no memo; see A1).
    Fee payer + signer = settlement authority. Use a cached blockhash, `skipPreflight`, rebroadcast every
    800 ms, and confirm websocket-first with sparse polling.
 6. Reply via `Promise.race` against `ASA_BUDGET_MS`:
@@ -109,7 +125,7 @@ Every authenticated route resolves `wallet` from `users`, never from the request
 
 ### F6 Live feed (QuickNode Streams)
 - A `programs_with_logs` Stream on the SolSend program (devnet) runs `infra/quicknode/filter.js`, which
-  decodes SolSend events and the settle memo into the `QnPayload` contract.
+  decodes SolSend events into the `QnPayload` contract. The `auth_hash` → Lithic token join happens server-side (A1).
 - `POST /api/quicknode` verifies the `x-qn-signature` HMAC and the timestamp, rejects a replayed nonce,
   and upserts into `feed_events` (`source='quicknode'`, idempotent unique index).
 - The UI polls `GET /api/feed` about every 1.5 s.

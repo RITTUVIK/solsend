@@ -2,6 +2,7 @@
 -- Security: RLS ON for every table and NO anon/authenticated policies. Only the server
 -- (service-role key, never shipped to the browser) reads/writes. The browser uses our API routes.
 -- PCI: no column may ever hold a PAN, CVV, expiry, or Lithic API/ASA secret.
+-- auth_hash = hex(sha256("solsend:auth:v1:" + lithic_token)) — the onchain commitment (no plaintext token onchain).
 
 create table if not exists users (
   id uuid primary key default gen_random_uuid(),
@@ -69,6 +70,7 @@ create table if not exists authorizations (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+create unique index if not exists authorizations_auth_hash_idx on authorizations (auth_hash);
 create index if not exists authorizations_card_idx on authorizations (card_pda, created_at desc);
 create index if not exists authorizations_reconcile_idx on authorizations (reconcile_action, created_at) where reconcile_action is null;
 

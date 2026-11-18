@@ -28,6 +28,26 @@ export type AsaRequest = z.infer<typeof AsaRequestZ>;
 export const AsaResultZ = z.enum(["APPROVED", "INSUFFICIENT_FUNDS", "CARD_PAUSED", "UNAUTHORIZED_MERCHANT", "VELOCITY_EXCEEDED", "SUSPECTED_FRAUD"]);
 export type AsaResult = z.infer<typeof AsaResultZ>;
 
+/** ASA `status` values that may settle onchain. Everything else (BALANCE_INQUIRY, credits, unknown) declines. */
+export const ASA_SETTLE_STATUSES = new Set(["AUTHORIZATION", "FINANCIAL_AUTHORIZATION"]);
+
+/** Lithic issuance config (security review, amendment 3). The onchain program is the AUTHORITATIVE spending gate;
+ *  Lithic limits are an OUTER circuit breaker at 2× the onchain limit, so they never pre-empt an onchain decision in
+ *  the normal range but bound issuer exposure if the ASA path ever approved without a confirmed settle.
+ *  MERCHANT_LOCKED is deliberately not used: the onchain merchant lock is authoritative and must stay observable. */
+export function lithicCardConfig(kind: "STORE_LOCKED" | "ONE_TIME" | "SUBSCRIPTION", limitCents: number) {
+  if (!Number.isInteger(limitCents) || limitCents <= 0) throw new Error("invalid limit");
+  const outer = limitCents * 2;
+  switch (kind) {
+    case "STORE_LOCKED": return { type: "VIRTUAL", spend_limit: outer, spend_limit_duration: "FOREVER" } as const;
+    case "ONE_TIME": return { type: "SINGLE_USE", spend_limit: outer, spend_limit_duration: "TRANSACTION" } as const;
+    case "SUBSCRIPTION": return { type: "VIRTUAL", spend_limit: outer, spend_limit_duration: "MONTHLY" } as const;
+  }
+}
+/** Account-level daily cap (cents) — global circuit breaker set by scripts/ops/lithic-setup.ts when the sandbox supports it. */
+export const LITHIC_ACCOUNT_DAILY_CAP_CENTS = 50_000;
+export const OUTER_LIMIT_DECLINE_REASON = "Declined by card-network safety limit (sandbox)";
+
 /** Lithic transaction (GET /v1/transactions/{token} and card_transaction.updated). Reconcile on
  *  `status` + event types — `result` stays "APPROVED" even after a void (CP0b S2 finding). */
 export const LithicTransactionZ = z.object({

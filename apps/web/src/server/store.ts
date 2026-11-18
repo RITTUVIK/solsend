@@ -29,6 +29,8 @@ export interface Store {
 
   upsertAuthorization(row: Partial<AuthorizationRow> & Pick<AuthorizationRow, "lithic_token">): Promise<void>;
   getAuthorization(lithicToken: string): Promise<AuthorizationRow | null>;
+  /** Lookup by onchain commitment (hex of authCommitment(token)) — joins QuickNode events to Lithic authorizations. */
+  getAuthorizationByAuthHash(authHashHex: string): Promise<AuthorizationRow | null>;
   listUnreconciled(olderThanSecs: number, limit: number): Promise<AuthorizationRow[]>;
 
   /** Idempotent: returns false if an identical (signature, kind, card_pda, lithic_token) row exists. */
@@ -88,6 +90,7 @@ export class MemoryStore implements Store {
     this.auths.set(row.lithic_token, { ...base, ...row, updated_at: now() });
   }
   async getAuthorization(t: string) { return this.auths.get(t) ?? null; }
+  async getAuthorizationByAuthHash(h: string) { return [...this.auths.values()].find((a) => a.auth_hash === h) ?? null; }
   async listUnreconciled(olderThanSecs: number, limit: number) {
     const cutoff = new Date(Date.now() - olderThanSecs * 1000).toISOString();
     return [...this.auths.values()].filter((a) => a.reconcile_action === null && a.created_at <= cutoff).slice(0, limit);
@@ -145,6 +148,7 @@ export class SupabaseStore implements Store {
     this.ok(await this.sb.from("authorizations").upsert({ ...row, updated_at: now() }, { onConflict: "lithic_token" }), "upsertAuthorization");
   }
   async getAuthorization(t: string) { return this.ok(await this.sb.from("authorizations").select().eq("lithic_token", t).maybeSingle(), "getAuthorization") as AuthorizationRow | null; }
+  async getAuthorizationByAuthHash(h: string) { return this.ok(await this.sb.from("authorizations").select().eq("auth_hash", h).maybeSingle(), "getAuthorizationByAuthHash") as AuthorizationRow | null; }
   async listUnreconciled(olderThanSecs: number, limit: number) {
     const cutoff = new Date(Date.now() - olderThanSecs * 1000).toISOString();
     return this.ok(await this.sb.from("authorizations").select().is("reconcile_action", null).lte("created_at", cutoff).order("created_at").limit(limit), "listUnreconciled") as AuthorizationRow[];
@@ -181,11 +185,12 @@ let store: Store | null = null;
 /** Process-wide store. Supabase when configured; MemoryStore only outside Vercel. */
 export function getStore(): Store {
   if (store) return store;
-  const url = process.env.SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  // Prefer the new secret API key (sb_secret_…); fall back to the legacy service_role JWT.
+  const url = process.env.SUPABASE_URL, key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (url && key) {
     store = new SupabaseStore(createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: (i, init) => fetch(i, { ...init, cache: "no-store" }) } }));
   } else {
-    if (process.env.VERCEL) throw new Error("Supabase not configured (MemoryStore is local-only)");
+    if (process.env.VERCEL) throw new Error("Supabase not configured: set SUPABASE_URL + SUPABASE_SECRET_KEY (MemoryStore is local-only)");
     store = new MemoryStore();
   }
   return store;

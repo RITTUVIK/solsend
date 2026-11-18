@@ -71,12 +71,11 @@ export const DemoVoidRequest = z.object({ lithicToken: z.string() });
 export const DemoVoidResponse = z.object({ lithicStatus: z.string(), refundSignature: Signature.nullable(), explorer: z.string().nullable(), note: z.string() });
 
 // ── QuickNode Stream webhook payload (output of infra/quicknode/filter.js; W4) ──────────────
-/** u64 fields are decimal strings; pubkeys base58; hashes hex. `memo` carries "solsend:auth:<lithic_token>" on settles. */
+/** u64 fields are decimal strings; pubkeys base58; [u8;32] hex. Settles carry NO memo (security review): the link to the
+ *  Lithic authorization is the event's `auth_hash` = authCommitment(token) (see commitments.ts). */
 export const QnEvent = z.object({ name: z.enum(["CardRegistered", "CardSettled", "CardRefunded", "CardFrozen", "CardUnfrozen", "CardClosed", "ConfigUpdated"]) }).catchall(z.union([z.string(), z.number(), z.boolean()]));
-export const QnMatch = z.object({ signature: Signature, slot: z.number(), blockTime: z.number().nullable(), success: z.boolean(), memo: z.string().nullable(), events: z.array(QnEvent) });
+export const QnMatch = z.object({ signature: Signature, slot: z.number(), blockTime: z.number().nullable(), success: z.boolean(), events: z.array(QnEvent) });
 export const QnPayload = z.object({ solsend: z.literal("v1"), matches: z.array(QnMatch) });
-/** Memo attached to every settle tx so explorer viewers can tie the payment to its Lithic authorization. */
-export const SETTLE_MEMO_PREFIX = "solsend:auth:";
 
 // ── Ops / status ─────────────────────────────────────────────────────────────────────────
 export const StatusCheck = z.object({ name: z.string(), ok: z.boolean(), detail: z.string() });

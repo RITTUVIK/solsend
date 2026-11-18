@@ -16,7 +16,8 @@ const Env = z.object({
   PRIVY_APP_ID: z.string().min(5),
   // Optional only for local dev (MemoryStore); getStore() refuses to run on Vercel without them.
   SUPABASE_URL: z.string().url().optional(),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(20).optional(),
+  SUPABASE_SECRET_KEY: z.string().startsWith("sb_secret_").optional(), // preferred (new API keys)
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(20).optional(),            // legacy JWT fallback (deprecated by Supabase end-2026)
   QN_STREAM_SECURITY_TOKEN: z.string().min(8).optional(),
   RECONCILE_CRON_SECRET: z.string().min(16).optional(),
   ADMIN_API_TOKEN: z.string().min(16).optional(),

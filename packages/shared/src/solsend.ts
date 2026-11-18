@@ -62,11 +62,6 @@ export const ixFreezeCard = (p: { authority: PublicKey; owner: PublicKey; cardId
   buildSolsendIx("freeze_card", {}, { authority: p.authority, config: configPda(), card: cardPda(p.owner, p.cardId) });
 export const ixUnfreezeCard = (owner: PublicKey, cardId: bigint) => buildSolsendIx("unfreeze_card", {}, { owner, card: cardPda(owner, cardId) });
 export const ixCloseCard = (owner: PublicKey, cardId: bigint) => buildSolsendIx("close_card", {}, { owner, card: cardPda(owner, cardId) });
-export function ixCloseSettlementRecord(p: { settler: PublicKey; owner: PublicKey; cardId: bigint; authHash: Uint8Array }) {
-  const card = cardPda(p.owner, p.cardId);
-  return buildSolsendIx("close_settlement_record", { authHash: p.authHash },
-    { settlementAuthority: p.settler, config: configPda(), card, settlementRecord: settlementRecordPda(card, p.authHash) });
-}
 export const ixAdminWithdraw = (p: { admin: PublicKey; destination: PublicKey; amount: bigint }) =>
   buildSolsendIx("admin_withdraw", { amount: p.amount },
     { admin: p.admin, config: configPda(), treasury: treasuryPda(), treasuryAta: treasuryAta(), destination: p.destination, usdcMint: USDC_MINT, tokenProgram: TOKEN_PROGRAM_ID });

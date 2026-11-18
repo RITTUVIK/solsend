@@ -26,22 +26,48 @@ can sign for it, and only inside `settle`.
 1. **Confirmed-before-approve.** The Lithic ASA reply is `APPROVED` only after the settle transaction is
    **confirmed** on devnet, or when an existing SettlementRecord for the same authorization is readable at
    confirmed commitment. Everything else declines, including errors, timeouts and unknown state.
-2. **Atomic idempotency.** One SettlementRecord PDA per (card, sha256(lithic_token)). A duplicate
-   authorization cannot pull twice.
+2. **Atomic, permanent idempotency.** There is one SettlementRecord PDA per (card, auth_hash), and records are
+   **never closed**: the program has no close instruction. A duplicate, re-delivered or replayed
+   authorization can never pull twice, no matter how old it is. Each record costs about 0.0015 devnet SOL of rent,
+   which is acceptable for the MVP. A redelivery is approved only when the existing record's amount equals the
+   requested amount; any other amount for the same token is declined, because incremental authorizations are not
+   supported in the MVP.
 3. **Correct refunds.** A refund goes only to `card.source_token_account` and is capped at
    `record.amount − record.refunded`.
 4. **Late settles are refunded.** If a settle confirms after we declined or timed out, the reconciler
    refunds it. The reconciler's source of truth is the **Lithic transaction status** (`DECLINED`,
    `VOIDED` or `EXPIRED` → refund the remainder), not our database.
 5. **Fail-closed.** There is a hard ASA deadline, below Lithic's 6 s limit. Timeouts decline.
-6. **The chain is the only spending policy.** Lithic cards are issued without Lithic spend limits or
-   merchant locks, so every approve or decline is decided by the onchain `settle` result. Declines carry
-   the failed devnet transaction signature as evidence.
+6. **The chain is the authoritative spending gate; Lithic is an outer circuit breaker.** Every approval needs
+   a confirmed onchain `settle`. Onchain declines carry the failed devnet transaction signature as evidence.
+   Lithic limits are set **looser** than the onchain policy, so they never pre-empt an onchain decision in the
+   normal range. They still bound the blast radius if the ASA path ever approved without a confirmed settle:
+   - Store-locked: `VIRTUAL`, `spend_limit` 2× the onchain limit, `FOREVER`.
+   - One-time: `SINGLE_USE` (closed by Lithic after the first successful authorization), 2× the limit, `TRANSACTION`.
+   - Subscription: `VIRTUAL`, 2× the per-period limit, `MONTHLY`.
+   - An account-level daily cap of $500, where the sandbox supports it.
+   - Lithic `MERCHANT_LOCKED` is deliberately **not** used. The onchain merchant lock is authoritative and has to stay
+     observable. A Lithic-side lock could decline before our ASA is ever called.
+   - If Lithic declines first, the UI says "Declined by card-network safety limit (sandbox)" and shows no onchain transaction.
+7. **The ASA path fails closed.** Only `AUTHORIZATION` and `FINANCIAL_AUTHORIZATION` in USD can settle. Balance
+   inquiries, credits and unknown statuses decline. A `$0` authorization (card verification) approves without
+   settling. A card whose Lithic state is not `OPEN` declines.
 
 ## Product decision: refunds do not restore the limit (MVP)
 A void or refund returns the USDC to your wallet, but **the card's consumed allowance stays consumed**.
 SolSend never silently re-grants spending permission. To spend more, create a new card or top up the
 allowance with your own signature. The UI states this on every refund.
+
+## Privacy: what is public onchain
+- **Public, and inherent to an onchain design:** the owner wallet, card PDAs, settle and refund amounts and their
+  timing, and `merchant_hash`.
+- `merchant_hash` = `sha256("solsend:merchant:v1:" + acceptor_id)`. It is a **pseudonym, not hiding**: merchant ids are
+  low-entropy and public, so it only links repeat purchases at the same merchant.
+- **Never onchain:** Lithic transaction tokens, card numbers, merchant names, emails.
+- Each settle is tied to its authorization by a **commitment**,
+  `auth_hash = sha256("solsend:auth:v1:" + lithic_token)`. The Lithic token is a UUIDv4 with 122 random bits, so
+  the commitment hides the token from the public. Anyone who holds the token, such as the cardholder in the app,
+  can recompute it and match it to the `CardSettled` event on the explorer. Settle transactions carry **no memo**.
 
 ## Offchain trust assumptions (stated honestly)
 - **Authorization facts are attested by our ASA handler.** Lithic signs the authorization request to
