@@ -108,7 +108,7 @@ function PurchaseRow({ it, fresh, voidable, onOpen }: { it: Item; fresh: boolean
       </div>
       {showVoid && (
         <div className="pb-1 pl-[60px]">
-          <button type="button" onClick={() => setSheet(true)} disabled={vo.busy} className="pick !min-h-9 !px-3 !text-[13px]" data-testid="row-void-btn">{vo.busy ? <><Spinner className="h-3 w-3" />Voiding…</> : "Void (sandbox store)"}</button>
+          <button type="button" onClick={() => setSheet(true)} disabled={vo.busy} className="pick !px-3.5 !text-[13px]" data-testid="row-void-btn">{vo.busy ? <><Spinner className="h-3 w-3" />Voiding…</> : "Void (sandbox store)"}</button>
           {vo.err && <p className="mt-1.5 text-[13px] text-no" role="alert">{vo.err}</p>}
         </div>
       )}

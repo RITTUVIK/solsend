@@ -11,7 +11,7 @@ import { AppShell, useAppData } from "@/components/AppShell";
 import { ApprovalSheet, type PayAttempt } from "@/components/ApprovalSheet";
 import { CardVisual, StoreTile } from "@/components/CardVisual";
 import { FeedList } from "@/components/FeedList";
-import { Icon } from "@/components/ui";
+import { Icon, radioKeys } from "@/components/ui";
 
 type Merchant = z.infer<typeof api.DemoMerchantZ>;
 const STORES: Merchant[] = ["TEMU", "AMAZON", "NETFLIX", "OTHER_STORE"];
@@ -118,7 +118,7 @@ function Content() {
 
           <fieldset className="min-w-0">
             <legend className="label">Pay with</legend>
-            <div className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2 pt-1" role="radiogroup" aria-label="Card" data-testid="card-select">
+            <div className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2 pt-1" role="radiogroup" onKeyDown={radioKeys} aria-label="Card" data-testid="card-select">
               {!cards.data && <div className="skeleton aspect-[1.586] w-[150px] shrink-0" />}
               {issued.map((c) => (
                 <button key={c.cardPda} type="button" role="radio" aria-checked={c.cardPda === cardPda} onClick={() => pickCard(c.cardPda)}
@@ -133,7 +133,7 @@ function Content() {
 
           <fieldset className="min-w-0">
             <legend className="label">Shop at</legend>
-            <div className="grid grid-cols-4 gap-2" role="radiogroup" aria-label="Store">
+            <div className="grid grid-cols-4 gap-2" role="radiogroup" onKeyDown={radioKeys} aria-label="Store">
               {STORES.map((m) => (
                 <button key={m} type="button" role="radio" aria-checked={merchant === m} onClick={() => setMerchant(m)} data-testid={`store-${m}`}
                   className={`flex min-h-16 flex-col items-center justify-center gap-1 rounded-[16px] px-1 text-[12px] font-semibold transition ${merchant === m ? "bg-surface text-ink ring-2 ring-ink" : "bg-surface/60 text-ink-2 ring-1 ring-line ring-inset hover:bg-surface"}`}>

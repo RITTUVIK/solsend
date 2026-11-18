@@ -206,6 +206,20 @@ export function Sheet({ open, onClose, children, labelledBy, variant = "center",
   );
 }
 
+/** A6: arrow keys move + select within a role="radiogroup" of buttons (WAI-ARIA radio pattern). */
+export function radioKeys(e: React.KeyboardEvent<HTMLElement>): void {
+  const keys: Record<string, number> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
+  const d = keys[e.key];
+  if (!d) return;
+  const radios = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('[role="radio"]:not([disabled])'));
+  const i = radios.indexOf(document.activeElement as HTMLElement);
+  if (i < 0 || radios.length === 0) return;
+  e.preventDefault();
+  const next = radios[(i + d + radios.length) % radios.length]!;
+  next.focus();
+  next.click();
+}
+
 /** Small "ⓘ" disclosure (inline, no popover lib). */
 export function InfoDisclosure({ label, children }: { label: string; children: ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -213,7 +227,7 @@ export function InfoDisclosure({ label, children }: { label: string; children: R
   return (
     <>
       <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-controls={id} aria-label={label}
-        className="inline-grid h-7 w-7 shrink-0 place-items-center rounded-full align-middle text-ink-3 hover:bg-sunken hover:text-ink">
+        className="-my-1 inline-grid h-9 w-9 shrink-0 place-items-center rounded-full align-middle text-ink-3 hover:bg-sunken hover:text-ink">
         <Icon name="info" className="h-4 w-4" />
       </button>
       <div id={id} hidden={!open} className="anim-fade mt-2 rounded-[14px] bg-sunken p-3 text-[13px] leading-5 text-ink-2">{children}</div>

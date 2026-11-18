@@ -8,7 +8,7 @@ import { AppShell, useAppData } from "@/components/AppShell";
 import { CardVisual, StoreTile } from "@/components/CardVisual";
 import { Stepper, type Stage } from "@/components/Stepper";
 import { WalletSetup } from "@/components/WalletSetup";
-import { ErrorNote, Icon, Spinner } from "@/components/ui";
+import { ErrorNote, Icon, Spinner, radioKeys } from "@/components/ui";
 
 type Kind = keyof typeof KIND_LABEL;
 const MIN_PER_DAY = 1440;
@@ -144,7 +144,7 @@ function Content() {
 
       <fieldset className="min-w-0">
         <legend className="label">Store</legend>
-        <div className="grid grid-cols-4 gap-2" role="radiogroup" aria-label="Store">
+        <div className="grid grid-cols-4 gap-2" role="radiogroup" onKeyDown={radioKeys} aria-label="Store">
           {STORES.map((s) => (
             <button key={s.name} type="button" role="radio" aria-checked={store === s.name} onClick={() => pickStore(s)}
               className={`flex min-h-[84px] flex-col items-center justify-center gap-1 rounded-[16px] px-1 transition ${store === s.name ? "bg-surface ring-2 ring-ink" : "bg-surface/60 ring-1 ring-line ring-inset hover:bg-surface"}`}>
@@ -164,7 +164,7 @@ function Content() {
 
       <fieldset className="min-w-0">
         <legend className="label">Card type</legend>
-        <div className="grid grid-cols-3 gap-1 rounded-[14px] bg-sunken p-1" role="radiogroup" aria-label="Card type">
+        <div className="grid grid-cols-3 gap-1 rounded-[14px] bg-sunken p-1" role="radiogroup" onKeyDown={radioKeys} aria-label="Card type">
           {KINDS.map((k) => (
             <button key={k.kind} type="button" role="radio" aria-checked={kind === k.kind} onClick={() => setKind(k.kind)}
               className={`min-h-11 rounded-[11px] px-1 text-[14px] font-semibold transition ${kind === k.kind ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"}`}>{k.title}</button>
@@ -188,7 +188,7 @@ function Content() {
 
       <fieldset className="min-w-0">
         <legend className="label">Auto-expire this card</legend>
-        <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Auto-expire this card">
+        <div className="flex flex-wrap gap-2" role="radiogroup" onKeyDown={radioKeys} aria-label="Auto-expire this card">
           {EXPIRY.map((e) => (
             <button key={e.label} type="button" role="radio" aria-checked={expires === e.minutes} onClick={() => setExpires(e.minutes)} className="pick aria-checked:bg-ink aria-checked:text-paper aria-checked:ring-ink"
               data-testid={`expiry-${e.minutes ?? "never"}`}>{e.label}</button>

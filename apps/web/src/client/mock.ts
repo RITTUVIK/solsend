@@ -346,8 +346,9 @@ function mockStatus(): api.TStatusResponse {
 function mockEmbedUrl(c: MCard, field: "all" | "pan" | "cvv" | "expMonth" | "expYear"): string {
   // Stand-ins for Lithic's hosted iframes. They never contain a card number or CVV: the real iframes (Lithic's origin) render those.
   const text = { all: `•••• •••• •••• ${c.lastFour ?? "0000"}`, pan: `•••• •••• •••• ${c.lastFour ?? "0000"}`, cvv: "•••", expMonth: "••", expYear: "••" }[field];
-  const html = `<!doctype html><meta charset=utf-8><body style="margin:0;font:14px system-ui;background:#18181b;color:#e4e4e7;display:grid;place-items:center;height:100vh">
-<div style="text-align:center;padding:6px"><div style="font-size:9px;letter-spacing:.12em;color:#fbbf24">MOCK · SANDBOX</div>
-<div style="font-size:${field === "all" ? 20 : 16}px;letter-spacing:.15em;margin:4px 0">${text}</div>${field === "all" ? '<div style="color:#a1a1aa;font-size:12px">Lithic\'s hosted frame shows the card details here.<br>SolSend never sees them.</div>' : ""}</div>`;
+  // Styled like the card back it sits in: one quiet "mock" tag on the number field only.
+  const tag = field === "pan" || field === "all" ? '<span style="font:600 9px system-ui;letter-spacing:.12em;color:#f0abfc;border:1px solid #6b2a73;border-radius:99px;padding:1px 6px;margin-left:10px;vertical-align:middle">MOCK</span>' : "";
+  const html = `<!doctype html><meta charset=utf-8><body style="margin:0;font:500 16px ui-monospace,SFMono-Regular,Menlo,monospace;background:#1c1c1f;color:#f4f4f2;display:flex;align-items:center;padding:0 12px;height:100vh;box-sizing:border-box">
+<div style="letter-spacing:.14em;font-size:${field === "all" ? 20 : 16}px">${text}${tag}</div>${field === "all" ? '<div style="color:#a1a1aa;font:12px system-ui">Lithic\'s hosted frame shows the card details here. SolSend never sees them.</div>' : ""}`;
   return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
 }

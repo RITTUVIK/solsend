@@ -12,7 +12,7 @@ import { AppShell, useAppData } from "@/components/AppShell";
 import { CardVisual, LimitBar } from "@/components/CardVisual";
 import { FeedList, LiveDot } from "@/components/FeedList";
 import { Stepper } from "@/components/Stepper";
-import { ErrorNote, Icon, InfoDisclosure, MockBadge, ProofRow, Sheet, Skeleton, Spinner } from "@/components/ui";
+import { ErrorNote, Icon, InfoDisclosure, ProofRow, Sheet, Skeleton, Spinner } from "@/components/ui";
 
 type Act = "freeze" | "unfreeze" | "close";
 const ACT_DONE: Record<Act, string> = { freeze: "Card frozen. Nothing can be charged until you unfreeze it.", unfreeze: "Card unfrozen and ready to use.", close: "Card closed. Its allowance was revoked onchain." };
@@ -121,7 +121,6 @@ function Content() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <Link href="/home" className="inline-flex min-h-10 items-center gap-1.5 rounded-lg pr-2 text-[15px] font-medium text-ink-2 hover:text-ink"><Icon name="back" className="h-4 w-4" />Wallet</Link>
-        <MockBadge className="sm:hidden" />
       </div>
 
       <div className="mx-auto w-full max-w-[380px]">

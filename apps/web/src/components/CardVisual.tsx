@@ -77,7 +77,7 @@ export function CardVisual({ card, showLimit = false, idle = false, born = false
               <p className="tnum text-[17px] font-semibold leading-5 tracking-[-0.02em]">{usd(card.limit.remainingBase)}</p>
               <p className="text-[12px] font-medium leading-4 text-white/85">left of {usd(card.limit.totalBase)}</p>
             </div>
-          ) : (
+          ) : (status === "Setting up" || warnRing) ? null : (
             <span className="shrink-0 pt-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/80">Sandbox</span>
           )}
         </div>

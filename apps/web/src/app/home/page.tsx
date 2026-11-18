@@ -58,11 +58,11 @@ function Balance() {
         <h2 id="bal" className="text-[13px] font-medium text-ink-3">Wallet balance</h2>
         {w && (
           <span className="inline-flex items-center gap-1">
-            <button type="button" className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-sunken px-2.5 font-mono text-[12px] text-ink-2 hover:text-ink"
+            <button type="button" className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-sunken px-3 font-mono text-[12px] text-ink-2 hover:text-ink"
               onClick={() => { void navigator.clipboard?.writeText(w.wallet).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1200); }); }} aria-label="Copy wallet address" title={w.wallet}>
               {copied ? "Copied" : shortId(w.wallet, 4)}<Icon name={copied ? "check" : "copy"} className="h-3.5 w-3.5" />
             </button>
-            <a href={explorerAddress(w.wallet)} target="_blank" rel="noreferrer" className="grid h-8 w-8 place-items-center rounded-full text-ink-3 hover:bg-sunken hover:text-ink" aria-label="View wallet on Solana Explorer (devnet)"><Icon name="ext" className="h-4 w-4" /></a>
+            <a href={explorerAddress(w.wallet)} target="_blank" rel="noreferrer" className="grid h-9 w-9 place-items-center rounded-full text-ink-3 hover:bg-sunken hover:text-ink" aria-label="View wallet on Solana Explorer (devnet)"><Icon name="ext" className="h-4 w-4" /></a>
           </span>
         )}
       </div>
