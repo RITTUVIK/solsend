@@ -48,3 +48,6 @@ spikes/.raw/
 .DS_Store
 .idea/
 *.swp
+
+# Third-party artifacts for the Allowances spike (fetched by spikes/allowances_spike/scripts/fetch-vendor.sh)
+spikes/allowances_spike/vendor/

@@ -11,7 +11,7 @@ mkdirSync(EVIDENCE_DIR, { recursive: true });
 mkdirSync(RAW_DIR, { recursive: true });
 
 // PCI hard rule 7 + link-token hygiene: never persist these keys in evidence.
-const SCRUB_KEYS = new Set(["number", "cvc", "pan", "kyc_link", "tos_link", "secret", "client_secret", "ephemeral_key"]);
+const SCRUB_KEYS = new Set(["number", "cvc", "cvv", "pan", "kyc_link", "tos_link", "secret", "client_secret", "ephemeral_key"]);
 
 export function scrub(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(scrub);

@@ -32,6 +32,15 @@ id = "raw-card-pan"
 description = "Possible raw card PAN (PCI hard rule 7: never store/log PAN)"
 regex = '''\b(?:4\d{3}|5[1-5]\d{2}|2[2-7]\d{2}|3[47]\d{2})[ -]?\d{4}[ -]?\d{4}[ -]?\d{3,4}\b'''
 
-[allowlist]
+[[allowlists]]
 description = "Lockfiles contain integrity hashes, not secrets"
 paths = ['''(^|/)pnpm-lock\.yaml$''', '''(^|/)Cargo\.lock$''']
+
+[[allowlists]]
+description = "Provider/card-network transaction tokens are UUID identifiers (required evidence), not secrets"
+regexTarget = "match"
+regexes = [
+  '''token"?\s*[:=]\s*"?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"?''',
+  # Solana PUBLIC addresses (32–44 base58 chars, quoted) in token-account fields. Private keys (~88 chars) never match.
+  '''[Tt]oken[A-Za-z_]*"\s*:\s*"[1-9A-HJ-NP-Za-km-z]{32,44}"''',
+]

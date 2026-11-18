@@ -49,3 +49,11 @@ export function bridgeKey(): string {
   if (!k.startsWith("sk-test")) throw new Error("Refusing to run: BRIDGE_API_KEY must be a sandbox key (sk-test…).");
   return k;
 }
+
+/** Evidence-safe RPC label: provider class only, never the endpoint (QuickNode URLs embed a token). */
+export function rpcLabel(): string {
+  const host = (() => { try { return new URL(RPC_URL).host; } catch { return "invalid"; } })();
+  if (host === "api.devnet.solana.com") return "public api.devnet.solana.com";
+  if (/quiknode/i.test(host)) return "quicknode devnet (endpoint redacted)";
+  return "custom devnet RPC (endpoint redacted)";
+}
