@@ -6,9 +6,10 @@ import { MOCK } from "./config";
 import { getBridge } from "./session";
 import { mockRequest } from "./mock";
 import { b64ToBytes, bytesToB64 } from "./format";
+import { setSignNotice } from "./notice";
 
 export class ApiCallError extends Error {
-  constructor(public status: number, message: string, public code?: string) { super(message); this.name = "ApiCallError"; }
+  constructor(public status: number, message: string, public code?: string, public body?: unknown) { super(message); this.name = "ApiCallError"; }
 }
 
 /** Human copy for any thrown value. Never leaks internals. */
@@ -18,6 +19,7 @@ export function humanError(e: unknown): string {
       case "unauthenticated": return "Your session expired. Please log in again.";
       case "rate_limited": return e.message || "Too many tries. Please wait a bit and try again.";
       case "intent_expired": return "That request timed out before it was signed. Please try again.";
+      case "tx_expired": return "The network moved on before you signed. Please try again.";
       case "setup_required": return "Your wallet needs a one-time setup before it can make cards.";
     }
     if (e.status === 0) return e.message;
@@ -77,7 +79,7 @@ async function raw(route: keyof typeof api.ROUTES, o: CallOpts, allowBind: boole
     await ensureBound();
     return raw(route, o, false);
   }
-  throw new ApiCallError(status, e.success ? e.data.error : "Request failed", e.success ? e.data.code : undefined);
+  throw new ApiCallError(status, e.success ? e.data.error : "Request failed", e.success ? e.data.code : undefined, json);
 }
 
 async function call<S extends z.ZodType>(route: keyof typeof api.ROUTES, schema: S, o: CallOpts = {}): Promise<z.infer<S>> {
@@ -107,10 +109,33 @@ export const client = {
   status: () => call("status", api.StatusResponse, { noAuth: true }),
 };
 
-/** Owner-signs a server-built PreparedTx with Privy, then has the server cosign + send it (waits for `confirmed`). */
-export async function signAndSubmit(p: z.infer<typeof api.PreparedTx>, onSigned?: () => void): Promise<z.infer<typeof api.SubmitTxResponse>> {
-  if (Date.now() > new Date(p.expiresAt).getTime()) throw new ApiCallError(410, "That request timed out before it was signed. Please try again.", "intent_expired");
-  const signed = await getBridge().signTx(b64ToBytes(p.txBase64));
-  onSigned?.();
-  return client.submitTx({ intentId: p.intentId, signedTxBase64: bytesToB64(signed) });
+export const SIGN_RETRY_NOTICE = "Signing took a little long — please approve once more";
+type Prepared = z.infer<typeof api.PreparedTx>;
+const retryable = (e: unknown): boolean => e instanceof ApiCallError && (e.code === "tx_expired" || e.code === "intent_expired");
+
+/**
+ * prepare → Privy owner-sign → server cosigns + sends (waits for `confirmed`).
+ * If the network moved on before the user signed (409 tx_expired, or our local intent expiry), the SAME prepare call is re-run
+ * ONCE (new intent + fresh blockhash) and the user signs again. Max one automatic retry; then the error surfaces.
+ */
+export async function signAndSubmit<P extends Prepared>(
+  prepare: () => Promise<P>,
+  o: { onPrepared?: (p: P) => void; onSigned?: () => void } = {},
+): Promise<z.infer<typeof api.SubmitTxResponse> & { prepared: P }> {
+  const attempt = async () => {
+    const p = await prepare();
+    o.onPrepared?.(p);
+    if (Date.now() > new Date(p.expiresAt).getTime()) throw new ApiCallError(410, "That request timed out before it was signed. Please try again.", "intent_expired");
+    const signed = await getBridge().signTx(b64ToBytes(p.txBase64));
+    o.onSigned?.();
+    const r = await client.submitTx({ intentId: p.intentId, signedTxBase64: bytesToB64(signed) });
+    return { ...r, prepared: p };
+  };
+  try {
+    return await attempt();
+  } catch (e) {
+    if (!retryable(e)) throw e;
+    setSignNotice(SIGN_RETRY_NOTICE);
+    try { return await attempt(); } finally { setSignNotice(null); }
+  }
 }

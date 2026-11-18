@@ -15,7 +15,7 @@ export function WalletSetup({ onDone }: { onDone?: () => void }) {
   async function go() {
     setBusy(true); setErr(null);
     try {
-      const r = await signAndSubmit(await client.walletSetup());
+      const r = await signAndSubmit(() => client.walletSetup());
       setSig(r.signature);
       await wallet.refresh();
       onDone?.();

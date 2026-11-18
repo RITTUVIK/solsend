@@ -20,6 +20,8 @@ interface MRefund { at: number; token: string }
 interface State {
   bound: boolean; wallet: string; usdc: number; lastFaucet: number; saReady: boolean;
   cards: MCard[]; feed: api.TFeedRow[]; intents: MIntent[]; auths: MAuth[]; refunds: MRefund[];
+  /** The first wallet-setup submit after login returns tx_expired once (exercises the automatic re-prepare + re-sign). */
+  setupExpiredShown?: boolean;
 }
 
 const KEY = "solsend.mock.v1";
@@ -106,7 +108,7 @@ function view(c: MCard): api.TCardView {
 
 interface Res { status: number; json: unknown }
 const ok = (json: unknown, status = 200): Res => ({ status, json });
-const err = (status: number, error: string, code?: string): Res => ({ status, json: { error, code } });
+const err = (status: number, error: string, code?: string, extra?: Record<string, unknown>): Res => ({ status, json: { error, code, ...extra } });
 
 const DECLINE_REASON: Record<string, string> = {
   INSUFFICIENT_FUNDS: "Over this card's limit",
@@ -216,6 +218,10 @@ export async function mockRequest(req: MockReq): Promise<Res> {
     if (!intent) return err(404, "Unknown transaction", "not_found");
     if (intent.consumed) return err(409, "That transaction was already sent.", "consumed");
     if (Date.now() > intent.expires) return err(410, "That transaction expired. Please start again.", "intent_expired");
+    if (intent.type === "setup" && !s.setupExpiredShown) {
+      s.setupExpiredShown = true; intent.consumed = true; save();
+      return err(409, "the network moved on before you signed; please try again", "tx_expired");
+    }
     await sleep(jitter(900, 1400)); // "waiting for confirmed"
     intent.consumed = true;
     const signature = fakeSig();
@@ -235,7 +241,10 @@ export async function mockRequest(req: MockReq): Promise<Res> {
     const a = s.auths.find((x) => x.token === b.data.lithicToken);
     if (!a) return err(404, "Unknown purchase", "not_found");
     await sleep(jitter(500, 900));
-    if (a.voided) return err(409, "This purchase was already voided.", "already_voided");
+    if (a.voided) {
+      const done = s.feed.find((r) => r.kind === "refunded" && r.lithicToken === a.token);
+      return err(409, "This purchase was already voided.", "already_voided", { refundSignature: done?.signature ?? null });
+    }
     a.voided = true;
     s.refunds.push({ at: Date.now() + 1800, token: a.token });
     save();

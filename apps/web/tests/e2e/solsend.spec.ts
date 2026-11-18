@@ -58,7 +58,10 @@ test("judge journey: login → faucet → card → approve → void → decline 
   await page.getByTestId("new-card").click();
   await expect(page.getByTestId("wallet-setup")).toBeVisible();
   await page.getByTestId("setup-btn").click();
+  // The mock's first setup submit returns tx_expired once: the UI re-prepares and asks for one more approval automatically.
+  await expect(page.getByTestId("sign-notice")).toContainText("Signing took a little long — please approve once more");
   await expect(page.getByTestId("setup-done")).toContainText("Wallet ready for cards");
+  await expect(page.getByTestId("sign-notice")).toHaveCount(0);
   await expect(page.getByTestId("setup-done").getByRole("link", { name: /View on Solana Explorer/ })).toHaveAttribute("href", /cluster=devnet/);
   await expect(page.getByTestId("explain")).toContainText("at most $40.00");
   await expect(page.getByTestId("explain")).toContainText("Temu (sandbox)");
@@ -99,6 +102,7 @@ test("judge journey: login → faucet → card → approve → void → decline 
   await expect(result.getByTestId("lithic-token")).not.toBeEmpty();
   await expect(result).toContainText("SANDBOX");
   await expect(result.getByTestId("latency")).toContainText(/\d+ ms/);
+  await expect(result).toContainText("Remaining on this card");
   await expect(result.getByTestId("remaining")).toContainText("$28.00");
   await shot(page, "06-approved");
 
@@ -211,6 +215,41 @@ test("other-store card locks to the first store that charges it", async ({ page 
   await page.getByTestId("store-NETFLIX").click();
   await page.getByTestId("pay").click();
   await expect(page.getByTestId("reason")).toContainText("Card locked to another store");
+});
+
+test("void from the Activity feed (and the store page) after navigating away", async ({ page }) => {
+  await login(page);
+  await page.getByTestId("faucet-btn").click();
+  await expect(page.getByTestId("faucet-done")).toBeVisible();
+  await createCard(page);
+  await page.getByTestId("create-card").click();
+  await expect(page.getByTestId("step-3")).toHaveAttribute("data-state", "done", { timeout: 20_000 });
+  await page.getByTestId("open-card").click();
+  await page.getByTestId("spend").click();
+  await page.getByLabel(/Amount/).fill("5");
+  await page.getByTestId("pay").click();
+  await expect(page.getByTestId("result")).toHaveAttribute("data-decision", "APPROVED");
+  // Recent purchases on the store page offer the void too
+  await expect(page.getByText("Recent sandbox purchases")).toBeVisible();
+  await expect(page.getByTestId("row-void-btn").first()).toBeVisible();
+
+  // Navigate away (the checkout void button is gone), then void from Activity
+  await page.goto("/activity");
+  const btn = page.getByTestId("row-void-btn");
+  await expect(btn).toHaveCount(1);
+  await btn.click();
+  await expect(page.getByTestId("void-sheet")).toContainText("Simulates the store cancelling this sandbox order. The USDC returns to your wallet onchain; this card's spending limit stays used.");
+  await shot(page, "16-void-sheet");
+  await page.getByTestId("void-confirm").click();
+  await expect(page.getByTestId("void-sheet")).toHaveCount(0);
+  // Pending until the refunded feed row appears, then Refunded + explorer link
+  const status = page.getByTestId("row-void-status");
+  await expect(status).toBeVisible();
+  await expect(status).toContainText("Refunded", { timeout: 20_000 });
+  await expect(status.getByRole("link", { name: /Refund transaction/ })).toHaveAttribute("href", /cluster=devnet/);
+  await expect(page.locator('[data-testid="feed-row"][data-kind="refunded"]')).toHaveCount(1);
+  await expect(page.getByTestId("row-void-btn")).toHaveCount(0);
+  await shot(page, "17-void-from-activity");
 });
 
 test("status page renders health checks", async ({ page }) => {

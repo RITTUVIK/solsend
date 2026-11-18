@@ -2,7 +2,8 @@
 import { useEffect, useState } from "react";
 import type { z } from "zod";
 import type { api } from "@solsend/shared";
-import { client, humanError } from "@/client/api";
+import { client } from "@/client/api";
+import { voidErrorCopy, voidPurchase } from "@/client/void";
 import { FEED_POLL_MS } from "@/client/config";
 import { usePoll } from "@/client/hooks";
 import { declineCopy, sandboxName, usd } from "@/client/format";
@@ -39,8 +40,9 @@ function VoidPanel({ res, cardPda, merchant, onVoided }: { res: Checkout; cardPd
   }, [pending, refundSig]);
 
   async function doVoid() {
+    if (busy) return;
     setBusy(true); setErr(null);
-    try { setV(await client.void(res.lithicToken)); onVoided(); } catch (e) { setErr(humanError(e)); } finally { setBusy(false); }
+    try { setV(await voidPurchase(res.lithicToken)); onVoided(); } catch (e) { setErr(voidErrorCopy(e)); } finally { setBusy(false); }
   }
 
   if (!v) {
@@ -63,7 +65,7 @@ function VoidPanel({ res, cardPda, merchant, onVoided }: { res: Checkout; cardPd
           <p className="mt-2 font-medium text-sky-950 dark:text-sky-100" data-testid="void-message">{VOID_MESSAGE}</p>
         </>
       ) : (
-        <p className="mt-1 flex items-center gap-2 text-sky-900 dark:text-sky-200"><Spinner />{waited ? "Still waiting. Refunds can take a few minutes; it will appear in Activity when sent." : "Waiting for the refund transaction…"}</p>
+        <p className="mt-1 flex items-center gap-2 text-sky-900 dark:text-sky-200"><Spinner />{waited ? "Still waiting. Refunds can take a few minutes; it will appear in Activity when sent." : "Refund on its way: Lithic sandbox voids are asynchronous (usually under a minute)"}</p>
       )}
       <p className="mt-1 text-xs text-sky-900/70 dark:text-sky-200/70">{v.note}</p>
     </div>
@@ -97,7 +99,7 @@ export function CheckoutResult({ res, cardPda, merchant, amountCents, onVoided }
         </Row>
         <Row k="Lithic token"><span className="inline-flex flex-wrap items-center gap-2"><code className="break-all font-mono text-xs" data-testid="lithic-token">{res.lithicToken}</code><SandboxChip /></span></Row>
         <Row k="Latency"><span className="font-semibold tabular-nums" data-testid="latency">{res.latencyMs} ms</span></Row>
-        <Row k="Remaining limit"><span className="font-semibold tabular-nums" data-testid="remaining">{usd(res.remainingBase)}</span></Row>
+        <Row k="Remaining on this card"><span className="font-semibold tabular-nums" data-testid="remaining">{usd(res.remainingBase)}</span></Row>
       </dl>
 
       {approved && <VoidPanel res={res} cardPda={cardPda} merchant={merchant} onVoided={onVoided} />}

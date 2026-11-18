@@ -8,7 +8,7 @@ non-localhost request).
 
 Reproduce: `cd apps/web && E2E_SHOTS=$PWD/../../docs/evidence/w3-screenshots pnpm exec playwright test`
 (uses system Chrome; `PW_CHANNEL=chromium` for a Playwright-downloaded browser).
-Result: typecheck pass, build pass, e2e 7/7 pass.
+Result: typecheck pass, build pass (mock and normal), web unit tests 107 pass, e2e 8/8 pass.
 
 | Step | Screenshot |
 |---|---|
@@ -27,6 +27,8 @@ Result: typecheck pass, build pass, e2e 7/7 pass.
 | Issuer-outage panel | `w3-screenshots/11-home-outage.png` |
 | `lithic_failed` with Retry | `w3-screenshots/12-lithic-failed.png` |
 | Idle card with Reactivate | `w3-screenshots/12b-idle-reactivate.png` |
+| Void confirm sheet (from the Activity row) | `w3-screenshots/16-void-sheet.png` |
+| Void from Activity: row shows Refunded + explorer link | `w3-screenshots/17-void-from-activity.png` |
 | `/status` | `w3-screenshots/13-status.png` |
 | Desktop + dark home / status | `w3-screenshots/14-…`, `15-…` |
 
@@ -34,6 +36,11 @@ Covered by e2e: login, one-time wallet setup (explorer link, card creation block
 Temu card, first-use decline at the wrong store (pre-lock), approve, void (exact message), onchain over-limit
 decline, freeze, revoke all, `lithic_failed` + Retry, card-network safety-limit decline (no onchain tx), idle
 decline + Reactivate, Other-store lock-on-first-charge, `/status`, desktop + dark mode.
+
+Demo UX fixes covered by e2e: void from an Activity row after navigating away (confirm sheet, pending state, Refunded +
+explorer link, button gone once refunded) and from "Recent sandbox purchases" on the store page; automatic one-time
+re-prepare + re-sign on `tx_expired` (wallet setup in the mock; same helper backs card creation, card actions and
+revoke-all); "Remaining on this card" always rendered in the checkout result.
 
 Live Privy login has NOT been exercised: it needs the deployed origin and `http://localhost:3000` added to the
 Privy dashboard's allowed origins plus `NEXT_PUBLIC_PRIVY_APP_ID`.
