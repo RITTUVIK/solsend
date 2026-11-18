@@ -78,3 +78,16 @@ describe("security-review amendments", () => {
     expect("ixCloseSettlementRecord" in mod).toBe(false);
   });
 });
+
+import { ixRevokeDelegation, readDelegation } from "../src/index.js";
+describe("W1 finding: sponsored delegation revoke needs the sponsor as writable receiver", () => {
+  it("adds receiver only when it differs from owner; readDelegation exposes payer", () => {
+    const owner = Keypair.generate().publicKey, d = Keypair.generate().publicKey, sponsor = Keypair.generate().publicKey;
+    const ix = ixRevokeDelegation(owner, d, sponsor);
+    expect(ix.keys.length).toBe(3);
+    expect(ix.keys[2]!.pubkey.equals(sponsor) && ix.keys[2]!.isWritable && !ix.keys[2]!.isSigner).toBe(true);
+    expect(ixRevokeDelegation(owner, d, owner).keys.length).toBe(2);
+    const data = new Uint8Array(187); data.set(owner.toBytes(), 3); data.set(d.toBytes(), 35); data.set(sponsor.toBytes(), 67);
+    expect(readDelegation(data)!.payer.equals(sponsor)).toBe(true);
+  });
+});

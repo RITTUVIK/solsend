@@ -32,27 +32,32 @@ export function ixCreateRecurringDelegation(p: { owner: PublicKey; delegatee: Pu
   return ix(keys, concat(Uint8Array.of(2), u64le(p.nonce), u64le(p.amountPerPeriod), u64le(p.periodSecs), i64le(p.startTs), i64le(p.expiryTs), i64le(p.initId)));
 }
 
-/** ix 3. Owner closes a delegation (works without SolSend — the user's escape hatch). */
-export const ixRevokeDelegation = (owner: PublicKey, delegation: PublicKey) => ix([meta(owner, true, true), meta(delegation, true)], Uint8Array.of(3));
+/** ix 3. Owner closes a delegation (works without SolSend — the user's escape hatch).
+ *  If the delegation's rent was sponsored (header `payer` != owner — true for every SolSend card, sponsored by our fee
+ *  payer), the devnet binary REQUIRES that sponsor as a writable `receiver` (rent goes back to it); otherwise it fails
+ *  with Allowances 113 notEnoughAccountKeys (found by W1 on devnet). Pass `readDelegation(data).payer`. */
+export const ixRevokeDelegation = (owner: PublicKey, delegation: PublicKey, receiver?: PublicKey) =>
+  ix([meta(owner, true, true), meta(delegation, true), ...(receiver && !receiver.equals(owner) ? [meta(receiver, true)] : [])], Uint8Array.of(3));
 
 // ── readers ─────────────────────────────────────────────────────────────────
 /** SubscriptionAuthority: disc1 user32 mint32 payer32 bump1 initId8 */
 export const readSaInitId = (data: Uint8Array): bigint => readI64(data, 98);
 
 export type DelegationView =
-  | { type: "fixed"; delegator: PublicKey; delegatee: PublicKey; remaining: bigint; expiryTs: bigint }
-  | { type: "recurring"; delegator: PublicKey; delegatee: PublicKey; amountPerPeriod: bigint; pulledInPeriod: bigint; remainingInPeriod: bigint; currentPeriodStartTs: bigint; periodSecs: bigint; expiryTs: bigint };
+  | { type: "fixed"; delegator: PublicKey; delegatee: PublicKey; payer: PublicKey; remaining: bigint; expiryTs: bigint }
+  | { type: "recurring"; delegator: PublicKey; delegatee: PublicKey; payer: PublicKey; amountPerPeriod: bigint; pulledInPeriod: bigint; remainingInPeriod: bigint; currentPeriodStartTs: bigint; periodSecs: bigint; expiryTs: bigint };
 
 /** Header: disc1 version1 bump1 delegator32 delegatee32 payer32 initId8 (107 bytes). Fixed = 187 bytes, Recurring = 211 bytes. */
 export function readDelegation(data: Uint8Array): DelegationView | null {
   if (data.length < 179) return null;
   const delegator = new PublicKey(data.subarray(3, 35));
   const delegatee = new PublicKey(data.subarray(35, 67));
+  const payer = new PublicKey(data.subarray(67, 99)); // rent sponsor → required `receiver` for revoke
   if (data.length >= 211) {
     const amountPerPeriod = readU64(data, 195);
     const pulledInPeriod = readU64(data, 203);
-    return { type: "recurring", delegator, delegatee, currentPeriodStartTs: readI64(data, 171), periodSecs: readU64(data, 179), expiryTs: readI64(data, 187),
+    return { type: "recurring", delegator, delegatee, payer, currentPeriodStartTs: readI64(data, 171), periodSecs: readU64(data, 179), expiryTs: readI64(data, 187),
       amountPerPeriod, pulledInPeriod, remainingInPeriod: amountPerPeriod > pulledInPeriod ? amountPerPeriod - pulledInPeriod : 0n };
   }
-  return { type: "fixed", delegator, delegatee, remaining: readU64(data, 171), expiryTs: readI64(data, 179) };
+  return { type: "fixed", delegator, delegatee, payer, remaining: readU64(data, 171), expiryTs: readI64(data, 179) };
 }
