@@ -1,7 +1,7 @@
 "use client";
 // Arrow-glyph field for the Home hero: a canvas of tiny arrows over the hero gradient, thinning out toward the middle.
 // Adapted from "Onward Summit Template" by Kedhareswer Naidu (MIT, https://kedhar.pages.dev), cut down to the hero
-// field. Deliberately STATIC: drawn once, and again only after its size settles (while it is resizing, e.g. the app pane
+// field. Copyright notice and MIT license text: THIRD_PARTY_NOTICES.md at the repository root. Deliberately STATIC: drawn once, and again only after its size settles (while it is resizing, e.g. the app pane
 // opening or the divider being dragged, the old bitmap is just stretched by CSS, so no frame pays for a redraw). An animated version (cursor lean,
 // opening ripple, shimmer) measured at ~56% idle main-thread CPU on desktop and 100% / 13 fps on a 4x-throttled phone.
 import { useEffect, useRef } from "react";

@@ -197,6 +197,8 @@ Variables are documented in [`.env.example`](.env.example). Deployment and the S
 
 SolSend was built during the hackathon by a two-person team: the repository was created on 16 November 2026, and the hackathon opened on 12 November. Most of the code, tests and documentation were written by **Claude Code, Anthropic's AI coding agent, working under the team's direction**. The humans set the requirements, approved the architecture at each checkpoint, configured every provider account, ran the end-to-end rehearsals that found the last bugs, and approved each release. The two security reviews were done by separate AI review agents, not by professional auditors. The commit history shows this openly: almost every commit carries a Claude co-author trailer.
 
+The Home hero's arrow field and layout are adapted from Kedhareswer Naidu's MIT-licensed "Onward Summit Template"; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
 ## Roadmap
 
 - Freeze the program or move to a multisig upgrade authority, and get a professional audit, before any mainnet use.

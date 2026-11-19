@@ -200,7 +200,8 @@ dialog.sheet[open] > .sheet-body { animation: sheet-up .32s var(--ease-out) both
 }
 
 /* Home hero, "Midnight Mint": near-black → deep Solana purple → near-black, with a faint mint glow at the bottom.
-   Layout adapted from the MIT "Onward Summit Template". Keeps its own colours in dark mode too. */
+   Layout adapted from the MIT "Onward Summit Template" by Kedhareswer Naidu (notice: THIRD_PARTY_NOTICES.md). Keeps its
+   own colours in dark mode too. */
 .landing-bg {
   background:
     linear-gradient(180deg, transparent 82%, #0b0618 100%),
