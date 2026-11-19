@@ -1,5 +1,6 @@
 "use client";
 import { Suspense, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "@/client/session";
 import type { CardView } from "@/client/format";
@@ -72,8 +73,10 @@ function LandingInner() {
   const router = useRouter();
   // A logged-out deep link (e.g. /cards/new) lands here as /?next=/cards/new; go back there after login.
   const next = safeNext(useSearchParams().get("next"));
-  const { login, pending } = useLoginThenGo(next);
-  useEffect(() => { if (s.ready && s.authenticated) router.replace(next ?? "/home"); }, [s.ready, s.authenticated, next, router]);
+  const { login, pending, authenticated } = useLoginThenGo(next);
+  // Signed-in users may visit Home (this page) from the tabs. Only a deep link (/?next=…) sends them on; logging in
+  // from this page goes to the wallet via useLoginThenGo.
+  useEffect(() => { if (s.ready && s.authenticated && next) router.replace(next); }, [s.ready, s.authenticated, next, router]);
 
   return (
     <div className="mx-auto max-w-5xl px-4 pb-10">
@@ -84,9 +87,11 @@ function LandingInner() {
           <h1 className="text-[44px] font-semibold leading-[46px] tracking-[-0.045em] sm:text-[64px] sm:leading-[64px] lg:text-[72px] lg:leading-[72px]">A burner card for every store.</h1>
           <p className="mt-5 max-w-xl text-[17px] leading-[26px] text-ink-2">Each card holds <strong className="font-semibold text-ink">$0</strong>. It can pull only what you allow, only at the store you pick — straight from your Solana wallet.</p>
           <div className="mt-7 flex flex-col gap-2 sm:flex-row">
-            <button type="button" onClick={login} className="btn-primary !min-h-[52px] !px-7 !text-[17px]">
-              {pending ? <Spinner /> : null}Try the sandbox demo
-            </button>
+            {authenticated
+              ? <Link href="/home" className="btn-primary !min-h-[52px] !px-7 !text-[17px]">Open your wallet</Link>
+              : <button type="button" onClick={login} className="btn-primary !min-h-[52px] !px-7 !text-[17px]">
+                  {pending ? <Spinner /> : null}Try the sandbox demo
+                </button>}
             <a href="#how" className="btn-ghost !min-h-[52px]">How it works<Icon name="chevron" className="h-4 w-4" /></a>
           </div>
           <p className="mt-3 text-[13px] text-ink-3">Free to try · test money only · no real merchants.</p>
@@ -129,9 +134,11 @@ function LandingInner() {
       <section className="mt-12 flex flex-col items-start gap-4 rounded-[20px] bg-surface p-6 ring-1 ring-line ring-inset sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-[19px] font-semibold tracking-[-0.02em]">Make your first card in about a minute</h2>
-          <p className="mt-1 text-[15px] text-ink-2">Sign in with an email. Test money only.</p>
+          <p className="mt-1 text-[15px] text-ink-2">{authenticated ? "Pick a store and a limit. Test money only." : "Sign in with an email. Test money only."}</p>
         </div>
-        <button type="button" onClick={login} className="btn-primary shrink-0">{pending ? <Spinner /> : null}Get started</button>
+        {authenticated
+          ? <Link href="/cards/new" className="btn-primary shrink-0">New card</Link>
+          : <button type="button" onClick={login} className="btn-primary shrink-0">{pending ? <Spinner /> : null}Get started</button>}
       </section>
 
       <SiteFooter />

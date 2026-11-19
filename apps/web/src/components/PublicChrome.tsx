@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/client/session";
-import { Logo } from "@/components/AppShell";
+import { AppTabBar, AppTabs, Logo } from "@/components/AppShell";
 import { MockBadge, Spinner } from "@/components/ui";
 
 /** Only same-origin app paths are allowed as a post-login destination (no "//host" or "/\host" open redirects). */
@@ -32,18 +32,34 @@ const NAV_LINK = "inline-flex min-h-10 items-center rounded-lg px-2.5 text-[14px
 /** Header for pages outside the signed-in app (landing, status, 404). */
 export function PublicHeader({ current, next = null }: { current?: "status"; next?: string | null }) {
   const { login, pending, authenticated } = useLoginThenGo(next);
+  const s = useSession();
+  const router = useRouter();
+  // Signed in: the same page tabs as the app (Home · Wallet · Demo store · Activity), so every page is one tap away.
+  if (authenticated) {
+    return (
+      <>
+        <header className="flex items-center justify-between gap-3 py-4">
+          <div className="flex items-center gap-2">
+            <Link href="/" className="rounded-lg" aria-label="SolSend home"><Logo /></Link>
+            <MockBadge />
+          </div>
+          <AppTabs />
+          <button type="button" onClick={() => void s.logout().then(() => router.replace("/"))} className="btn-ghost !min-h-10 !px-3 !text-[14px]" title={s.email ?? undefined}>Log out</button>
+        </header>
+        <AppTabBar />
+      </>
+    );
+  }
   return (
     <header className="flex items-center justify-between gap-2 py-4">
       <div className="flex items-center gap-2">
-        <Link href={authenticated ? "/home" : "/"} className="rounded-lg" aria-label="SolSend home"><Logo /></Link>
+        <Link href="/" className="rounded-lg" aria-label="SolSend home"><Logo /></Link>
         <MockBadge />
       </div>
       <nav aria-label="Site" className="flex items-center gap-0.5 sm:gap-1">
         <Link href="/#how" className={`${NAV_LINK} max-sm:hidden`}>How it works</Link>
         <Link href="/status" className={NAV_LINK} aria-current={current === "status" ? "page" : undefined}>Status</Link>
-        {authenticated
-          ? <Link href="/home" className="btn-secondary !min-h-10 !rounded-full !px-4 !text-[14px]">Open wallet</Link>
-          : <button type="button" onClick={login} className="btn-secondary !min-h-10 !rounded-full !px-4 !text-[14px]">{pending ? <Spinner /> : null}Log in</button>}
+        <button type="button" onClick={login} className="btn-secondary !min-h-10 !rounded-full !px-4 !text-[14px]">{pending ? <Spinner /> : null}Log in</button>
       </nav>
     </header>
   );
@@ -51,7 +67,11 @@ export function PublicHeader({ current, next = null }: { current?: "status"; nex
 
 /** Footer for the public pages and the app shell. */
 export function SiteFooter({ inApp = false }: { inApp?: boolean }) {
+  const s = useSession();
+  // Public pages show the mobile tab bar when signed in; keep the footer clear of it (the app shell pads itself).
+  const tabBarSpace = !inApp && s.ready && s.authenticated;
   return (
+    <>
     <footer className="mt-16 flex flex-col gap-3 border-t border-line pt-6 text-[13px] text-ink-3 sm:flex-row sm:items-center sm:justify-between">
       <p>Sandbox cards · Solana devnet USDC. No real money, no real merchants.</p>
       <nav aria-label="Footer" className="-mx-2 flex flex-wrap items-center">
@@ -60,5 +80,7 @@ export function SiteFooter({ inApp = false }: { inApp?: boolean }) {
         <Link href="/status" className="inline-flex min-h-9 items-center px-2 hover:text-ink">System status</Link>
       </nav>
     </footer>
+    {tabBarSpace && <div className="h-20 sm:hidden" aria-hidden="true" />}
+    </>
   );
 }

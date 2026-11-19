@@ -24,13 +24,46 @@ export const useAppData = (): AppData => {
   return c;
 };
 
-/** Card pages (/cards/new, /cards/<pda>) live under Wallet. */
+/** Card pages (/cards/new, /cards/<pda>) live under Wallet. Home (the landing page) matches only "/" exactly. */
 const isActive = (path: string, href: string) => path === href || (href === "/home" && path.startsWith("/cards"));
 const NAV = [
+  { href: "/", label: "Home", icon: "home" },
   { href: "/home", label: "Wallet", icon: "wallet" },
   { href: "/merchant", label: "Demo store", icon: "store" },
   { href: "/activity", label: "Activity", icon: "pulse" },
 ] as const;
+
+/** Signed-in page tabs, desktop (pill in the header). Shared by the app shell and the public pages when logged in. */
+export function AppTabs() {
+  const path = usePathname();
+  return (
+    <nav aria-label="Primary" className="hidden gap-1 rounded-full bg-sunken p-1 sm:flex">
+      {NAV.map((n) => (
+        <Link key={n.href} href={n.href} aria-current={isActive(path, n.href) ? "page" : undefined}
+          className={`rounded-full px-3.5 py-1.5 text-[14px] font-medium transition ${isActive(path, n.href) ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"}`}>{n.label}</Link>
+      ))}
+    </nav>
+  );
+}
+
+/** Signed-in page tabs, mobile (fixed bottom bar). Pages that show it need ~88px of bottom padding. */
+export function AppTabBar() {
+  const path = usePathname();
+  return (
+    <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-paper/85 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl sm:hidden">
+      <ul className="mx-auto flex max-w-2xl">
+        {NAV.map((n) => (
+          <li key={n.href} className="flex-1">
+            <Link href={n.href} aria-current={isActive(path, n.href) ? "page" : undefined}
+              className={`flex min-h-[60px] flex-col items-center justify-center gap-0.5 text-[11px] font-semibold ${isActive(path, n.href) ? "text-ink" : "text-ink-3"}`}>
+              <Icon name={n.icon} className="h-[22px] w-[22px]" strokeWidth={isActive(path, n.href) ? 2.2 : 1.8} />{n.label}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+}
 
 function Data({ children }: { children: ReactNode }) {
   const wallet = usePoll<Wallet>(client.wallet, DATA_POLL_MS);
@@ -95,12 +128,7 @@ export function AppShell({ children, wide = false }: { children: ReactNode; wide
           <Link href="/home" className="rounded-lg" aria-label="SolSend home"><Logo /></Link>
           <MockBadge />
         </div>
-        <nav aria-label="Primary" className="hidden gap-1 rounded-full bg-sunken p-1 sm:flex">
-          {NAV.map((n) => (
-            <Link key={n.href} href={n.href} aria-current={isActive(path, n.href) ? "page" : undefined}
-              className={`rounded-full px-3.5 py-1.5 text-[14px] font-medium transition ${isActive(path, n.href) ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"}`}>{n.label}</Link>
-          ))}
-        </nav>
+        <AppTabs />
         {s.authenticated && (
           <button type="button" onClick={() => void s.logout().then(() => router.replace("/"))} className="btn-ghost !min-h-10 !px-3 !text-[14px]" title={s.email ?? undefined}>Log out</button>
         )}
@@ -120,18 +148,7 @@ export function AppShell({ children, wide = false }: { children: ReactNode; wide
         <div role="status" data-testid="sign-notice" className="anim-rise fixed inset-x-4 bottom-[88px] z-[90] mx-auto max-w-md rounded-[16px] bg-ink px-4 py-3 text-center text-[15px] font-medium text-paper shadow-2xl sm:bottom-6">{notice}</div>
       )}
       <ToastHost />
-      <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-paper/85 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl sm:hidden">
-        <ul className="mx-auto flex max-w-2xl">
-          {NAV.map((n) => (
-            <li key={n.href} className="flex-1">
-              <Link href={n.href} aria-current={isActive(path, n.href) ? "page" : undefined}
-                className={`flex min-h-[60px] flex-col items-center justify-center gap-0.5 text-[11px] font-semibold ${isActive(path, n.href) ? "text-ink" : "text-ink-3"}`}>
-                <Icon name={n.icon} className="h-[22px] w-[22px]" strokeWidth={isActive(path, n.href) ? 2.2 : 1.8} />{n.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </nav>
+      <AppTabBar />
     </div>
   );
 }
