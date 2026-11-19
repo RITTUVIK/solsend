@@ -1,5 +1,5 @@
 "use client";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { z } from "zod";
@@ -7,6 +7,7 @@ import type { api } from "@solsend/shared";
 import { client, humanError } from "@/client/api";
 import { STORE_ART_NAME, cardArt } from "@/client/cardArt";
 import { MERCHANT_LABEL, displayStatus, isPresetStore, isUsable, sandboxName, usd, type DeclineFix } from "@/client/format";
+import { defaultProductIndex } from "@/client/store-default";
 import { useAppData } from "@/components/AppShell";
 import { ApprovalSheet, type PayAttempt } from "@/components/ApprovalSheet";
 import { CardVisual, StoreTile } from "@/components/CardVisual";
@@ -45,12 +46,33 @@ function Content() {
   const [announce, setAnnounce] = useState("");
 
   const selected = issued.find((c) => c.cardPda === cardPda);
+  // Preselect a product the wallet can cover (client/store-default.ts): a new wallet holds one faucet claim, less than
+  // the usual $12 pick, and its first try should be an approval, not a decline for wallet balance.
+  const walletBase = wallet.data ? BigInt(wallet.data.usdcBase) : null;
+  const affordablePick = (m: Merchant, base: bigint | null) => {
+    const prices = PRODUCTS[m].map((p) => p.dollars);
+    return prices[defaultProductIndex(prices, base)]!;
+  };
+  /** An automatic pick made before the wallet balance loaded; corrected once when it arrives (effect below). */
+  const blindPick = useRef<{ merchant: Merchant; amount: string } | null>(null);
   function pickCard(pda: string) {
     setCardPda(pda);
     const c = issued.find((x) => x.cardPda === pda);
     const m = c && isPresetStore(c.merchantName) ? enumFor(c.merchantName) : c ? "OTHER_STORE" : null;
-    if (m) { setMerchant(m); setAmount(PRODUCTS[m][Math.min(1, PRODUCTS[m].length - 1)]!.dollars); }
+    if (m) {
+      const pick = affordablePick(m, walletBase);
+      setMerchant(m); setAmount(pick);
+      blindPick.current = walletBase === null ? { merchant: m, amount: pick } : null;
+    }
   }
+  useEffect(() => {
+    const blind = blindPick.current;
+    if (!blind || walletBase === null) return;
+    blindPick.current = null;
+    // Only if the shopper hasn't changed the store or the amount since the automatic pick.
+    if (merchant === blind.merchant && amount === blind.amount) setAmount(affordablePick(blind.merchant, walletBase));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [walletBase]);
   // ?card= ("Pay at the sandbox store" right after creating a card): the shared cards list lives in the app shell and
   // persists across pages, so it can be a poll behind and not list that card as issued yet. Refresh and wait for it
   // instead of preselecting another card; fall back only if it still hasn't appeared after a few polls.
