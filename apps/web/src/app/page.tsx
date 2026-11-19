@@ -1,12 +1,11 @@
 "use client";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "@/client/session";
 import type { CardView } from "@/client/format";
-import { Logo } from "@/components/AppShell";
 import { CardVisual, StoreTile } from "@/components/CardVisual";
-import { Icon, MockBadge, OnchainGlyph, Spinner } from "@/components/ui";
+import { PublicHeader, SiteFooter, safeNext, useLoginThenGo } from "@/components/PublicChrome";
+import { Icon, OnchainGlyph, Spinner } from "@/components/ui";
 
 const DEMO_CARD: CardView = {
   cardPda: "demo", cardId: "demo", label: "Temu card", merchantName: "Temu", kind: "STORE_LOCKED", status: "ACTIVE", issueState: "issued",
@@ -65,27 +64,28 @@ const STEPS = [
 ] as const;
 
 export default function Landing() {
+  return <Suspense fallback={null}><LandingInner /></Suspense>;
+}
+
+function LandingInner() {
   const s = useSession();
   const router = useRouter();
-  const [wantLogin, setWantLogin] = useState(false);
-  useEffect(() => { if (s.ready && s.authenticated) router.replace("/home"); }, [s.ready, s.authenticated, router]);
-  // Never render the CTA disabled before hydration: queue the click and open login once the session is ready.
-  useEffect(() => { if (wantLogin && s.ready && !s.authenticated) { setWantLogin(false); s.login(); } }, [wantLogin, s]);
+  // A logged-out deep link (e.g. /cards/new) lands here as /?next=/cards/new; go back there after login.
+  const next = safeNext(useSearchParams().get("next"));
+  const { login, pending } = useLoginThenGo(next);
+  useEffect(() => { if (s.ready && s.authenticated) router.replace(next ?? "/home"); }, [s.ready, s.authenticated, next, router]);
 
   return (
-    <div className="mx-auto max-w-5xl px-4 pb-16">
-      <header className="flex items-center justify-between py-4">
-        <div className="flex items-center gap-2"><Logo /><MockBadge /></div>
-        <Link href="/status" className="inline-flex min-h-10 items-center rounded-lg px-2 text-[14px] font-medium text-ink-3 hover:text-ink">Status</Link>
-      </header>
+    <div className="mx-auto max-w-5xl px-4 pb-10">
+      <PublicHeader next={next} />
 
       <section className="grid items-center gap-10 pt-4 lg:grid-cols-[1.1fr_1fr] lg:pt-14">
         <div>
           <h1 className="text-[44px] font-semibold leading-[46px] tracking-[-0.045em] sm:text-[64px] sm:leading-[64px] lg:text-[72px] lg:leading-[72px]">A burner card for every store.</h1>
           <p className="mt-5 max-w-xl text-[17px] leading-[26px] text-ink-2">Each card holds <strong className="font-semibold text-ink">$0</strong>. It can pull only what you allow, only at the store you pick — straight from your Solana wallet.</p>
           <div className="mt-7 flex flex-col gap-2 sm:flex-row">
-            <button type="button" onClick={() => (s.ready ? s.login() : setWantLogin(true))} className="btn-primary !min-h-[52px] !px-7 !text-[17px]">
-              {wantLogin && !s.ready ? <Spinner /> : null}Try the sandbox demo
+            <button type="button" onClick={login} className="btn-primary !min-h-[52px] !px-7 !text-[17px]">
+              {pending ? <Spinner /> : null}Try the sandbox demo
             </button>
             <a href="#how" className="btn-ghost !min-h-[52px]">How it works<Icon name="chevron" className="h-4 w-4" /></a>
           </div>
@@ -96,8 +96,8 @@ export default function Landing() {
 
       <p className="mt-12 text-center text-[13px] font-medium text-ink-3">Settles on <span className="text-ink-2">Solana</span> · Cards via <span className="text-ink-2">Lithic</span> sandbox · Events via <span className="text-ink-2">QuickNode</span> Streams</p>
 
-      <section aria-labelledby="how" className="mt-14 scroll-mt-12" id="how">
-        <h2 id="how-h" className="text-[22px] font-semibold tracking-[-0.02em]"><span id="how-title">How it works</span></h2>
+      <section aria-labelledby="how-title" className="mt-14 scroll-mt-16" id="how">
+        <h2 id="how-title" className="text-[22px] font-semibold tracking-[-0.02em]">How it works</h2>
         <ol className="-mx-4 mt-4 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0">
           {STEPS.map((st, i) => (
             <li key={st.title} className="surface w-[78%] shrink-0 snap-start sm:w-auto">
@@ -125,6 +125,16 @@ export default function Landing() {
           <p className="mt-2 text-[15px] leading-[22px] text-ink-2">Cards come from a sandbox issuer and money is devnet test USDC. No real merchant is ever charged and no real card network settles anything. The &ldquo;Demo store&rdquo; is a sandbox simulator, not a real shop. The Solana transactions are real devnet transactions you can inspect.</p>
         </details>
       </section>
+
+      <section className="mt-12 flex flex-col items-start gap-4 rounded-[20px] bg-surface p-6 ring-1 ring-line ring-inset sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-[19px] font-semibold tracking-[-0.02em]">Make your first card in about a minute</h2>
+          <p className="mt-1 text-[15px] text-ink-2">Sign in with an email. Test money only.</p>
+        </div>
+        <button type="button" onClick={login} className="btn-primary shrink-0">{pending ? <Spinner /> : null}Get started</button>
+      </section>
+
+      <SiteFooter />
     </div>
   );
 }

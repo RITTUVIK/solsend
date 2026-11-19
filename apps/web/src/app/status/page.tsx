@@ -1,19 +1,16 @@
 "use client";
-import Link from "next/link";
 import { client } from "@/client/api";
 import { usePoll } from "@/client/hooks";
-import { Logo } from "@/components/AppShell";
-import { ErrorNote, Icon, MockBadge, Skeleton } from "@/components/ui";
+import { PublicHeader, SiteFooter } from "@/components/PublicChrome";
+import { ErrorNote, Icon, Skeleton } from "@/components/ui";
 
 const SPONSOR: Record<string, string> = { "QuickNode Stream": "QuickNode", "Lithic sandbox": "Lithic", "Solana devnet RPC": "Solana" };
 
 export default function StatusPage() {
   const { data, error, loading, refresh } = usePoll(client.status, 10_000);
   return (
-    <div className="mx-auto max-w-2xl px-4 pb-16">
-      <header className="flex items-center justify-between py-4">
-        <div className="flex items-center gap-2"><Link href="/" className="rounded-lg" aria-label="SolSend home"><Logo /></Link><MockBadge /></div>
-      </header>
+    <div className="mx-auto max-w-2xl px-4 pb-10">
+      <PublicHeader current="status" />
       <h1 className="text-[28px] font-semibold tracking-[-0.03em]">System status</h1>
       <p className="mt-1 text-[15px] text-ink-2">Live checks of the pieces behind your cards. Sandbox and devnet only.</p>
 
@@ -39,7 +36,7 @@ export default function StatusPage() {
           </ul>
         </>
       )}
-      <p className="mt-6 text-[13px] text-ink-3">Sandbox cards · Solana devnet USDC. Nothing here involves real money or real merchants.</p>
+      <SiteFooter />
     </div>
   );
 }

@@ -1,0 +1,64 @@
+"use client";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useSession } from "@/client/session";
+import { Logo } from "@/components/AppShell";
+import { MockBadge, Spinner } from "@/components/ui";
+
+/** Only same-origin app paths are allowed as a post-login destination (no "//host" or "/\host" open redirects). */
+export function safeNext(raw: string | null | undefined): string | null {
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//") || raw.startsWith("/\\")) return null;
+  return raw;
+}
+
+/**
+ * Log-in trigger shared by the public pages. Never renders disabled before hydration: a click before the session is
+ * ready is queued. Once logged in it sends you to `next` (or the wallet).
+ */
+export function useLoginThenGo(next: string | null = null) {
+  const s = useSession();
+  const router = useRouter();
+  const [queued, setQueued] = useState(false);
+  const [asked, setAsked] = useState(false);
+  useEffect(() => { if (queued && s.ready && !s.authenticated) { setQueued(false); s.login(); } }, [queued, s]);
+  useEffect(() => { if (asked && s.ready && s.authenticated) router.replace(next ?? "/home"); }, [asked, s.ready, s.authenticated, next, router]);
+  const login = () => { setAsked(true); if (s.ready) s.login(); else setQueued(true); };
+  return { login, pending: queued && !s.ready, authenticated: s.ready && s.authenticated };
+}
+
+const NAV_LINK = "inline-flex min-h-10 items-center rounded-lg px-2.5 text-[14px] font-medium text-ink-2 hover:text-ink";
+
+/** Header for pages outside the signed-in app (landing, status, 404). */
+export function PublicHeader({ current, next = null }: { current?: "status"; next?: string | null }) {
+  const { login, pending, authenticated } = useLoginThenGo(next);
+  return (
+    <header className="flex items-center justify-between gap-2 py-4">
+      <div className="flex items-center gap-2">
+        <Link href={authenticated ? "/home" : "/"} className="rounded-lg" aria-label="SolSend home"><Logo /></Link>
+        <MockBadge />
+      </div>
+      <nav aria-label="Site" className="flex items-center gap-0.5 sm:gap-1">
+        <Link href="/#how" className={`${NAV_LINK} max-sm:hidden`}>How it works</Link>
+        <Link href="/status" className={NAV_LINK} aria-current={current === "status" ? "page" : undefined}>Status</Link>
+        {authenticated
+          ? <Link href="/home" className="btn-secondary !min-h-10 !rounded-full !px-4 !text-[14px]">Open wallet</Link>
+          : <button type="button" onClick={login} className="btn-secondary !min-h-10 !rounded-full !px-4 !text-[14px]">{pending ? <Spinner /> : null}Log in</button>}
+      </nav>
+    </header>
+  );
+}
+
+/** Footer for the public pages and the app shell. */
+export function SiteFooter({ inApp = false }: { inApp?: boolean }) {
+  return (
+    <footer className="mt-16 flex flex-col gap-3 border-t border-line pt-6 text-[13px] text-ink-3 sm:flex-row sm:items-center sm:justify-between">
+      <p>Sandbox cards · Solana devnet USDC. No real money, no real merchants.</p>
+      <nav aria-label="Footer" className="-mx-2 flex flex-wrap items-center">
+        {/* In the app, Wallet / Demo store / Activity are already in the tab bar; only add what it lacks. */}
+        {!inApp && <Link href="/#how" className="inline-flex min-h-9 items-center px-2 hover:text-ink">How it works</Link>}
+        <Link href="/status" className="inline-flex min-h-9 items-center px-2 hover:text-ink">System status</Link>
+      </nav>
+    </footer>
+  );
+}

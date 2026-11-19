@@ -12,6 +12,7 @@ import { isMockSig, shortId, type CardView } from "@/client/format";
 import { useSignNotice } from "@/client/notice";
 import { useSession } from "@/client/session";
 import { dismissToast, useToast } from "@/client/toast";
+import { SiteFooter } from "./PublicChrome";
 import { Icon, MockBadge, MockTag, OnchainGlyph, Skeleton, Spinner } from "./ui";
 
 type Wallet = z.infer<typeof api.WalletResponse>;
@@ -80,7 +81,10 @@ export function AppShell({ children, wide = false }: { children: ReactNode; wide
   const s = useSession();
   const router = useRouter();
   const path = usePathname();
-  useEffect(() => { if (s.ready && !s.authenticated) router.replace("/"); }, [s.ready, s.authenticated, router]);
+  // Logged out on an app page: go to the landing page, remembering where you were so login brings you back.
+  useEffect(() => {
+    if (s.ready && !s.authenticated) router.replace(path && path !== "/home" ? `/?next=${encodeURIComponent(path)}` : "/");
+  }, [s.ready, s.authenticated, router, path]);
 
   const notice = useSignNotice();
   const gated = !s.ready || !s.authenticated || s.walletPending || !s.wallet;
@@ -101,7 +105,7 @@ export function AppShell({ children, wide = false }: { children: ReactNode; wide
           <button type="button" onClick={() => void s.logout().then(() => router.replace("/"))} className="btn-ghost !min-h-10 !px-3 !text-[14px]" title={s.email ?? undefined}>Log out</button>
         )}
       </header>
-      <main className="flex-1 px-4 pb-32 pt-2 sm:pb-12">
+      <main className="flex-1 px-4 pb-4 pt-2">
         {gated ? (
           <div className="space-y-4" role="status" aria-live="polite">
             <p className="flex items-center gap-2 text-sm text-ink-2"><Spinner />{s.walletPending ? "Creating your Solana wallet…" : "Loading…"}</p>
@@ -111,6 +115,7 @@ export function AppShell({ children, wide = false }: { children: ReactNode; wide
           <Data>{children}</Data>
         )}
       </main>
+      <div className="px-4 pb-28 sm:pb-8"><SiteFooter inApp /></div>
       {notice && (
         <div role="status" data-testid="sign-notice" className="anim-rise fixed inset-x-4 bottom-[88px] z-[90] mx-auto max-w-md rounded-[16px] bg-ink px-4 py-3 text-center text-[15px] font-medium text-paper shadow-2xl sm:bottom-6">{notice}</div>
       )}
