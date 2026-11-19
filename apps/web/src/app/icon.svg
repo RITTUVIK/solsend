@@ -1,5 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28">
-  <rect x="2" y="7" width="20" height="15" rx="4.5" fill="#0b0c0e"/>
-  <rect x="7" y="4" width="19" height="14" rx="4.5" fill="#19e6a0" stroke="#ffffff" stroke-width="1.5"/>
-  <path d="M11 13.5h6" stroke="#04130d" stroke-width="2" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -3 120 120">
+  <defs>
+    <linearGradient id="g" gradientUnits="userSpaceOnUse" x1="0" y1="100" x2="110" y2="14">
+      <stop offset="0" stop-color="#9945FF"/><stop offset="0.5" stop-color="#43B4CA"/><stop offset="1" stop-color="#14F195"/>
+    </linearGradient>
+  </defs>
+  <g transform="matrix(1 0 -0.2126 1 18 0)">
+    <rect x="30" y="18" width="72" height="50" rx="10" fill="none" stroke="url(#g)" stroke-width="5"/>
+    <rect x="20" y="32" width="72" height="50" rx="10" fill="url(#g)" fill-opacity="0.4"/>
+    <rect x="10" y="46" width="72" height="50" rx="10" fill="url(#g)"/>
+    <rect x="22" y="58" width="16" height="12" rx="3" fill="#fff" fill-opacity="0.92"/>
+  </g>
 </svg>

@@ -1,5 +1,5 @@
 "use client";
-import { createContext, useContext, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useId, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { api } from "@solsend/shared";
@@ -71,16 +71,32 @@ function Data({ children }: { children: ReactNode }) {
   return <Ctx.Provider value={{ wallet, cards }}>{children}</Ctx.Provider>;
 }
 
-/** Wordmark: a card leaving a wallet (two offset rounded rects) + "solsend" set tight. */
+/** Brand mark: three stacked, slanted cards in the Solana gradient (also used as the favicon, src/app/icon.svg). */
+export function LogoMark({ className = "h-7 w-7" }: { className?: string }) {
+  const id = `ss-${useId().replace(/[^a-zA-Z0-9-]/g, "")}`;
+  return (
+    <svg viewBox="0 8 120 100" className={className} aria-hidden="true">
+      <defs>
+        <linearGradient id={id} gradientUnits="userSpaceOnUse" x1="0" y1="100" x2="110" y2="14">
+          <stop offset="0" stopColor="#9945FF" /><stop offset="0.5" stopColor="#43B4CA" /><stop offset="1" stopColor="#14F195" />
+        </linearGradient>
+      </defs>
+      <g transform="matrix(1 0 -0.2126 1 18 0)">
+        <rect x="30" y="18" width="72" height="50" rx="10" fill="none" stroke={`url(#${id})`} strokeWidth="5" />
+        <rect x="20" y="32" width="72" height="50" rx="10" fill={`url(#${id})`} fillOpacity="0.4" />
+        <rect x="10" y="46" width="72" height="50" rx="10" fill={`url(#${id})`} />
+        <rect x="22" y="58" width="16" height="12" rx="3" fill="#fff" fillOpacity="0.92" />
+      </g>
+    </svg>
+  );
+}
+
+/** Wordmark: the mark + "sol" (bold, ink) "send" (Solana gradient). */
 export function Logo({ className = "" }: { className?: string }) {
   return (
-    <span className={`inline-flex items-center gap-2 text-[19px] font-semibold tracking-[-0.045em] ${className}`}>
-      <svg viewBox="0 0 28 28" className="h-7 w-7" aria-hidden="true">
-        <rect x="2" y="7" width="20" height="15" rx="4.5" fill="var(--ink)" />
-        <rect x="7" y="4" width="19" height="14" rx="4.5" fill="var(--mint)" stroke="var(--paper)" strokeWidth="1.5" />
-        <path d="M11 13.5h6" stroke="#04130d" strokeWidth="2" strokeLinecap="round" />
-      </svg>
-      solsend
+    <span className={`inline-flex items-center gap-2 text-[20px] font-bold leading-none tracking-[-0.045em] ${className}`}>
+      <LogoMark className="h-7 w-8" />
+      <span>sol<span className="bg-[linear-gradient(90deg,#9945FF,#43B4CA,#14F195)] bg-clip-text font-normal text-transparent">send</span></span>
     </span>
   );
 }
