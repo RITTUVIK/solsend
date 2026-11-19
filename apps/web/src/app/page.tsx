@@ -1,5 +1,5 @@
 "use client";
-import { Suspense, useEffect, useState, type MouseEvent } from "react";
+import { Suspense, useEffect, useState, type MouseEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "@/client/session";
@@ -22,15 +22,20 @@ const NAV = [
 const PAGE_NAME: Record<string, string> = { "/home": "your wallet", "/merchant": "the demo store", "/activity": "your activity", "/cards/new": "a new card" };
 
 const STEPS = [
-  { icon: "drop", title: "Get free test money", body: "Sign in with your email. We make you a Solana wallet and drop in free test dollars (devnet USDC)." },
-  { icon: "card", title: "Make a card for one store", body: "Pick a store and a limit, like “Temu, $40 total” or “Netflix, $15.49 a month for 7 days”." },
-  { icon: "chain", title: "Pay. The money moves first.", body: "Your dollars stay in your wallet until you buy. Solana moves exactly that amount, then the card says yes." },
+  { title: "Get free test money", body: "Sign in with your email. You get a Solana wallet with free test dollars." },
+  { title: "Make a card for one store", body: "Pick a store and a limit, like “Temu, $40 total”." },
+  { title: "Pay. The money moves first.", body: "Dollars stay in your wallet until you buy. Solana pays, then the card says yes." },
 ] as const;
 
 const WHY = [
-  { icon: "wallet", title: "Holds $0", body: "Nothing sits on the card. It can only pull what you allowed, when you buy." },
-  { icon: "lock", title: "Locked to one store", body: "If the number leaks, it gets declined everywhere else." },
-  { icon: "shield", title: "A hard limit", body: "The limit is enforced by Solana itself, not just a setting in an app." },
+  { icon: "wallet", title: "Holds $0", body: "It only pulls what you allowed, when you buy." },
+  { icon: "lock", title: "Locked to one store", body: "A leaked number gets declined everywhere else." },
+  { icon: "shield", title: "You stay in control", body: "Hard limits enforced by Solana. Freeze or close any card." },
+] as const;
+
+const REAL = [
+  { icon: "flask", title: "Test version", body: "Sandbox cards and test USDC. No real store is ever charged." },
+  { icon: "chain", title: "Real Solana transactions", body: "Every payment is a real devnet transaction you can look up." },
 ] as const;
 
 const DEMO_CARD: CardView = {
@@ -41,28 +46,24 @@ const DEMO_CARD: CardView = {
   registerSignature: null, expiresAt: null, expired: false,
 };
 
-/** 7 s loop built from the real card component, captioned as an illustration (not live data). Starts when scrolled into view. */
+/** 7 s loop built from the real card component, captioned as an illustration (not live data). */
 function DemoLoop() {
   const [step, setStep] = useState(4);
-  const [el, setEl] = useState<HTMLElement | null>(null);
   useEffect(() => {
-    if (!el || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return; // static final frame
-    let t: ReturnType<typeof setTimeout> | undefined;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return; // static final frame
+    setStep(0);
     const seq = [800, 1700, 1500, 2000, 1000];
     let i = 0;
+    let t: ReturnType<typeof setTimeout>;
     const next = () => { i = (i + 1) % seq.length; setStep(i); t = setTimeout(next, seq[i]); };
-    const io = new IntersectionObserver(([e]) => {
-      if (e?.isIntersecting && t === undefined) { i = 0; setStep(0); t = setTimeout(next, seq[0]); }
-      else if (!e?.isIntersecting && t !== undefined) { clearTimeout(t); t = undefined; }
-    }, { threshold: 0.3 });
-    io.observe(el);
-    return () => { io.disconnect(); if (t !== undefined) clearTimeout(t); };
-  }, [el]);
+    t = setTimeout(next, seq[0]);
+    return () => clearTimeout(t);
+  }, []);
   const card: CardView = step >= 1 ? { ...DEMO_CARD, limit: { ...DEMO_CARD.limit, remainingBase: "28000000" } } : DEMO_CARD;
   return (
-    <figure ref={setEl} className="relative mx-auto w-full max-w-[360px]" aria-label="Illustration: a Temu card is approved for $12, then the same number is declined at Amazon">
+    <figure className="relative mx-auto w-[min(360px,46vh)]" aria-label="Illustration: a Temu card is approved for $12, then the same number is declined at Amazon">
       <div className="mb-3 flex justify-center">
-        <span className="tnum inline-flex items-center gap-2 rounded-full bg-white/10 px-3.5 py-1.5 text-[14px] font-semibold text-white ring-1 ring-white/15">
+        <span className="tnum inline-flex items-center gap-2 rounded-full bg-[#0b0618]/60 px-3.5 py-1.5 text-[14px] font-semibold text-white ring-1 ring-white/15 backdrop-blur-sm">
           <Icon name="wallet" className="h-4 w-4 text-white/60" />Your wallet
           <span key={step >= 2 ? "88" : "100"} className="anim-fade">{step >= 2 ? "$88.00" : "$100.00"}</span>
         </span>
@@ -78,12 +79,59 @@ function DemoLoop() {
         {step >= 3 && (
           <div key="no" className="anim-rise absolute inset-x-0 flex items-center gap-3 rounded-[16px] bg-[#1a0b3d] px-3.5 py-2.5 shadow-lg ring-1 ring-white/15">
             <StoreTile merchant="Amazon" size={32} />
-            <div className="min-w-0 text-[14px] leading-5"><p className="font-semibold text-[#ff8a8a]">Declined at Amazon</p><p className="text-[13px] text-white/60">Locked to Temu, so a leaked number is useless here</p></div>
+            <div className="min-w-0 text-[14px] leading-5"><p className="font-semibold text-[#ff8a8a]">Declined at Amazon</p><p className="text-[13px] text-white/60">Locked to Temu, so a leaked number is useless</p></div>
           </div>
         )}
       </div>
-      <figcaption className="mt-2 text-center text-[11px] font-medium text-white/45">Illustration of the sandbox demo</figcaption>
+      <figcaption className="mt-1 text-center text-[11px] font-medium text-white/45">Illustration of the sandbox demo</figcaption>
     </figure>
+  );
+}
+
+/** One row: icon or number badge, title, one-line explanation. */
+function Point({ badge, title, body, className = "" }: { badge: ReactNode; title: string; body: string; className?: string }) {
+  return (
+    <li className={`flex gap-3 ${className}`}>
+      {badge}
+      <div className="min-w-0">
+        <p className="text-[15px] font-semibold leading-5 tracking-[-0.01em]">{title}</p>
+        <p className="mt-0.5 text-[13.5px] leading-[19px] text-white/65">{body}</p>
+      </div>
+    </li>
+  );
+}
+const iconBadge = (name: string) => (
+  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-white/[0.07] text-[#14f195] ring-1 ring-white/10"><Icon name={name} className="h-[18px] w-[18px]" /></span>
+);
+const numBadge = (n: number) => (
+  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#14f195] text-[13px] font-bold text-[#04130d]">{n}</span>
+);
+
+const TABS = [
+  { id: "how", label: "How it works" },
+  { id: "why", label: "Why it's safer" },
+  { id: "real", label: "What's real" },
+] as const;
+
+/** Phones and tablets: the same explanations as the desktop layout, one topic at a time, so nothing needs scrolling. */
+function InfoTabs() {
+  const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("how");
+  return (
+    <div className="mx-auto flex min-h-0 w-full max-w-md flex-col rounded-[20px] bg-[#0b0618]/60 p-3 ring-1 ring-white/10 backdrop-blur-md">
+      <div role="tablist" aria-label="About SolSend" className="grid shrink-0 grid-cols-3 gap-1 rounded-full bg-white/[0.06] p-1">
+        {TABS.map((t) => (
+          <button key={t.id} type="button" role="tab" id={`tab-${t.id}`} aria-selected={tab === t.id} aria-controls="info-panel" onClick={() => setTab(t.id)}
+            className={`min-h-9 rounded-full px-1 text-[12.5px] font-semibold transition-colors ${tab === t.id ? "bg-white text-[#1a0b3d]" : "text-white/70 hover:text-white"}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      <ul id="info-panel" role="tabpanel" aria-labelledby={`tab-${tab}`} className="mt-3 min-h-0 space-y-3 overflow-y-auto px-1 pb-1 text-left">
+        {tab === "how" && STEPS.map((s, i) => <Point key={s.title} badge={numBadge(i + 1)} title={s.title} body={s.body} />)}
+        {tab === "why" && WHY.map((w) => <Point key={w.title} badge={iconBadge(w.icon)} title={w.title} body={w.body} />)}
+        {tab === "real" && REAL.map((r) => <Point key={r.title} badge={iconBadge(r.icon)} title={r.title} body={r.body} />)}
+      </ul>
+    </div>
   );
 }
 
@@ -91,30 +139,27 @@ export default function Landing() {
   return <Suspense fallback={null}><LandingInner /></Suspense>;
 }
 
-/** Height of the sticky sandbox banner from the root layout (it wraps to two lines on narrow phones). */
+/** Height of the sandbox banner at the top of the page (phones only; it wraps to two lines on narrow ones). */
 function useBannerHeight() {
   const [h, setH] = useState(32);
   useEffect(() => {
     const el = document.querySelector<HTMLElement>('[data-testid="sandbox-banner"]');
     if (!el) return;
-    const read = () => setH(el.offsetHeight);
+    // Only the phone layout keeps the banner in the flow at the top; from sm up it's a pill pinned bottom-left.
+    const read = () => setH(getComputedStyle(el).position === "fixed" ? 0 : el.offsetHeight);
     read();
     const ro = new ResizeObserver(read);
     ro.observe(el);
-    return () => ro.disconnect();
+    window.addEventListener("resize", read);
+    return () => { ro.disconnect(); window.removeEventListener("resize", read); };
   }, []);
   return h;
 }
 
-const SECTION = "mx-auto w-full max-w-5xl px-5 sm:px-8";
-const KICKER = "text-[12px] font-semibold uppercase tracking-[0.12em] text-[#14f195]";
-const H2 = "mt-2 text-[28px] font-semibold leading-[1.15] tracking-[-0.03em] sm:text-[36px]";
-const TILE = "rounded-[20px] bg-white/[0.04] p-6 ring-1 ring-white/10";
-
 /**
- * Home. First screen: a midnight-purple hero with a calm field of arrows (layout and field adapted from the MIT
- * "Onward Summit Template", see components/GlyphField.tsx). Below it, in plain words: how it works, why it's safer,
- * what's real, and a last call to action. The nav sticks to the top and frosts once you scroll.
+ * Home: everything on one screen, no scrolling. A midnight-purple field of arrows (adapted from the MIT "Onward Summit
+ * Template", see components/GlyphField.tsx) behind the pitch, the steps, why it's safer and what's real. Desktop shows
+ * it all at once; phones show the explanations in a small tab panel.
  */
 function LandingInner() {
   const s = useSession();
@@ -123,15 +168,8 @@ function LandingInner() {
   const next = safeNext(useSearchParams().get("next"));
   const { login, pending, authenticated } = useLoginThenGo(next);
   const bannerH = useBannerHeight();
-  const [scrolled, setScrolled] = useState(false);
   // Signed in and sent here with ?next= (old link, back button): carry on to that page.
   useEffect(() => { if (s.ready && s.authenticated && next) router.replace(next); }, [s.ready, s.authenticated, next, router]);
-  useEffect(() => {
-    const on = () => setScrolled(window.scrollY > 24);
-    on();
-    window.addEventListener("scroll", on, { passive: true });
-    return () => window.removeEventListener("scroll", on);
-  }, []);
 
   const onNav = (e: MouseEvent<HTMLAnchorElement>, href: string, app: boolean) => {
     if (!app || authenticated) return;
@@ -150,12 +188,18 @@ function LandingInner() {
     );
   });
 
+  const hint = !authenticated && next && PAGE_NAME[next] ? `Log in to open ${PAGE_NAME[next]}.` : "Each card holds $0 · test money only · free";
+  const cta = authenticated
+    ? <Link href="/home" className="landing-cta-2">Open your wallet</Link>
+    : <button type="button" onClick={() => login("/cards/new")} className="landing-cta-2">Make your first card</button>;
+
   return (
-    <div className="landing-page bg-[#0b0618] text-white" style={{ ["--banner-h" as string]: `${bannerH}px` }}>
-      {/* Sticky top bar. It overlaps the hero (negative margin = its height) and frosts once the page scrolls. */}
-      <div className={`sticky z-40 -mb-[104px] transition-[background-color,box-shadow] duration-300 lg:-mb-16 ${scrolled ? "bg-[#0b0618]/80 shadow-[0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-md" : ""}`}
-        style={{ top: bannerH }}>
-        <header className="grid h-16 grid-cols-[1fr_auto] items-center gap-3 px-4 sm:px-8 lg:grid-cols-[1fr_auto_1fr]">
+    <div className="fixed inset-x-0 bottom-0 z-0 overflow-hidden" style={{ top: bannerH }}>
+      <section aria-label="SolSend" className="relative isolate flex h-full flex-col text-white">
+        <div className="landing-bg absolute inset-0 -z-20" aria-hidden="true" />
+        <GlyphField />
+
+        <header className="grid h-16 shrink-0 grid-cols-[1fr_auto] items-center gap-3 px-4 sm:px-8 lg:grid-cols-[1fr_auto_1fr]">
           <div className="flex items-center gap-2">
             <Link href="/" className="rounded-lg" aria-label="SolSend home"><Logo className="text-white" /></Link>
             <MockBadge className="bg-white/90 max-sm:hidden" />
@@ -177,105 +221,55 @@ function LandingInner() {
             )}
           </div>
         </header>
+
         {/* Phones and tablets: the same nav as a row under the header. */}
-        <nav aria-label="Pages" className="flex h-10 items-center gap-1 overflow-x-auto px-4 [scrollbar-width:none] sm:justify-center lg:hidden">
+        <nav aria-label="Pages" className="flex h-10 shrink-0 items-center gap-1 overflow-x-auto px-4 [scrollbar-width:none] sm:justify-center lg:hidden">
           {navLinks(true)}
         </nav>
-      </div>
 
-      {/* Hero: exactly the first screen. */}
-      <section aria-label="SolSend" className="relative isolate flex flex-col overflow-hidden pt-[104px] lg:pt-16" style={{ height: `calc(100svh - ${bannerH}px)` }}>
-        <div className="landing-bg absolute inset-0 -z-20" aria-hidden="true" />
-        <GlyphField />
-        <div className="flex min-h-0 flex-1 flex-col items-center px-5 pb-[6vh] text-center [justify-content:safe_center] short:pb-2">
-          <h1 className="landing-title anim-rise">SolSend</h1>
-          <p className="mt-2 text-[clamp(17px,1.95vw,24px)] font-medium leading-[1.25] tracking-[-0.02em] [text-shadow:0_2px_20px_rgba(11,6,24,0.6)]">
-            A burner card for every store,<br />paid straight from your Solana wallet.
-          </p>
-          <div className="mt-6 short:mt-3 flex flex-wrap items-center justify-center gap-2">
-            {authenticated
-              ? <Link href="/home" className="landing-cta-2">Open your wallet</Link>
-              : <button type="button" onClick={() => login("/cards/new")} className="landing-cta-2">Make your first card</button>}
-          </div>
-          <p className="mt-3 text-[13px] font-medium text-white/80 short:hidden [text-shadow:0_1px_8px_rgba(11,6,24,0.6)]">
-            {!authenticated && next && PAGE_NAME[next] ? `Log in to open ${PAGE_NAME[next]}.` : "Each card holds $0 · test money only · free"}
-          </p>
-        </div>
-        <a href="#how" className="mx-auto mb-4 inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full px-4 text-[13px] font-medium text-white/60 transition-colors hover:text-white short:hidden">
-          How it works<Icon name="chevron" className="h-4 w-4" />
-        </a>
-      </section>
-
-      {/* 1. How it works */}
-      <section id="how" aria-labelledby="how-title" className={`${SECTION} landing-anchor pt-20 sm:pt-24`}>
-        <p className={KICKER}>How it works</p>
-        <h2 id="how-title" className={H2}>Three steps. About a minute.</h2>
-        <ol className="mt-8 grid gap-3 sm:grid-cols-3">
-          {STEPS.map((st, i) => (
-            <li key={st.title} className={TILE}>
-              <div className="flex items-center gap-3">
-                <span className="grid h-8 w-8 place-items-center rounded-full bg-[#14f195] text-[14px] font-bold text-[#04130d]">{i + 1}</span>
-                <Icon name={st.icon} className="h-5 w-5 text-white/50" />
+        {/* ---------- Desktop: pitch + why on the left, the card on the right, steps along the bottom ---------- */}
+        <div className="mx-auto hidden min-h-0 w-full max-w-6xl flex-1 flex-col px-8 lg:flex">
+          <div className="grid min-h-0 flex-1 grid-cols-[1.15fr_1fr] items-center gap-10">
+            <div>
+              <h1 className="landing-title landing-title--side anim-rise">SolSend</h1>
+              <p className="mt-2 text-[clamp(18px,1.7vw,24px)] font-medium leading-[1.25] tracking-[-0.02em] [text-shadow:0_2px_20px_rgba(11,6,24,0.6)]">
+                A burner card for every store,<br />paid straight from your Solana wallet.
+              </p>
+              <div className="mt-5 flex items-center gap-4">
+                {cta}
+                <p className="text-[13px] font-medium text-white/75">{hint}</p>
               </div>
-              <h3 className="mt-4 text-[17px] font-semibold tracking-[-0.01em]">{st.title}</h3>
-              <p className="mt-1.5 text-[15px] leading-[22px] text-white/65">{st.body}</p>
-            </li>
-          ))}
-        </ol>
-      </section>
-
-      {/* 2. Why it's safer, with the card illustration */}
-      <section aria-labelledby="why-title" className={`${SECTION} grid items-center gap-12 pt-24 lg:grid-cols-[1fr_380px]`}>
-        <div>
-          <p className={KICKER}>Why it&apos;s safer</p>
-          <h2 id="why-title" className={H2}>One card per store.<br />Useless anywhere else.</h2>
-          <ul className="mt-8 space-y-5">
-            {WHY.map((w) => (
-              <li key={w.title} className="flex gap-4">
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] bg-white/[0.06] text-[#14f195] ring-1 ring-white/10"><Icon name={w.icon} className="h-5 w-5" /></span>
-                <div>
-                  <h3 className="text-[17px] font-semibold tracking-[-0.01em]">{w.title}</h3>
-                  <p className="mt-0.5 text-[15px] leading-[22px] text-white/65">{w.body}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-        <DemoLoop />
-      </section>
-
-      {/* 3. Control + honesty */}
-      <section aria-label="Control and what's real" className={`${SECTION} grid gap-3 pt-24 sm:grid-cols-2`}>
-        <div className={TILE}>
-          <h2 className="flex items-center gap-2 text-[17px] font-semibold"><Icon name="shield" className="h-5 w-5 text-[#14f195]" />You stay in control</h2>
-          <p className="mt-2 text-[15px] leading-[22px] text-white/65">Freeze or close any card, or shut off all of them at once. If the card company goes down, your money never left your wallet.</p>
-        </div>
-        <div className={TILE}>
-          <h2 className="flex items-center gap-2 text-[17px] font-semibold"><Icon name="flask" className="h-5 w-5 text-[#14f195]" />What&apos;s real here?</h2>
-          <p className="mt-2 text-[15px] leading-[22px] text-white/65">This is a test version. Cards are sandbox cards and the money is test USDC, so no real store is ever charged. The Solana transactions are real (on devnet) and you can look them up.</p>
-        </div>
-      </section>
-
-      {/* 4. Last call to action */}
-      <section aria-labelledby="cta-title" className={`${SECTION} pt-24`}>
-        <div className="relative overflow-hidden rounded-[24px] bg-[linear-gradient(135deg,#2e1065,#4c1d95_55%,#0f5c43)] p-8 ring-1 ring-white/10 sm:flex sm:items-center sm:justify-between sm:p-10">
-          <div>
-            <h2 id="cta-title" className="text-[24px] font-semibold tracking-[-0.025em] sm:text-[28px]">Make your first card in a minute</h2>
-            <p className="mt-1.5 text-[15px] text-white/70">{authenticated ? "Pick a store and a limit. Test money only." : "Sign in with an email. Test money only."}</p>
+              <ul aria-label="Why it's safer" className="mt-7 grid max-w-xl gap-3.5 rounded-[20px] bg-[#0b0618]/50 p-4 ring-1 ring-white/10 backdrop-blur-md tall:gap-4 tall:p-5">
+                {WHY.map((w) => <Point key={w.title} badge={iconBadge(w.icon)} title={w.title} body={w.body} />)}
+              </ul>
+            </div>
+            <DemoLoop />
           </div>
-          {authenticated
-            ? <Link href="/cards/new" className="landing-cta-2 mt-6 shrink-0 sm:mt-0">Create a card</Link>
-            : <button type="button" onClick={() => login()} className="landing-cta-2 mt-6 shrink-0 sm:mt-0">{pending ? <Spinner /> : null}Get started</button>}
+          <div className="shrink-0 pb-4">
+            <p className="mb-2 text-[12px] font-semibold uppercase tracking-[0.12em] text-[#14f195]">How it works</p>
+            <ol className="grid grid-cols-3 gap-3">
+              {STEPS.map((st, i) => (
+                <Point key={st.title} badge={numBadge(i + 1)} title={st.title} body={st.body} className="rounded-[16px] bg-[#0b0618]/55 p-4 ring-1 ring-white/10 backdrop-blur-md" />
+              ))}
+            </ol>
+            {/* The sandbox pill (root layout) sits at the bottom-left of this row. */}
+            <p className="mt-3 flex min-h-7 items-center justify-end text-[12px] font-medium text-white/50">Solana · Lithic sandbox · QuickNode Streams</p>
+          </div>
+        </div>
+
+        {/* ---------- Phones and tablets: pitch, then the explanations in tabs ---------- */}
+        <div className="flex min-h-0 flex-1 flex-col items-center gap-4 px-4 pb-4 pt-3 text-center lg:hidden short:gap-2 short:pt-1">
+          <div className="flex flex-1 flex-col items-center [justify-content:safe_center]">
+            <h1 className="landing-title anim-rise">SolSend</h1>
+            <p className="mt-1 text-[clamp(16px,2.6vw,22px)] font-medium leading-[1.25] tracking-[-0.02em] [text-shadow:0_2px_20px_rgba(11,6,24,0.6)] short:hidden">
+              A burner card for every store,<br />paid straight from your Solana wallet.
+            </p>
+            <div className="mt-4 short:mt-2">{cta}</div>
+            <p className="mt-2 text-[12.5px] font-medium text-white/75 short:hidden">{hint}</p>
+          </div>
+          <InfoTabs />
         </div>
       </section>
-
-      <footer className={`${SECTION} mt-20 flex flex-col gap-3 border-t border-white/10 py-8 text-[13px] text-white/50 sm:flex-row sm:items-center sm:justify-between`}>
-        <p>Settles on Solana · Cards via Lithic sandbox · Events via QuickNode Streams</p>
-        <nav aria-label="Footer" className="-mx-2 flex items-center">
-          <a href="#how" className="inline-flex min-h-9 items-center px-2 hover:text-white">How it works</a>
-          <Link href="/status" className="inline-flex min-h-9 items-center px-2 hover:text-white">System status</Link>
-        </nav>
-      </footer>
     </div>
   );
 }
