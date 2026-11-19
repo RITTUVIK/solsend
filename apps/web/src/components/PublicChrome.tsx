@@ -6,11 +6,8 @@ import { useSession } from "@/client/session";
 import { AppTabBar, AppTabs, Logo } from "@/components/AppShell";
 import { MockBadge, Spinner } from "@/components/ui";
 
-/** Only same-origin app paths are allowed as a post-login destination (no "//host" or "/\host" open redirects). */
-export function safeNext(raw: string | null | undefined): string | null {
-  if (!raw || !raw.startsWith("/") || raw.startsWith("//") || raw.startsWith("/\\")) return null;
-  return raw;
-}
+/** Only same-origin app paths are allowed as a post-login destination (see client/safe-next.ts). */
+export { safeNext } from "@/client/safe-next";
 
 /**
  * Log-in trigger shared by the public pages. Never renders disabled before hydration: a click before the session is

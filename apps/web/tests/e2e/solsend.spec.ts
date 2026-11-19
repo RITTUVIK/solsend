@@ -380,6 +380,23 @@ test("QuickNode stream paused: no streamed claim anywhere; purchases still show 
   await shot(page, "20-stream-paused-activity");
 });
 
+// ?next= (return to a deep link after login) must never leave the site. Browsers drop tabs/newlines when they parse a
+// URL, so "/\t/evil.example" (?next=%2F%09%2Fevil.example) becomes "//evil.example": a prefix check alone is bypassable.
+test("post-login ?next= cannot redirect off-site (tab trick)", async ({ page }) => {
+  await page.goto("/?next=%2F%09%2Fevil.example");
+  await page.getByRole("button", { name: "Try the sandbox demo" }).click();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page).toHaveURL(/^http:\/\/(localhost|127\.0\.0\.1):\d+\/home$/);
+  await expect(page.getByTestId("balance")).toBeVisible();
+});
+
+test("post-login ?next= still returns to an in-app deep link", async ({ page }) => {
+  await page.goto("/?next=%2Factivity");
+  await page.getByRole("button", { name: "Try the sandbox demo" }).click();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page).toHaveURL(/^http:\/\/(localhost|127\.0\.0\.1):\d+\/activity$/);
+});
+
 test("status page renders health checks", async ({ page }) => {
   await page.goto("/status");
   await expect(page.getByTestId("overall")).toContainText("All systems operational");
