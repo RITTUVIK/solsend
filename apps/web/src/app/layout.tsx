@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { SANDBOX_BANNER } from "@solsend/shared";
 import { Providers } from "@/components/Providers";
+import { SplitFrame } from "@/components/SplitFrame";
 import "./globals.css";
 
 const sans = Geist({ subsets: ["latin"], variable: "--font-geist-sans", display: "swap", weight: ["400", "500", "600", "700"] });
@@ -30,7 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <span key={seg}>{i > 0 ? " " : ""}<span className="whitespace-nowrap">{seg}{i < all.length - 1 ? " ·" : ""}</span></span>
           ))}</span>
         </div>
-        <Providers>{children}</Providers>
+        <Providers><SplitFrame>{children}</SplitFrame></Providers>
       </body>
     </html>
   );

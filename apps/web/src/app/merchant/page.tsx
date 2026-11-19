@@ -7,7 +7,7 @@ import type { api } from "@solsend/shared";
 import { client, humanError } from "@/client/api";
 import { STORE_ART_NAME, cardArt } from "@/client/cardArt";
 import { MERCHANT_LABEL, displayStatus, isPresetStore, isUsable, sandboxName, usd, type DeclineFix } from "@/client/format";
-import { AppShell, useAppData } from "@/components/AppShell";
+import { useAppData } from "@/components/AppShell";
 import { ApprovalSheet, type PayAttempt } from "@/components/ApprovalSheet";
 import { CardVisual, StoreTile } from "@/components/CardVisual";
 import { FeedList } from "@/components/FeedList";
@@ -197,5 +197,5 @@ function StoreBanner({ merchant }: { merchant: Merchant }) {
 }
 
 export default function MerchantPage() {
-  return <AppShell><Suspense fallback={null}><Content /></Suspense></AppShell>;
+  return <Suspense fallback={null}><Content /></Suspense>; // AppShell comes from the layout (SplitFrame)
 }

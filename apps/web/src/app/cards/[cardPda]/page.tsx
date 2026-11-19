@@ -8,7 +8,7 @@ import { client, humanError, signAndSubmit } from "@/client/api";
 import { displayStatus, expiresIn, isPresetStore, isUsable, sandboxName, usd } from "@/client/format";
 import { usePoll } from "@/client/hooks";
 import { toast } from "@/client/toast";
-import { AppShell, useAppData } from "@/components/AppShell";
+import { useAppData } from "@/components/AppShell";
 import { CardVisual, LimitBar } from "@/components/CardVisual";
 import { FeedList, LiveDot } from "@/components/FeedList";
 import { Stepper } from "@/components/Stepper";
@@ -196,5 +196,5 @@ function Content() {
 }
 
 export default function CardDetailPage() {
-  return <AppShell><Content /></AppShell>;
+  return <Content />; // AppShell comes from the layout (SplitFrame)
 }

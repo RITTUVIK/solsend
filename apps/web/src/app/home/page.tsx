@@ -6,7 +6,7 @@ import { Suspense } from "react";
 import { explorerAddress } from "@solsend/shared";
 import { ApiCallError, client, humanError } from "@/client/api";
 import { blastRadius, displayStatus, shortId, usd, type CardView } from "@/client/format";
-import { AppShell, useAppData } from "@/components/AppShell";
+import { useAppData } from "@/components/AppShell";
 import { CardVisual } from "@/components/CardVisual";
 import { OutagePanel } from "@/components/OutagePanel";
 import { WalletSetup } from "@/components/WalletSetup";
@@ -194,5 +194,5 @@ function Content() {
 }
 
 export default function HomePage() {
-  return <AppShell><Suspense fallback={null}><Content /></Suspense></AppShell>;
+  return <Suspense fallback={null}><Content /></Suspense>; // AppShell comes from the layout (SplitFrame)
 }

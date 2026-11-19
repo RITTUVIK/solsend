@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ApiCallError, client, humanError, signAndSubmit } from "@/client/api";
 import { usePoll } from "@/client/hooks";
 import { KIND_LABEL, isPresetStore, sandboxName, type CardView } from "@/client/format";
-import { AppShell, useAppData } from "@/components/AppShell";
+import { useAppData } from "@/components/AppShell";
 import { CardVisual, StoreTile } from "@/components/CardVisual";
 import { Stepper, type Stage } from "@/components/Stepper";
 import { WalletSetup } from "@/components/WalletSetup";
@@ -223,5 +223,5 @@ function Content() {
 }
 
 export default function NewCardPage() {
-  return <AppShell><Content /></AppShell>;
+  return <Content />; // AppShell comes from the layout (SplitFrame)
 }

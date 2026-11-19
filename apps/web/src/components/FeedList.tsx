@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { client } from "@/client/api";
 import { FEED_POLL_MS } from "@/client/config";
 import { usePoll } from "@/client/hooks";
+import { useSession } from "@/client/session";
 import { sandboxName, storeName, timeAgo, usd, type FeedRow } from "@/client/format";
 import { voidErrorCopy, voidPurchase, type Voided } from "@/client/void";
 import { streamSummary } from "@/client/stream";
@@ -209,7 +210,8 @@ function DetailSheet({ it, onClose }: { it: Item | null; onClose: () => void }) 
 
 /** Live feed: polls GET /api/feed every 1.5 s. Rows that appear after the first load animate in. */
 export function FeedList({ cardPda, limit = 50, empty, showStream = false }: { cardPda?: string; limit?: number; empty?: string; showStream?: boolean }) {
-  const { data, error, loading, refresh } = usePoll(() => client.feed(cardPda), FEED_POLL_MS);
+  const owner = useSession().wallet;
+  const { data, error, loading, refresh } = usePoll(() => client.feed(cardPda), FEED_POLL_MS, true, owner ? `feed:${owner}:${cardPda ?? "all"}` : undefined);
   const seen = useRef<Set<string> | null>(null);
   const [open, setOpen] = useState<Item | null>(null);
   const groups = useMemo(() => {

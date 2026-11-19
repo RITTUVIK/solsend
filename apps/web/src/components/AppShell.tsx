@@ -7,7 +7,7 @@ import { explorerTx } from "@solsend/shared";
 import type { z } from "zod";
 import { client } from "@/client/api";
 import { DATA_POLL_MS } from "@/client/config";
-import { usePoll, type Polled } from "@/client/hooks";
+import { clearPollCache, usePoll, type Polled } from "@/client/hooks";
 import { isMockSig, shortId, type CardView } from "@/client/format";
 import { useSignNotice } from "@/client/notice";
 import { useSession } from "@/client/session";
@@ -65,9 +65,10 @@ export function AppTabBar() {
   );
 }
 
-function Data({ children }: { children: ReactNode }) {
-  const wallet = usePoll<Wallet>(client.wallet, DATA_POLL_MS);
-  const cards = usePoll(client.listCards, DATA_POLL_MS);
+function Data({ owner, children }: { owner: string; children: ReactNode }) {
+  // Cached per wallet so switching tabs shows the last balances/cards instantly while they refresh.
+  const wallet = usePoll<Wallet>(client.wallet, DATA_POLL_MS, true, `wallet:${owner}`);
+  const cards = usePoll(client.listCards, DATA_POLL_MS, true, `cards:${owner}`);
   return <Ctx.Provider value={{ wallet, cards }}>{children}</Ctx.Provider>;
 }
 
@@ -141,12 +142,13 @@ export function AppShell({ children, wide = false }: { children: ReactNode; wide
     <div className={`mx-auto flex min-h-[calc(100dvh-32px)] w-full flex-col ${wide ? "max-w-5xl" : "max-w-2xl"}`}>
       <header className="flex items-center justify-between gap-3 px-4 py-3">
         <div className="flex items-center gap-2">
-          <Link href="/home" className="rounded-lg" aria-label="SolSend home"><Logo /></Link>
+          {/* Desktop: the landing on the left already carries the logo. */}
+          <Link href="/home" className="rounded-lg lg:hidden" aria-label="SolSend home"><Logo /></Link>
           <MockBadge />
         </div>
         <AppTabs />
         {s.authenticated && (
-          <button type="button" onClick={() => void s.logout().then(() => router.replace("/"))} className="btn-ghost !min-h-10 !px-3 !text-[14px]" title={s.email ?? undefined}>Log out</button>
+          <button type="button" onClick={() => { clearPollCache(); void s.logout().then(() => router.replace("/")); }} className="btn-ghost !min-h-10 !px-3 !text-[14px]" title={s.email ?? undefined}>Log out</button>
         )}
       </header>
       <main className="flex-1 px-4 pb-4 pt-2">
@@ -156,7 +158,7 @@ export function AppShell({ children, wide = false }: { children: ReactNode; wide
             <Skeleton className="h-24" /><Skeleton className="aspect-[1.586] !rounded-[20px]" />
           </div>
         ) : (
-          <Data>{children}</Data>
+          <Data owner={s.wallet!}>{children}</Data>
         )}
       </main>
       <div className="px-4 pb-28 sm:pb-8"><SiteFooter inApp /></div>
