@@ -139,7 +139,8 @@ export function AppShell({ children, wide = false }: { children: ReactNode; wide
   const notice = useSignNotice();
   const gated = !s.ready || !s.authenticated || s.walletPending || !s.wallet;
   return (
-    <div className={`mx-auto flex min-h-[calc(100dvh-32px)] w-full flex-col ${wide ? "max-w-5xl" : "max-w-2xl"}`}>
+    // Desktop: the app pane can be dragged wider (PaneResizer); once it's wide enough, the content grows with it.
+    <div className={`mx-auto flex min-h-[calc(100dvh-32px)] w-full flex-col ${wide ? "max-w-5xl" : "max-w-2xl lg:@min-[1000px]/app-pane:max-w-4xl"}`}>
       <header className="flex items-center justify-between gap-3 px-4 py-3">
         <div className="flex items-center gap-2">
           {/* Desktop: the landing on the left already carries the logo. */}

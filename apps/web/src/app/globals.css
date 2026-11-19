@@ -244,4 +244,23 @@ dialog.sheet[open] > .sheet-body { animation: sheet-up .32s var(--ease-out) both
     animation: pane-in .55s var(--ease-out) both;
   }
   .app-pane-scroll { height: 100%; overflow-y: auto; overscroll-behavior: contain; }
+
+  /* Resize handle on the pane's left edge (components/PaneResizer.tsx). A 12 px hit area centred on the border, with a
+     grip that lights up mint on hover, focus and while dragging. It fades in once the pane has slid into place. */
+  .pane-resizer {
+    position: fixed; top: 0; bottom: 0; right: var(--app-w); z-index: 11; width: 12px; margin-right: -6px;
+    cursor: col-resize; touch-action: none; outline: none; animation: fade .3s .45s var(--ease-out) both;
+  }
+  .pane-resizer::after {
+    content: ""; position: absolute; top: 50%; left: 50%; width: 4px; height: 44px; margin: -22px 0 0 -2px; border-radius: 4px;
+    background: color-mix(in srgb, var(--ink-3) 45%, transparent); transition: background-color .15s, height .15s, margin .15s;
+  }
+  .pane-resizer:hover::after, .pane-resizer:focus-visible::after, .pane-resizing .pane-resizer::after { background: var(--mint); height: 72px; margin-top: -36px; }
+  .pane-resizer:focus-visible::after { box-shadow: 0 0 0 3px color-mix(in srgb, var(--mint) 35%, transparent); }
+  .pane-resizing, .pane-resizing * { cursor: col-resize !important; user-select: none; }
+  .pane-resizing .landing-shell { transition: none; }
 }
+/* Pages size themselves to the pane, not the window: `@min-[…]/app-pane:` variants (e.g. a 3-column card grid). */
+.app-pane-scroll { container: app-pane / inline-size; }
+.pane-resizer { display: none; }
+@media (min-width: 1024px) { .pane-resizer { display: block; } }

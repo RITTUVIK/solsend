@@ -132,7 +132,7 @@ function CardList({ list }: { list: CardView[] }) {
   return (
     <>
       {/* Mobile: Wallet-style stack (each card peeks 72px; the last is fully visible). ≥sm: grid. */}
-      <ul className="@container grid gap-3 sm:grid-cols-2 max-sm:gap-0">
+      <ul className="@container grid gap-3 sm:grid-cols-2 max-sm:gap-0 lg:@min-[1000px]/app-pane:grid-cols-3">
         {main.map((c, i) => (
           <li key={c.cardPda} className="relative transition-transform duration-200 hover:-translate-y-1 focus-within:-translate-y-1 max-sm:not-first:mt-[calc(72px-63.05cqw)]" style={{ zIndex: i }}>
             <Link href={`/cards/${c.cardPda}`} className="block rounded-[20px]" aria-label={`${c.label}, open card`} data-testid="card-tile">
@@ -144,7 +144,7 @@ function CardList({ list }: { list: CardView[] }) {
       {rest.length > 0 && (
         <details className="mt-4 rounded-[16px] bg-sunken/60 px-4 py-2">
           <summary className="flex min-h-10 cursor-pointer items-center justify-between text-[15px] font-medium text-ink-2">Closed cards ({rest.length})<Icon name="chevron" className="h-4 w-4" /></summary>
-          <ul className="@container grid gap-3 pb-2 pt-2 sm:grid-cols-2">{rest.map((c) => (
+          <ul className="@container grid gap-3 pb-2 pt-2 sm:grid-cols-2 lg:@min-[1000px]/app-pane:grid-cols-3">{rest.map((c) => (
             <li key={c.cardPda}><Link href={`/cards/${c.cardPda}`} className="block rounded-[20px]" aria-label={`${c.label}, open card`} data-testid="card-tile"><CardVisual card={c} showLimit /></Link></li>
           ))}</ul>
         </details>

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { AppShell } from "./AppShell";
 import { Landing } from "./Landing";
+import { PaneResizer } from "./PaneResizer";
 
 /** Signed-in app pages. They open in the right-hand pane (desktop) or full screen (phones and tablets). */
 export const isAppPath = (path: string) => /^\/(home|merchant|activity|cards)(\/|$)/.test(path);
@@ -21,9 +22,12 @@ export function SplitFrame({ children }: { children: ReactNode }) {
   return (
     <>
       {app ? (
-        <div className="app-pane" data-testid="app-pane">
-          <div className="app-pane-scroll"><AppShell>{children}</AppShell></div>
-        </div>
+        <>
+          <div className="app-pane" data-testid="app-pane">
+            <div className="app-pane-scroll"><AppShell>{children}</AppShell></div>
+          </div>
+          <PaneResizer />
+        </>
       ) : children}
       <Landing split={app} />
     </>
