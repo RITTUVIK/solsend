@@ -51,11 +51,25 @@ function Content() {
     const m = c && isPresetStore(c.merchantName) ? enumFor(c.merchantName) : c ? "OTHER_STORE" : null;
     if (m) { setMerchant(m); setAmount(PRODUCTS[m][Math.min(1, PRODUCTS[m].length - 1)]!.dollars); }
   }
+  // ?card= ("Pay at the sandbox store" right after creating a card): the shared cards list lives in the app shell and
+  // persists across pages, so it can be a poll behind and not list that card as issued yet. Refresh and wait for it
+  // instead of preselecting another card; fall back only if it still hasn't appeared after a few polls.
+  const wantedIssued = !!wanted && issued.some((c) => c.cardPda === wanted);
+  const [awaitWanted, setAwaitWanted] = useState(!!wanted);
+  useEffect(() => {
+    setAwaitWanted(!!wanted);
+    if (!wanted) return;
+    void cards.refresh();
+    const t = setTimeout(() => setAwaitWanted(false), 8000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wanted]);
   useEffect(() => {
     if (cardPda || issued.length === 0) return;
+    if (wanted && !wantedIssued && awaitWanted) return;
     pickCard(issued.find((c) => c.cardPda === wanted)?.cardPda ?? issued.find(isUsable)?.cardPda ?? issued[0]!.cardPda);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [issued.length, cardPda, wanted]);
+  }, [issued.length, cardPda, wanted, wantedIssued, awaitWanted]);
 
   const cents = Math.round(Number(amount) * 100);
   const amountOk = Number.isFinite(cents) && cents >= 1 && cents <= 5000;

@@ -397,6 +397,54 @@ test("post-login ?next= still returns to an in-app deep link", async ({ page }) 
   await expect(page).toHaveURL(/^http:\/\/(localhost|127\.0\.0\.1):\d+\/activity$/);
 });
 
+// Demo beats 2→3 (docs/DEMO-SCRIPT.md: a spare Temu card exists, create a new one, "Pay at the sandbox store"): the
+// store must preselect the card just created. The app shell's cards list persists across pages (split layout), so it
+// can be a poll behind and not list the new card as issued yet when the store opens; it must not fall back to another.
+test("Pay at the sandbox store preselects the card just created, not an older one", async ({ page }) => {
+  await login(page);
+  await page.getByTestId("faucet-btn").click();
+  await expect(page.getByTestId("faucet-done")).toBeVisible();
+  await createCard(page, { store: "Temu", label: "Spare Temu" });
+  await created(page);
+  await page.getByRole("link", { name: "Wallet", exact: true }).first().click(); // client-side: keeps the shell's list
+  await expect(page).toHaveURL(/\/home$/);
+  await page.getByTestId("new-card").click();
+  await page.getByRole("radio", { name: /^Temu/ }).click();
+  await page.getByLabel("Card name").fill("Demo Temu");
+  await created(page);
+  await page.getByRole("link", { name: "Pay at the sandbox store" }).click();
+  await expect(page).toHaveURL(/\/merchant\?card=/);
+  const picked = page.getByTestId("card-select").getByRole("radio", { checked: true });
+  await expect(picked).toHaveAccessibleName(/^Demo Temu,/);
+  await page.waitForTimeout(3500); // a later poll must not move the selection
+  await expect(picked).toHaveAccessibleName(/^Demo Temu,/);
+  await expect(page.getByTestId("pay")).toBeEnabled();
+});
+
+// Hard rule 2: the sandbox banner stays visible on every page. Below lg every sheet is a full-width bottom sheet in the
+// browser's top layer, so the banner must sit at the top there (a bottom-left pill would be hidden behind the payment
+// sheet on tablets).
+test.describe("tablet", () => {
+  test.use({ viewport: { width: 820, height: 1180 }, isMobile: false, hasTouch: true });
+  test("sandbox banner stays visible above the payment sheet", async ({ page }) => {
+    await login(page);
+    await page.getByTestId("faucet-btn").click();
+    await expect(page.getByTestId("faucet-done")).toBeVisible();
+    await createCard(page, { store: "Temu" });
+    await created(page);
+    await page.getByRole("link", { name: "Pay at the sandbox store" }).click();
+    await pay(page, null, "12");
+    const geo = await page.evaluate(() => {
+      const b = document.querySelector('[data-testid="sandbox-banner"]')!.getBoundingClientRect();
+      const s = document.querySelector("dialog[open] .sheet-body")!.getBoundingClientRect();
+      return { bannerTop: b.top, bannerBottom: b.bottom, sheetTop: s.top };
+    });
+    expect(geo.bannerTop).toBeGreaterThanOrEqual(0);
+    expect(geo.bannerBottom).toBeLessThanOrEqual(geo.sheetTop);
+    await expect(page.getByTestId("sandbox-banner")).toHaveText(BANNER);
+  });
+});
+
 test("status page renders health checks", async ({ page }) => {
   await page.goto("/status");
   await expect(page.getByTestId("overall")).toContainText("All systems operational");

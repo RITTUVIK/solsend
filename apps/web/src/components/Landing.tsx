@@ -143,13 +143,13 @@ export function Landing({ split = false }: { split?: boolean }) {
   return <Suspense fallback={null}><LandingInner split={split} /></Suspense>;
 }
 
-/** Height of the sandbox banner at the top of the page (phones only; it wraps to two lines on narrow ones). */
+/** Height of the sandbox banner at the top of the page (phones and tablets; it wraps to two lines on narrow ones). */
 function useBannerHeight() {
   const [h, setH] = useState(32);
   useEffect(() => {
     const el = document.querySelector<HTMLElement>('[data-testid="sandbox-banner"]');
     if (!el) return;
-    // Only the phone layout keeps the banner in the flow at the top; from sm up it's a pill pinned bottom-left.
+    // Below lg the banner stays in the flow at the top; from lg up it's a pill pinned bottom-left.
     const read = () => setH(getComputedStyle(el).position === "fixed" ? 0 : el.offsetHeight);
     read();
     const ro = new ResizeObserver(read);

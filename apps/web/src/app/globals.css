@@ -103,8 +103,8 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
-/* sm+: room under every page for the sandbox pill pinned bottom-left (see layout.tsx). */
-@media (min-width: 640px) { body { padding-bottom: 52px; } }
+/* lg+: room under every page for the sandbox pill pinned bottom-left (see layout.tsx). */
+@media (min-width: 1024px) { body { padding-bottom: 52px; } }
 /* A13: visible on any background, including dark buttons */
 :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; box-shadow: 0 0 0 5px color-mix(in srgb, var(--mint) 45%, transparent); border-radius: 10px; }
 ::selection { background: color-mix(in srgb, var(--mint) 45%, transparent); color: var(--ink); }
@@ -269,7 +269,9 @@ dialog.sheet[open] > .sheet-body { animation: sheet-up .32s var(--ease-out) both
   .pane-resizing, .pane-resizing * { cursor: col-resize !important; user-select: none; }
   .pane-resizing .landing-shell { transition: none; }
 }
-/* Pages size themselves to the pane, not the window: `@min-[…]/app-pane:` variants (e.g. a 3-column card grid). */
-.app-pane-scroll { container: app-pane / inline-size; }
+/* Pages size themselves to the pane, not the window: `lg:@min-[…]/app-pane:` variants (e.g. a 3-column card grid).
+   lg+ only, where those variants apply: on phones a size container could become the containing block for the fixed tab
+   bar, toasts and sign notice in some engines (older WebKit), pinning them to the page instead of the screen. */
+@media (min-width: 1024px) { .app-pane-scroll { container: app-pane / inline-size; } }
 .pane-resizer { display: none; }
 @media (min-width: 1024px) { .pane-resizer { display: block; } }
