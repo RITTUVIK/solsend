@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { safeNext } from "@/client/safe-next";
 import { useSession } from "@/client/session";
 import { AppTabBar, AppTabs, Logo } from "@/components/AppShell";
 import { MockBadge, Spinner } from "@/components/ui";
