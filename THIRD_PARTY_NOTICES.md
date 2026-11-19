@@ -5,9 +5,11 @@ own license in its package.
 
 ## "Onward Summit Template" by Kedhareswer Naidu (MIT License)
 
-- **Used in:** `apps/web/src/components/GlyphField.tsx` (the arrow-glyph field behind the Home hero, cut down and made
-  static) and the Home hero styles in `apps/web/src/app/globals.css` (`.landing-*`), used by
-  `apps/web/src/components/Landing.tsx`.
+- **Used in:** the Home hero layout and styles: the `.landing-*` rules in `apps/web/src/app/globals.css` and the hero
+  markup in `apps/web/src/components/Landing.tsx`. The arrow-glyph canvas (`apps/web/src/components/GlyphField.tsx`)
+  is no longer derived from the template: it was rewritten from scratch in a separate change (different drawing
+  structure, field maths and noise). That rewrite was written by an author who had read the adapted code, so it is an
+  independent reimplementation, not a clean-room one.
 - **Author:** Kedhareswer Naidu ([github.com/Kedhareswer](https://github.com/Kedhareswer), [kedhar.pages.dev](https://kedhar.pages.dev)).
 - **License:** MIT, as published by the author for this template.
 - **Open item (team):** the template's original download page and LICENSE file are not publicly listed any more. The

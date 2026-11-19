@@ -165,8 +165,8 @@ function useBannerHeight() {
 }
 
 /**
- * Home: everything on one screen, no scrolling. A midnight-purple field of arrows (adapted from the MIT "Onward Summit
- * Template", see components/GlyphField.tsx) behind the pitch, the steps, why it's safer and what's real. Desktop shows
+ * Home: everything on one screen, no scrolling. A midnight-purple field of arrows (components/GlyphField.tsx; the hero
+ * layout is adapted from the MIT "Onward Summit Template", see THIRD_PARTY_NOTICES.md) behind the pitch, the steps, why it's safer and what's real. Desktop shows
  * it all at once; phones show the explanations in a small tab panel.
  */
 function LandingInner({ split }: { split: boolean }) {
