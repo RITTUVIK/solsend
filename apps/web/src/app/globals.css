@@ -234,22 +234,25 @@ dialog.sheet[open] > .sheet-body { animation: sheet-up .32s var(--ease-out) both
 :root { --app-w: clamp(440px, 46vw, 720px); }
 @keyframes pane-in { from { transform: translateX(100%); } to { transform: none; } }
 .app-pane { animation: fade .3s var(--ease-out) both; }
-.landing-shell { transition: right .55s var(--ease-out); }
+/* No transition on the landing's right edge: animating it re-laid out the whole landing (and its canvas) on every
+   frame and dropped frames. It snaps to the narrow layout; only the pane moves, with a GPU-only transform. */
 @media (min-width: 1024px) {
   /* `contain: layout` makes the pane the containing block for its fixed children (toasts, notices), so they sit inside
      the pane instead of over the landing. The inner element scrolls, so those children don't scroll away. */
   .app-pane {
     position: fixed; inset: 0 0 0 auto; z-index: 10; width: var(--app-w); contain: layout;
     background: var(--paper); border-left: 1px solid var(--line); box-shadow: -30px 0 80px -40px rgb(11 6 24 / .7);
-    animation: pane-in .55s var(--ease-out) both;
+    animation: pane-in .45s cubic-bezier(.22, 1, .36, 1) both; will-change: transform; backface-visibility: hidden;
   }
+  /* While the pane slides in, the strip it will cover shows the landing's darkest colour instead of the page paper. */
+  body:has(.app-pane) { background: #0b0618; }
   .app-pane-scroll { height: 100%; overflow-y: auto; overscroll-behavior: contain; }
 
   /* Resize handle on the pane's left edge (components/PaneResizer.tsx). A 12 px hit area centred on the border, with a
      grip that lights up mint on hover, focus and while dragging. It fades in once the pane has slid into place. */
   .pane-resizer {
     position: fixed; top: 0; bottom: 0; right: var(--app-w); z-index: 11; width: 12px; margin-right: -6px;
-    cursor: col-resize; touch-action: none; outline: none; animation: fade .3s .45s var(--ease-out) both;
+    cursor: col-resize; touch-action: none; outline: none; animation: fade .25s .4s var(--ease-out) both;
   }
   .pane-resizer::after {
     content: ""; position: absolute; top: 50%; left: 50%; width: 4px; height: 44px; margin: -22px 0 0 -2px; border-radius: 4px;

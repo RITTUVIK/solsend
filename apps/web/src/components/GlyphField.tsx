@@ -1,7 +1,8 @@
 "use client";
 // Arrow-glyph field for the Home hero: a canvas of tiny arrows over the hero gradient, thinning out toward the middle.
 // Adapted from "Onward Summit Template" by Kedhareswer Naidu (MIT, https://kedhar.pages.dev), cut down to the hero
-// field. Deliberately STATIC: drawn once, and again only when its size changes. An animated version (cursor lean,
+// field. Deliberately STATIC: drawn once, and again only after its size settles (while it is resizing, e.g. the app pane
+// opening or the divider being dragged, the old bitmap is just stretched by CSS, so no frame pays for a redraw). An animated version (cursor lean,
 // opening ripple, shimmer) measured at ~56% idle main-thread CPU on desktop and 100% / 13 fps on a 4x-throttled phone.
 import { useEffect, useRef } from "react";
 
@@ -68,7 +69,6 @@ export function GlyphField() {
       lastW = W; lastH = H;
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
-      cv.style.width = `${W}px`; cv.style.height = `${H}px`;
       const spriteL = arrowSprite(LIGHT, dpr), spriteD = arrowSprite(DARK, dpr);
       const cols = Math.ceil(W / CELL) + 1, rows = Math.ceil(H / CELL) + 1;
       const ox = (W - (cols - 1) * CELL) / 2, oy = (H - (rows - 1) * CELL) / 2;
@@ -91,14 +91,15 @@ export function GlyphField() {
     };
 
     draw();
-    const ro = new ResizeObserver(draw);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const ro = new ResizeObserver(() => { clearTimeout(timer); timer = setTimeout(draw, 150); });
     ro.observe(wrap);
-    return () => ro.disconnect();
+    return () => { ro.disconnect(); clearTimeout(timer); };
   }, []);
 
   return (
     <div ref={wrapRef} className="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden="true">
-      <canvas ref={canvasRef} className="absolute left-0 top-0 block max-w-none" />
+      <canvas ref={canvasRef} className="absolute inset-0 block h-full w-full" />
     </div>
   );
 }
