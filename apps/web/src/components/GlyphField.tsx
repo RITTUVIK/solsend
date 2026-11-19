@@ -1,9 +1,9 @@
 "use client";
 // Arrow-glyph field for the Home hero: a canvas of tiny arrows over the hero gradient, thinning out around the
 // title. Adapted from "Onward Summit Template" by Kedhareswer Naidu (MIT, https://kedhar.pages.dev), cut down to the
-// hero field and deliberately calmer: arrows only lean a little near the pointer (no swelling, no click ripples, no
-// intro pulse), the idle shimmer is slow, and it redraws at ~30 fps when nothing is moving. Static under
-// prefers-reduced-motion, paused when off screen or in a background tab.
+// hero field and deliberately calmer: arrows only lean a little near the pointer (no swelling, no click ripples), one
+// ripple runs out from the title when the page opens (desktop only), the idle shimmer is slow, and it redraws at ~30 fps
+// when nothing is moving. Static under prefers-reduced-motion, paused when off screen or in a background tab.
 import { useEffect, useRef } from "react";
 
 const CELL = 13;
@@ -71,7 +71,11 @@ export function GlyphField() {
 
     let W = 1, H = 1, dpr = 1, n = 0;
     let xs = new Float32Array(0), ys = new Float32Array(0), wl = new Float32Array(0), wd = new Float32Array(0);
-    let grain = new Float32Array(0), ang = new Float32Array(0);
+    let grain = new Float32Array(0), ang = new Float32Array(0), scl = new Float32Array(0);
+    // The opening ripple (desktop: a fine pointer that can hover). One ring, ~1.9 s.
+    const desktop = window.matchMedia?.("(hover: hover) and (pointer: fine)").matches ?? false;
+    let ripple: { x: number; y: number; t0: number } | null = null;
+    const RIPPLE_MS = 1900;
     let spriteL: HTMLCanvasElement | null = null, spriteD: HTMLCanvasElement | null = null;
     const ptr = { x: 0, y: 0, on: false };
     let raf = 0, last = 0, visible = true, settled = true;
@@ -86,7 +90,7 @@ export function GlyphField() {
       const cols = Math.ceil(W / CELL) + 1, rows = Math.ceil(H / CELL) + 1;
       n = cols * rows;
       xs = new Float32Array(n); ys = new Float32Array(n); wl = new Float32Array(n); wd = new Float32Array(n);
-      grain = new Float32Array(n); ang = new Float32Array(n);
+      grain = new Float32Array(n); ang = new Float32Array(n); scl = new Float32Array(n).fill(1);
       const ox = (W - (cols - 1) * CELL) / 2, oy = (H - (rows - 1) * CELL) / 2;
       const rand = mulberry32(cols * 977 + rows);
       for (let j = 0, k = 0; j < rows; j++) {
@@ -105,25 +109,39 @@ export function GlyphField() {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, cv.width, cv.height);
       let moving = false;
+      if (ripple && t - ripple.t0 > RIPPLE_MS) ripple = null;
+      if (ripple) moving = true;
       for (let i = 0; i < n; i++) {
         const a0 = wl[i]!, b0 = wd[i]!;
         if (a0 + b0 < 0.012) continue;
         const x = xs[i]!, y = ys[i]!;
+        let boost = 0;
         if (!reduced) {
-          let target = 0;
+          let target = 0, tS = 1;
           if (ptr.on) {
             const dx = x - ptr.x, dy = y - ptr.y, d2 = dx * dx + dy * dy;
             if (d2 < R2) { let w = 1 - Math.sqrt(d2) / R; w = w * w * (3 - 2 * w); target = shortestAngle(Math.atan2(dy, dx) + Math.PI / 4) * w * 0.45; }
           }
+          if (ripple) {
+            const age = t - ripple.t0, dx = x - ripple.x, dy = y - ripple.y;
+            const dd = Math.abs(Math.sqrt(dx * dx + dy * dy) - age * 0.62);
+            if (dd < 56) {
+              const k = (1 - dd / 56) * (1 - age / RIPPLE_MS);
+              tS += 0.9 * k; boost = 0.7 * k;
+              target += shortestAngle(Math.atan2(dy, dx) + Math.PI / 4) * k * 0.6;
+            }
+          }
           ang[i]! += (target - ang[i]!) * 0.1;
-          if (Math.abs(ang[i]! - target) > 0.004) moving = true;
+          scl[i]! += (tS - scl[i]!) * 0.16;
+          if (Math.abs(ang[i]! - target) > 0.004 || Math.abs(scl[i]! - tS) > 0.004) moving = true;
         }
         const shimmer = reduced ? 1 : 0.86 + 0.14 * Math.sin((x + y * 0.8) * 0.011 - t * 0.0007);
         const g = grain[i]! * shimmer;
-        const a = ang[i]!;
-        if (Math.abs(a) < 0.003) ctx.setTransform(dpr, 0, 0, dpr, dpr * x, dpr * y);
-        else { const c = Math.cos(a) * dpr, s = Math.sin(a) * dpr; ctx.setTransform(c, s, -s, c, dpr * x, dpr * y); }
-        const la = clamp(a0 * g, 0, 1), da = clamp(b0 * g, 0, 1);
+        const a = ang[i]!, sc = scl[i]!;
+        if (Math.abs(a) < 0.003 && Math.abs(sc - 1) < 0.003) ctx.setTransform(dpr, 0, 0, dpr, dpr * x, dpr * y);
+        else { const c = Math.cos(a) * sc * dpr, s = Math.sin(a) * sc * dpr; ctx.setTransform(c, s, -s, c, dpr * x, dpr * y); }
+        const tot = a0 + b0;
+        const la = clamp(a0 * g + boost * (a0 / tot) * 0.7, 0, 1), da = clamp(b0 * g + boost * (b0 / tot) * 0.7, 0, 1);
         if (la > 0.01) { ctx.globalAlpha = la; ctx.drawImage(spriteL, -half, -half, CELL, CELL); }
         if (da > 0.01) { ctx.globalAlpha = da; ctx.drawImage(spriteD, -half, -half, CELL, CELL); }
       }
@@ -159,10 +177,12 @@ export function GlyphField() {
     const leave = () => { ptr.on = false; };
     host.addEventListener("pointermove", move);
     host.addEventListener("pointerleave", leave);
+    const intro = desktop && !reduced ? window.setTimeout(() => { ripple = { x: W / 2, y: H * 0.47, t0: performance.now() }; settled = false; start(); }, 350) : 0;
     start();
 
     return () => {
       cancelAnimationFrame(raf);
+      window.clearTimeout(intro);
       ro.disconnect(); io.disconnect();
       document.removeEventListener("visibilitychange", onVis);
       host.removeEventListener("pointermove", move);
