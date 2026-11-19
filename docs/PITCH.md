@@ -44,7 +44,7 @@ About 300 words outside the live part.
 
 **Worst case (2:55).** "So the worst case is a number you chose: the sum of your limits. A hacked store, a leaked number, even our own server cannot take more, and one tap revokes every card. Two things you still trust us for: our server reports which store is charging, and on the test network we can still upgrade the program. Before real money, that gets locked and audited."
 
-**Close (3:25).** "You'd reach for this at every new store and every free trial: email login, no seed phrase, no fees. Next is the hard part, and we know it: a real card issuer and a professional audit. SolSend: a burner card for every store. It holds nothing, it works in one place, and you can switch them all off." Stop. Leave the slide up.
+**Close (3:25).** "You'd reach for this at every new store and every free trial: email login, no seed phrase, no fees. Next is the hard part, and we know it: a real card issuer, a professional audit, and a checkout extension so the card appears where you shop. SolSend: a burner card for every store. It holds nothing, it works in one place, and you can switch them all off." Stop. Leave the slide up.
 
 ## Live-demo safety plan
 
@@ -62,32 +62,35 @@ About 300 words outside the live part.
 1. **Is this real money?**
    No. The cards are Lithic sandbox cards and the money is Solana devnet test USDC. No real merchant is charged and no card network settles. The Solana transactions are real devnet transactions, so every claim has a signature in [EVIDENCE.md](EVIDENCE.md).
 
-2. **Why isn't this on mainnet?**
+2. **Can I use one of these cards at Amazon today?**
+   No. These are sandbox cards, and Lithic's sandbox is not connected to payment networks, so no real store can accept them. The store names in the demo are sandbox labels. What you watched is a simulated checkout whose approval or decline is decided by a real Solana transaction. Real stores need a production issuer. A checkout extension that makes a card for the site you are on is the natural next surface, and it was this project's original idea. We have not built it, and it has to be designed so card numbers stay in the issuer's secure fields.
+
+3. **Why isn't this on mainnet?**
    The Allowances program we build on is live on mainnet at the same address, so the permission layer is not a devnet-only idea. Our own program holds the store lock and decides when money moves, it has not had a professional audit, and its upgrade key is still ours. We chose not to put that next to real money to win a weekend. The card side is the longer road: real cards need a licensed issuer and a sponsor bank, which is weeks of onboarding, not an API key.
 
-3. **What if your server is compromised?**
+4. **What if your server is compromised?**
    The settlement key can pull live cards only up to their remaining caps, and only into our treasury PDA. It cannot withdraw, raise a limit, unfreeze or pay anyone else; refunds go only to your stored account. The admin can pause settles and rotate the key, and you can revoke every card yourself in Solana's Allowances program. The assumption we cannot remove is that our server relays the card network's authorization and merchant ID truthfully; the program cannot verify Lithic's signature onchain.
 
-4. **How is the merchant lock enforced, if your server relays the merchant ID?**
+5. **How is the merchant lock enforced, if your server relays the merchant ID?**
    The cap and the expiry are enforced by Solana with no trust in us. The store check is also onchain, but it trusts the store ID our server relays from the card authorization, and in this sandbox our own demo store sets that ID. A compromised server could lie about the store; it could never exceed your caps. With real cards the ID would come from the card network, and stores that bill under several IDs are an open problem we would solve with lock-on-first-use or a merchant registry.
 
-5. **Why not just a virtual card, or Privacy.com?**
+6. **Why not just a virtual card, or Privacy.com?**
    They are real products and we are a sandbox. Privacy.com (built on Lithic) needs a US bank account and keeps the limits in its own systems; Rain's new scoped cards do the same with a pre-funded balance. The self-custodial cards we could document back one card with one spending approval shared by every store. In SolSend every card is its own allowance on Solana that you created and can revoke yourself, nothing is pre-funded, and if the issuer fails the card stops but your money never left your wallet. See [POSITIONING.md](POSITIONING.md).
 
-6. **Why Solana?**
+7. **Why Solana?**
    Capped, revocable delegation is a primitive in the Allowances program; PDAs make only our program able to pull; confirmation is fast enough to approve inside a card network's deadline (real sandbox approvals took 0.9 to 1.1 s; Lithic declines at 6 s and recommends 3 s); and a permanent record per authorization gives replay-proof idempotency.
 
-7. **What happens if confirmation is slow?**
+8. **What happens if confirmation is slow?**
    We decline. There is a hard 4.5 s deadline under Lithic's 6 s limit. If the settle lands after we declined, the reconciler refunds it, driven by Lithic's final transaction status. We found and fixed a gap in exactly that path during testing.
 
-8. **Why does a refund not restore the limit?**
+9. **Why does a refund not restore the limit?**
    A deliberate MVP rule: a refund returns USDC, but SolSend never silently re-grants spending permission. To spend more, create a new card or top up with your own signature. An opt-in restore is on the roadmap.
 
-9. **How does QuickNode fit?**
+10. **How does QuickNode fit?**
    Two ways. Its devnet RPC carries every settle on the hot path. And a Stream is our independent witness: on `solana-devnet`, with the `programs_with_logs` dataset, it runs a filter generated from our program's IDL and delivers each program event to an HMAC-verified webhook. That marks the Activity row as seen onchain, adds the slot, and cross-checks each settlement against the card authorization; a settlement with no approved authorization raises an alert. One delivery measured 584 ms after confirmation. Money decisions never wait on it, and on the trial it bills per block, so it runs during demo windows.
 
-10. **Who audited this?**
+11. **Who audited this?**
    The Allowances program we build on was audited by Cantina; that is its mainnet build, and our tests pass against both that build and the newer devnet one. Our own code had two adversarial security reviews, one of the program and one of the backend. They were AI-assisted: separate review agents with fresh context, working from the code alone. Neither found a Critical issue; every High, Medium and Low finding was fixed and pinned as a regression test. To be clear, this is not a professional audit. That comes before any mainnet use, and the program is upgradeable on devnet.
 
-11. **What is next, and is this a business?**
+12. **What is next, and is this a business?**
     Freeze or multisig the upgrade authority and get a professional audit before any mainnet use; a real issuing partner; a refund-aware treasury; recurring-pull UX. The pain is real: consumers underestimate subscription spending by $133 a month and 42% pay for one they stopped using ([CNBC](https://www.cnbc.com/2022/09/06/consumers-underestimate-monthly-subscription-costs-by-at-least-100.html)). We have not validated willingness to pay.

@@ -32,7 +32,7 @@ As far as we could find, this is the first working demo that backs each payment 
 
 ## What would you build next?
 
-First, freeze the program or move to a multisig upgrade authority and commission a professional audit before any mainnet use; the full list is in docs/MAINNET-READINESS.md. Second, partner with a real card issuer, which brings compliance work, so SolSend can move from a sandbox to cards people use every day at real stores. Third, a refund-aware treasury with capped withdrawal and real treasury-to-issuer settlement, plus incremental authorizations and partial captures. Fourth, recurring-pull UX: clear previews of each upcoming subscription charge, so a subscription card shows what it will pull and when. Finally, an opt-in setting to restore a limit after a refund.
+First, freeze the program or move to a multisig upgrade authority and commission a professional audit before any mainnet use; the full list is in docs/MAINNET-READINESS.md. Second, partner with a real card issuer, which brings compliance work, so SolSend can move from a sandbox to cards people use at real stores. Third, meet people where they shop: a checkout browser extension (SolSend's original idea) that makes a card for the store you are on, designed so card details stay in the issuer's secure fields, and funding by card or bank through an on-ramp so nobody needs to hold crypto first. Fourth, a refund-aware treasury with real treasury-to-issuer settlement, plus incremental authorizations and partial captures. Finally, clear previews of each upcoming subscription charge, and an opt-in setting to restore a limit after a refund.
 
 ## Track, chain award, bounty
 

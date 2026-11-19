@@ -45,16 +45,19 @@ After recording: `pnpm qn:stream pause`, then `pnpm qn:stream get` must say `pau
 
 | Time | Clip | Voiceover | Caption on screen |
 |---|---|---|---|
-| 0:00–0:10 | 5 | "A store just leaked my card number. A thief tries it at Amazon. *(Declined appears.)* Declined. That number is useless anywhere else." | First 2 s: **This card number just leaked.** Then: Sandbox card · test money · no real purchase |
-| 0:10–0:22 | 9, then 1 | "This is SolSend: a burner card for every store. Each card holds zero dollars. My money stays in my own wallet until the moment I pay." | **solsend** · A burner card for every store |
-| 0:22–0:38 | 2 | "A new store gets a new card. Temu only, forty dollars at most. One tap to approve. I signed in with my email: no seed phrase, and we pay the network fees." | Email login · no seed phrase · no fees |
-| 0:38–1:02 | 3 | "Now, twelve-dollar earbuds. Watch the order. The card network asks us to approve. We move the money on Solana first. *(Approved appears.)* Only when that is confirmed do we say yes." Then read the time chip aloud. | **Money moves first. Approval second.** |
-| 1:02–1:14 | 4 | "This is that payment on Solana's public explorer. Our program calls the Solana Foundation's Allowances program. That is where the card's limit lives, not in our database." | Box the two programs and label them: **SolSend program** · **Solana Subscriptions & Allowances** |
-| 1:14–1:36 | 3 (zoom on the badge), frame, then 7 | "And we don't just take our own server's word for it. A QuickNode Stream reads our program's events straight from Solana and delivers each one to us. That badge appears only when the delivery really arrives." **If the new build is live, add:** "The line under it is the Stream's own cross-check: same amount, same card." | **QuickNode Streams: an independent witness** |
-| 1:36–1:54 | 6 | "Free trials. I started a Netflix trial earlier, on a card that expires by itself. Now Netflix tries to bill me. *(Declined.)* Declined. Nothing to cancel." | Demo expiry: 2 minutes. Real cards: 7, 14 or 30 days |
-| 1:54–2:14 | 8 | "And if I ever want out, one tap switches every card off. I sign it myself, and it goes to Solana's own Allowances program, so the permissions are gone on the chain, not just in our app. My balance never moved." | One transaction. Every card off. |
-| 2:14–2:36 | End card | "Everything you saw is a working sandbox: test cards and test money on Solana's test network, and every result is a public transaction. Next: a real card issuer and a professional audit. SolSend. A burner card for every store." | (the end card carries it) |
+| 0:00–0:07 | 3, short cut: the store, **Pay**, **Approved** | "I'm buying from a store I've never used. So I pay with a card that only works there." | Sandbox card · test money · no real purchase |
+| 0:07–0:16 | 5 | "Later that store leaks my number, and a thief tries it at Amazon. *(Declined appears.)* Declined. Useless anywhere else." | **The same card number, tried at another store** |
+| 0:16–0:27 | 9, then 1 | "This is SolSend: a burner card for every store. Each card holds zero dollars. My money stays in my own wallet until the moment I pay." | **solsend** · A burner card for every store |
+| 0:27–0:42 | 2 | "Making that card took one tap. Temu only, forty dollars at most. I signed in with my email: no seed phrase, and we pay the network fees." | Email login · no seed phrase · no fees |
+| 0:42–1:04 | 3, in full at real speed | "Now watch that first payment again, slowly. The card network asks us to approve. We move the money on Solana first. *(Approved appears.)* Only when that is confirmed do we say yes." Then read the time chip aloud. | **Money moves first. Approval second.** |
+| 1:04–1:16 | 4 | "This is that payment on Solana's public explorer. Our program calls the Solana Foundation's Allowances program. That is where the card's limit lives, not in our database." | Box the two programs and label them: **SolSend program** · **Solana Subscriptions & Allowances** |
+| 1:16–1:38 | 3 (zoom on the badge), frame, then 7 | "And we don't just take our own server's word for it. A QuickNode Stream reads our program's events straight from Solana and delivers each one to us. That badge appears only when the delivery really arrives. The line under it is the Stream's own cross-check: same amount, same card." | **QuickNode Streams: an independent witness** |
+| 1:38–1:56 | 6 | "Free trials. I started a Netflix trial earlier, on a card that expires by itself. Now Netflix tries to bill me. *(Declined.)* Declined. Nothing to cancel." | Demo expiry: 2 minutes. Real cards: 7, 14 or 30 days |
+| 1:56–2:16 | 8 | "And if I ever want out, one tap switches every card off. I sign it myself, and it goes to Solana's own Allowances program, so the permissions are gone on the chain, not just in our app. My balance never moved." | One transaction. Every card off. |
+| 2:16–2:38 | End card | "Everything you saw is a working sandbox: test cards and test money on Solana's test network, and every result is a public transaction. Next: a real card issuer and a professional audit. SolSend. A burner card for every store." | (the end card carries it) |
 
+- **Why it opens on a purchase:** the viewer sees a normal checkout first, so the decline nine seconds later reads as a story (shop, leak, declined), not as a security test. Clip 3 is used twice: trimmed to the tap and the result at the start, and in full at 0:42. Trim the wait; never speed it up.
+- **The store names are sandbox labels.** No purchase is made at any real store, and the caption in the first frame says so.
 - **The time chip:** say "under a second" only if the chip shows less than 1000 ms. Otherwise read the number.
 - **Cut order if over 2:55:** shorten clip 4 to 8 seconds, then trim clip 2. Never cut the QuickNode segment, the sandbox caption or the end card.
 - **Length rule:** 2 to 3 minutes (guide, "What to Submit"). Check the exported file, not the editor timeline.
@@ -74,7 +77,7 @@ The stream has been paused since 18 November, on purpose. Production has recorde
 |---|---|
 | Wallet too low for another take | Void the last purchase (Activity → **Simulate store refund**), wait for "Refunded to your wallet", retake. |
 | "Waiting for QuickNode Stream…" for more than 5 seconds | Stop. `pnpm qn:stream get`. If it is paused, `activate`. Do not record around it. |
-| The stream cannot be restored in 20 minutes | Record without the badge, drop the 1:14 segment, Then decide whether to keep the bounty entry, citing the recorded 18 November delivery ([lead-deployed-e2e.md](evidence/lead-deployed-e2e.md)) instead. Never fake the badge. |
+| The stream cannot be restored in 20 minutes | Record without the badge and drop the 1:16 segment. Then decide whether to keep the bounty entry, citing the recorded 18 November delivery ([lead-deployed-e2e.md](evidence/lead-deployed-e2e.md)) instead. Never fake the badge. |
 | A payment declines for time | That is the product declining by design. Retake. |
 | A wallet approval window fails | Switch to a second browser profile that is already logged in. |
 | Netflix card not expired yet | Wait. It needs two minutes from creation. |

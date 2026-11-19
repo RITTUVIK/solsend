@@ -217,3 +217,4 @@ The Home hero's layout and styles are adapted from Kedhareswer Naidu's "Onward S
 - Recurring-pull UX for subscription cards.
 - A refund-aware treasury, incremental authorizations and partial captures, and an opt-in "restore limit on refund".
 - A real issuing partner and the compliance work that comes with it.
+- Meet people where they shop. A checkout browser extension (the project's original idea) that makes a card for the store you are on, and funding by card or bank through an on-ramp so nobody needs to hold crypto first. Neither is built. Today card details appear only inside the issuer's hosted fields and never reach our servers or our page, and an extension would have to keep it that way; we have not yet evaluated the ways to do that (issuer-hosted fields, network tokens, wallet provisioning).
