@@ -8,8 +8,8 @@
 //!
 //! Trust model (docs/TRUST.md): the settlement authority can pull a live card up to its onchain
 //! allowance into the program treasury and nowhere else; refunds go only to the card's stored
-//! source token account; the admin can pause, rotate the settlement key and withdraw the treasury
-//! only to a fixed destination; users can revoke any card directly in the Allowances program.
+//! source token account; the admin can pause and rotate the settlement key, and there is no treasury
+//! withdrawal instruction; users can revoke any card directly in the Allowances program.
 //!
 //! IDL STABILITY: account structs, instruction names/args/account order and events below are the
 //! CP1 contract consumed by packages/shared. Changing them requires coordinator approval.

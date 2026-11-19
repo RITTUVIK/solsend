@@ -9,6 +9,7 @@
   "scripts": {
     "build:program": "NO_DNA=1 anchor build && cp target/idl/solsend.json packages/shared/idl/solsend.json",
     "test:program": "cargo test -p solsend -- --test-threads=1",
+    "test:program:mainnet": "ALLOWANCES_SO=\"$PWD/target/fixtures/subscriptions_mainnet.so\" cargo test -p solsend -- --test-threads=1",
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "pnpm -r --if-present test",
     "dev": "pnpm --filter @solsend/web dev",
