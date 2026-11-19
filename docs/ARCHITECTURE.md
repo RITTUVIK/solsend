@@ -47,7 +47,7 @@ flowchart LR
   UI -->|"issue card"| LI
 ```
 
-QuickNode appears twice on purpose: it is the **RPC** for every transaction we send and the **Stream** that feeds the activity page. A GitHub Actions cron also calls `/api/reconcile` as a safety net.
+QuickNode appears twice on purpose: it is the **RPC** for every transaction we send and the **Stream** that independently confirms each onchain event in the activity page and cross-checks every settlement against its card authorization. A GitHub Actions cron also calls `/api/reconcile` as a safety net.
 
 ## Flows
 

@@ -2,9 +2,9 @@
 
 Tagline: **A burner card for every store — your money stays in your wallet until the moment you pay.**
 
-About 4 minutes of demo. The 5-minute finals pitch in [PITCH.md](PITCH.md) wraps this demo; the 2:45 video ([VIDEO-PLAN.md](VIDEO-PLAN.md)) follows the same beats. Everything is **Lithic sandbox + Solana devnet test USDC**. Say so in the first ten seconds and never imply otherwise. Merchant names are sandbox labels, always "(sandbox)" in the UI.
+About 4 minutes of demo when run in full (for a booth, a call or office hours). The finals slot is **4 minutes in total**, so the pitch in [PITCH.md](PITCH.md) uses only beats 3, 4 and 5 of this script; the video ([VIDEO-PLAN.md](VIDEO-PLAN.md)) follows the same beats. Everything is **Lithic sandbox + Solana devnet test USDC**. Say so in the first ten seconds and never imply otherwise. Merchant names are sandbox labels, always "(sandbox)" in the UI.
 
-Live app: https://solsend-ashen.vercel.app. Tabs at the bottom (mobile) or top (desktop): **Wallet**, **Demo store**, **Activity**. Labels below are quoted from the UI v2 code and screenshots ([evidence/ui-v2](evidence/ui-v2/README.md)); the screenshots there are **mock mode**, so exact dollar figures on your screen will differ.
+Live app: https://solsend-ashen.vercel.app. Tabs at the bottom (mobile) or top (desktop): **Home**, **Wallet**, **Demo store**, **Activity**. On a desktop-width window the app opens in a pane on the right with the landing page on the left; on a phone-width window it takes the whole screen. Labels below are quoted from the UI v2 code and screenshots ([evidence/ui-v2](evidence/ui-v2/README.md)); the screenshots there are **mock mode**, so exact dollar figures on your screen will differ.
 
 **Never show a full card number, expiry or CVV on screen, even sandbox ones:** do not open card **Details** during the demo or the recording. The masked card (`•••• 1234`) is enough.
 
@@ -32,7 +32,7 @@ Cumulative timing. "Say" is one or two plain sentences.
 
 ### 1. Hook (0:00 to 0:25)
 
-- **On screen:** the landing page: headline "A burner card for every store." and the amber banner "Sandbox cards · Solana devnet USDC · no real merchants are charged".
+- **On screen:** the landing page (**Home**): the solsend wordmark, the line "A burner card for every store, paid straight from your Solana wallet." and the sandbox notice "Sandbox cards · Solana devnet USDC · no real merchants are charged" (a bar at the top on phones, a pill at the bottom left on desktop).
 - **Say:** "Every card you save online is a liability: stores get breached, numbers leak, and free trials quietly become subscriptions. Everything here is a sandbox with devnet test USDC, and SolSend gives you a burner card for every store while your money stays in your wallet until the moment you pay."
 
 ### 2. Create a $40 Temu card (0:25 to 1:00)
@@ -52,7 +52,7 @@ Cumulative timing. "Say" is one or two plain sentences.
 
 - **Click:** in the same sheet tap **Try this card's number at Amazon**. The store switches to Amazon and an amber callout appears: "This card is locked to Temu (sandbox). Paying at Amazon simulates a thief using a leaked card number." Tap **Try the leaked number at Amazon**.
 - **Expect:** **Declined**, "Card locked to another store", and "This card only works at Temu (sandbox). A leaked number is useless anywhere else. Your USDC didn't move." The proof row reads **Rejected onchain** with **View failed tx on Explorer (devnet)**; open it: a failed devnet transaction. Wallet "didn't move".
-- **Say:** "If Temu leaks this number, a thief at Amazon is declined onchain, even on first use, with the failed transaction as proof. Each payment must match the store ID the card network reports; our server relays it, and Solana enforces the lock and the cap."
+- **Say:** "If Temu leaks this number, a thief at Amazon is declined onchain, even on first use, with the failed transaction as proof. Each payment must match the card's store ID; our server relays it from the card authorization, and Solana enforces the lock and the cap." (In this sandbox our demo store sets that ID when it asks Lithic to simulate the purchase.)
 - **Click:** **Pay at Temu instead**, then tap **Drone $45**, then **Pay $45.00 with •••• NNNN**.
 - **Expect:** **Declined** by the card's remaining limit (only $28.00 is left); the sheet's explanation and its fix button come from the decline copy, so read what it says. Rejected-onchain proof row again.
 - **Say:** "A forty-five-dollar drone is declined by the cap: the Allowances program itself refuses it." Tap **Done**.
@@ -68,20 +68,20 @@ Cumulative timing. "Say" is one or two plain sentences.
 
 - **Click:** **Activity**. On the $12 Temu row tap **Simulate store refund**, then in the sheet "Void this purchase?" tap **Void purchase**. Then go to **Wallet**.
 - **Expect:** the row shows "Refund on its way: sandbox voids are asynchronous (usually under a minute)", then "Refunded to your wallet" with **Refund transaction (devnet)**; the row reads "Refunded +$12.00". Home shows "Most that can ever be pulled: $X across N live cards — even by SolSend." Void timeline order: Approved, Voided by the store, Refunded to your wallet onchain.
-- **Say:** "The home screen shows my blast radius: the most anyone can ever pull is the sum of my caps. The void sends my USDC back onchain, but the card's limit stays used on purpose, because we never silently re-grant spending permission."
+- **Say:** "The Wallet screen shows my blast radius: the most a store, a leak or our own server can pull is the sum of my caps. The void sends my USDC back onchain, but the card's limit stays used on purpose, because we never silently re-grant spending permission."
 - **Timing tip:** do the void right after beat 3 if the refund is slow on rehearsal; the Lithic sandbox void is asynchronous and the refund follows its event.
 
 ### 7. The issuer dies (3:30 to 4:00)
 
 - **Click:** on **Wallet**, scroll to the Safety card "If the card issuer goes down". Tap **Revoke all cards…**. In the sheet "Revoke N cards?" tap **Revoke all cards**. The sheet closes, the Safety card shows "Approve the revoke in your wallet window", and Privy's approval window opens on top. Approve once. If you cancel, it says nothing was sent and the cards are unchanged; tap **Try revoking again…**.
 - **Expect:** "All cards revoked in one transaction." "Balance still $Y — nothing was moved. No card can pull again." and a **Revoked on Solana** proof row.
-- **Say:** "When Solflare's card issuer Kulipa wound down, the card paused but the money stayed in wallets. Same here: if our issuer disappears, my money never left my wallet, and one transaction revokes every card, sent straight to Solana's audited Allowances program, not ours."
+- **Say:** "When Solflare's card issuer Kulipa wound down, the card paused but the money stayed in wallets. Same here: if our issuer disappears, my money never left my wallet, and one transaction that I sign revokes every card. It is addressed to Solana's Allowances program, not ours."
 - **Optional:** the URL `/home?demo=outage` shows the Safety card as "Card issuer unreachable (simulated)".
 
 ### 8. Tech close (4:00 to 4:20)
 
 - **On screen:** the architecture diagram ([ARCHITECTURE.md](ARCHITECTURE.md)) or `/status`.
-- **Say:** "Underneath: Solana's official, audited Allowances program plus our Anchor program, with 41 tests against the real Allowances binary and two adversarial AI-assisted security reviews with every finding fixed. We approve only after a confirmed settle; a hosted cold start is 2.4 seconds against Lithic's 6-second limit; and a QuickNode Stream drives the live feed, about half a second after confirmation."
+- **Say:** "Underneath: Solana's official Allowances program plus our Anchor program, with 41 tests that pass against both its devnet build and its audited mainnet build, and two adversarial AI-assisted security reviews with every High, Medium and Low finding fixed. We approve only after a confirmed settle: 0.9 seconds in our live run, against Lithic's 6-second limit. And a QuickNode Stream is our independent witness: it delivers each event from the chain and cross-checks it against the card authorization."
 - **After:** `pnpm qn:stream pause`, confirm `paused`.
 
 ## Fallback plan
@@ -90,7 +90,7 @@ Cumulative timing. "Say" is one or two plain sentences.
 |---|---|
 | Demo store errors or Lithic sandbox is slow | CLI from [DEPLOY.md](DEPLOY.md) section 5, run from `scripts/`: `pnpm merchant-sim list`, `pnpm merchant-sim buy <cardToken> TEMU 1200`, `pnpm merchant-sim void <txToken>`. Same Lithic simulation and ASA; never prints the card number. A handful of requests only |
 | Privy login or a signature popup fails | Switch to the second browser profile, already logged in and funded |
-| QuickNode badge or feed row does not appear | Say so; the settle and Explorer link are the proof, the feed is a notification layer. Check `pnpm qn:stream get` shows active |
+| QuickNode badge does not appear | Say so; the settle and Explorer link are the proof, and the Stream is an independent second check, not part of the payment. Check `pnpm qn:stream get` shows active |
 | Void refund is slow | Continue; the Lithic event and the reconciler both trigger it. Show the recorded refund (E3 in [EVIDENCE.md](EVIDENCE.md)) |
 | Netflix card was not created in time or has not expired | Skip beat 5 and give the time to beat 8 |
 | Everything is down | Play the backup video, or walk [evidence/ui-v2](evidence/ui-v2/README.md) screenshots, stating they are **mock mode** with illustrative signatures; then show the real devnet signatures in [EVIDENCE.md](EVIDENCE.md) |
@@ -105,7 +105,7 @@ Longer answers are in [PITCH.md](PITCH.md). Short versions:
 4. **Why Solana?** The Allowances program gives capped, revocable delegation; PDAs make only our program the delegatee; confirmation fits a card network's deadline.
 5. **What if confirmation is slow?** We decline: hard 4.5 s deadline under Lithic's 6 s. A settle that lands late is refunded by the reconciler.
 6. **Why does a refund not restore the limit?** A deliberate MVP rule: SolSend never silently re-grants spending permission.
-7. **How does QuickNode fit?** Its devnet RPC carries every settle, and a Stream on our program feeds the live feed (+584 ms after confirmation in our deployed test).
+7. **How does QuickNode fit?** Its devnet RPC carries every settle, and a Stream on our program is our independent witness: it delivers each event from the chain's own log, adds the slot, and cross-checks every settlement against the card authorization (one delivery measured 584 ms after confirmation).
 8. **What is next?** Freeze or multisig the upgrade authority plus a professional audit, a real issuing partner, a refund-aware treasury, and recurring-pull UX.
 
 ## Do not say
@@ -113,5 +113,5 @@ Longer answers are in [PITCH.md](PITCH.md). Short versions:
 - That a real purchase happened at Temu, Amazon, Netflix or Corner Cafe.
 - That card-network settlement is live, or that anything runs on mainnet.
 - That the screenshots are live captures (they are mock mode).
-- That the free-trial expiry proof came from a Lithic run. It was a direct program-level devnet test (settlement-authority signed, no card network involved).
+- That the `42fhAuNK…` expiry proof came from a Lithic run. That one was a direct program-level devnet test. The live Lithic run is `3q4HQCQf…` from the 18 November rehearsal; cite that one.
 - Any number not in [EVIDENCE.md](EVIDENCE.md) or the evidence files.

@@ -75,10 +75,10 @@ Earlier real-Lithic runs against a local server through a tunnel (W2) are record
 | # | Claim | Evidence |
 |---|---|---|
 | Q1 | Deployed: `CardSettled` delivered to the Vercel webhook **+584 ms** after the settle was confirmed (06:25:43.364 to 06:25:43.948); feed row `settled` / `quicknode` | [lead-deployed-e2e.md](evidence/lead-deployed-e2e.md); settle [`3Nah6LUMJX…`](https://explorer.solana.com/tx/3Nah6LUMJXd8iwqBLK2BbGg5sN7VmcaEZMS9XFncBA557VfG57zbcMUEyzrZy6UbJ5XUUk9kcJRVxuQoap2V3nSM?cluster=devnet) |
-| Q2 | `CardRefunded` delivered at 06:26:39.999; deduped against the reconciler's row and enriched with `source=quicknode` and slot | [lead-deployed-e2e.md](evidence/lead-deployed-e2e.md); refund [`5eNWPKCdzg…`](https://explorer.solana.com/tx/5eNWPKCdzgjYZAheB8hUTtasQBST8JAyftd3baGzBN72Rdy6hSd4ucod5GxbzT7Pb9GmimxehrRE7WnLX4NkTjR9?cluster=devnet) |
+| Q2 | `CardRefunded` delivered at 06:26:39.999; deduped against the reconciler's row. (That row still reads `reconciler`: the code that marks an existing row as streamed and adds its slot was added two minutes after this delivery, and is unit-tested but has not yet run against a live delivery.) | [lead-deployed-e2e.md](evidence/lead-deployed-e2e.md); refund [`5eNWPKCdzg…`](https://explorer.solana.com/tx/5eNWPKCdzgjYZAheB8hUTtasQBST8JAyftd3baGzBN72Rdy6hSd4ucod5GxbzT7Pb9GmimxehrRE7WnLX4NkTjR9?cluster=devnet) |
 | Q3 | Stream paused and verified after the window | lead-deployed-e2e.md |
 | Q4 | Filter decodes all 7 SolSend events; ignores `Program data:` lines emitted in a CPI to another program; runs in a sandboxed `vm` self-test; QuickNode's own filter test returned HTTP 201 with no errors; CI fails on filter drift | [w4-streams.md](evidence/w4-streams.md) |
-| Q5 | CP0b live Stream (earlier spike program, not the final one): 5 real transactions delivered and HMAC-verified, confirmed to webhook p50 373 ms (n=5); replay returned 409; tampered or forged returned 401 | [GATE0.md](../GATE0.md) (G0.7) |
+| Q5 | CP0b live Stream (earlier spike program, not the final one): 5 real transactions delivered and HMAC-verified, confirmed to webhook p50 373 ms (n=5); replay returned 409 (the current webhook acknowledges a repeated delivery with 200 and does not process it, so retries cannot pause the stream); tampered or forged returned 401 | [GATE0.md](../GATE0.md) (G0.7) |
 | Q6 | Limits found: free plan caps `getMultipleAccounts` at 5; `programs_with_logs` lists top-level instructions only (so the program emits its own events); billed per processed block; usage API returns 403 for the Streams key | GATE0.md, w4-streams.md |
 
 ## 5. Audits and security review
@@ -93,6 +93,7 @@ Earlier real-Lithic runs against a local server through a tunnel (W2) are record
 | A6 | AI-assisted adversarial backend review (separate review agent; not a professional audit): no Critical finding; 1 High, 5 Medium, 3 Low and Info findings fixed; 9 confirming tests are permanent regressions (7 failed before the fixes); 107 web unit tests pass | [audit-backend-cp1.md](evidence/audit-backend-cp1.md), `apps/web/src/server/__test__/audit.regression.test.ts` |
 | A7 | Post-audit deployed re-verification: real Lithic sandbox approve (token `ce7b1d47-e4ff-4827-b49b-e5fbeae5e9c6`) only after settle [`rn4fpLVA…`](https://explorer.solana.com/tx/rn4fpLVAGe2T6ZdFFDX87UbPfqALUDQyEZvarzKrEsD8H9mhnhynTZ5J9PvkSPLZS6feCbSJ6KqqmnEydAMaNY3?cluster=devnet) confirmed; 9 sensitive routes return 401; `/api/status` 11/11 | [audit-backend-cp1.md](evidence/audit-backend-cp1.md), [lead-deployed-e2e.md](evidence/lead-deployed-e2e.md) |
 | A8 | Program tests: 41 LiteSVM tests (29 + 12) against the real devnet Allowances binary | `programs/solsend/tests/` |
+| A9 | The same 41 tests pass against the **mainnet** build of Allowances (133,856 bytes; trimmed sha256 `056ca97c…0318`, the hash OtterSec verified against the public source). No transaction was sent to mainnet. Re-run 2026-11-19: 41 of 41 on each build | `pnpm test:program:mainnet`, [MAINNET-READINESS.md](MAINNET-READINESS.md) |
 
 ## 6. CP0b validation (early spikes, spike program)
 
@@ -109,7 +110,7 @@ Source: [GATE0.md](../GATE0.md). These ran against a spike program and the publi
 
 ## Not covered by evidence
 
-- Live Privy login in the browser against the deployed origin is not recorded in the evidence files except the CP0b wallet test (V5). The UI screenshots in [evidence/w3-screenshots](evidence/w3-screenshots) were produced in **MOCK** UI mode with fake signatures and are not onchain claims ([w3-frontend.md](evidence/w3-frontend.md)).
+- Live Privy login in the browser against the deployed origin is recorded in the 18 November rehearsal ([rehearsal-2026-11-18.md](evidence/rehearsal-2026-11-18.md)) and the CP0b wallet test (V5). The UI screenshots in [evidence/w3-screenshots](evidence/w3-screenshots) were produced in **MOCK** UI mode with fake signatures and are not onchain claims ([w3-frontend.md](evidence/w3-frontend.md)).
 - No load test of Lithic or QuickNode was run; sandbox policy allows a handful of real requests.
 
 ## Free-trial expiry and card kinds (2026-11-18)
