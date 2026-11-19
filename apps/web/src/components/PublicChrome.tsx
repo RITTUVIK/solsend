@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/client/session";
@@ -11,44 +11,21 @@ export { safeNext } from "@/client/safe-next";
 
 /**
  * Log-in trigger shared by the public pages. Never renders disabled before hydration: a click before the session is
- * ready is queued. Once logged in it sends you to `next` (or the wallet).
+ * ready is queued. Once logged in it sends you to the page you asked for (`login("/merchant")`), else `next`, else
+ * the wallet.
  */
 export function useLoginThenGo(next: string | null = null) {
   const s = useSession();
   const router = useRouter();
   const [queued, setQueued] = useState(false);
-  const [asked, setAsked] = useState(false);
+  const [dest, setDest] = useState<string | null>(null); // null until a login was asked for on this page
   useEffect(() => { if (queued && s.ready && !s.authenticated) { setQueued(false); s.login(); } }, [queued, s]);
-  useEffect(() => { if (asked && s.ready && s.authenticated) router.replace(next ?? "/home"); }, [asked, s.ready, s.authenticated, next, router]);
-  const login = () => { setAsked(true); if (s.ready) s.login(); else setQueued(true); };
-  return { login, pending: queued && !s.ready, authenticated: s.ready && s.authenticated };
-}
-
-/**
- * Bring the landing page's "How it works" section (#how) into view and flash its steps. Scrolling alone looked broken:
- * on large screens the whole landing page fits, so there is nothing to scroll and the click seemed to do nothing.
- * Returns false when the section isn't on the page (yet).
- */
-export function revealHowItWorks(): boolean {
-  const el = document.getElementById("how");
-  if (!el) return false;
-  el.scrollIntoView({ behavior: "smooth", block: "start" });
-  if (location.hash !== "#how") history.replaceState(history.state, "", "#how");
-  el.classList.remove("how-flash");
-  void el.offsetWidth; // restart the animation on repeated clicks
-  el.classList.add("how-flash");
-  window.setTimeout(() => el.classList.remove("how-flash"), 1700);
-  el.querySelector<HTMLElement>("#how-title")?.focus({ preventScroll: true });
-  return true;
-}
-
-/** "How it works" link: on the landing page it reveals the section in place; elsewhere it opens /#how. */
-export function HowItWorksLink({ className, children = "How it works" }: { className?: string; children?: ReactNode }) {
-  const onClick = (e: MouseEvent<HTMLAnchorElement>) => {
-    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return; // let "open in new tab" work
-    if (location.pathname === "/" && revealHowItWorks()) e.preventDefault();
+  useEffect(() => { if (dest && s.ready && s.authenticated) router.replace(dest); }, [dest, s.ready, s.authenticated, router]);
+  const login = (to?: string) => {
+    setDest(safeNext(to) ?? next ?? "/home");
+    if (s.ready) s.login(); else setQueued(true);
   };
-  return <Link href="/#how" scroll={false} onClick={onClick} className={className}>{children}</Link>;
+  return { login, pending: queued && !s.ready, authenticated: s.ready && s.authenticated };
 }
 
 const NAV_LINK = "inline-flex min-h-10 items-center rounded-lg px-2.5 text-[14px] font-medium text-ink-2 hover:text-ink";
@@ -81,9 +58,9 @@ export function PublicHeader({ current, next = null }: { current?: "status"; nex
         <MockBadge />
       </div>
       <nav aria-label="Site" className="flex items-center gap-0.5 sm:gap-1">
-        <HowItWorksLink className={`${NAV_LINK} max-sm:hidden`} />
+        <Link href="/" className={`${NAV_LINK} max-sm:hidden`}>Home</Link>
         <Link href="/status" className={NAV_LINK} aria-current={current === "status" ? "page" : undefined}>Status</Link>
-        <button type="button" onClick={login} className="btn-secondary !min-h-10 !rounded-full !px-4 !text-[14px]">{pending ? <Spinner /> : null}Log in</button>
+        <button type="button" onClick={() => login()} className="btn-secondary !min-h-10 !rounded-full !px-4 !text-[14px]">{pending ? <Spinner /> : null}Log in</button>
       </nav>
     </header>
   );
@@ -99,8 +76,6 @@ export function SiteFooter({ inApp = false }: { inApp?: boolean }) {
     <footer className="mt-16 flex flex-col gap-3 border-t border-line pt-6 text-[13px] text-ink-3 sm:flex-row sm:items-center sm:justify-between">
       <p>Sandbox cards · Solana devnet USDC. No real money, no real merchants.</p>
       <nav aria-label="Footer" className="-mx-2 flex flex-wrap items-center">
-        {/* In the app, Wallet / Demo store / Activity are already in the tab bar; only add what it lacks. */}
-        {!inApp && <HowItWorksLink className="inline-flex min-h-9 items-center px-2 hover:text-ink" />}
         <Link href="/status" className="inline-flex min-h-9 items-center px-2 hover:text-ink">System status</Link>
       </nav>
     </footer>
