@@ -3,12 +3,12 @@ import { Suspense, useEffect, useState, type MouseEvent, type ReactNode } from "
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "@/client/session";
-import type { CardView } from "@/client/format";
+import { cardArt } from "@/client/cardArt";
 import { Logo } from "@/components/AppShell";
-import { CardVisual, StoreTile } from "@/components/CardVisual";
+import { StoreTile } from "@/components/CardVisual";
 import { GlyphField } from "@/components/GlyphField";
 import { safeNext, useLoginThenGo } from "@/components/PublicChrome";
-import { Icon, MockBadge, OnchainGlyph, Spinner } from "@/components/ui";
+import { Icon, MockBadge, Spinner } from "@/components/ui";
 
 /** Pages reachable from the top nav. App pages need a session: logged out, a click logs in and then opens the page. */
 const NAV = [
@@ -38,52 +38,59 @@ const REAL = [
   { icon: "chain", title: "Real Solana transactions", body: "Every payment is a real devnet transaction you can look up." },
 ] as const;
 
-const DEMO_CARD: CardView = {
-  cardPda: "demo", cardId: "demo", label: "Temu card", merchantName: "Temu", kind: "STORE_LOCKED", status: "ACTIVE", issueState: "issued",
-  lithic: { cardToken: null, lastFour: "4242", state: "OPEN" },
-  limit: { type: "lifetime", totalBase: "40000000", remainingBase: "40000000", periodSecs: null },
-  totals: { settledBase: "0", refundedBase: "0" }, merchantLocked: true, delegationLive: true, delegation: "demo", createdAt: "2026-01-01T00:00:00Z",
-  registerSignature: null, expiresAt: null, expired: false,
-};
+const AMAZON = cardArt("Amazon");
 
-/** 7 s loop built from the real card component, captioned as an illustration (not live data). */
+/** Illustration (not live data): an Amazon-only card pays $12 at Amazon, then the same number is declined at Temu. */
 function DemoLoop() {
-  const [step, setStep] = useState(4);
+  // 0 ready · 1 approved at Amazon · 2 declined at Temu · 3 rest
+  const [step, setStep] = useState(2);
   useEffect(() => {
-    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return; // static final frame
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return; // static frame: the decline
     setStep(0);
-    const seq = [800, 1700, 1500, 2000, 1000];
+    const seq = [900, 1900, 2300, 900];
     let i = 0;
     let t: ReturnType<typeof setTimeout>;
     const next = () => { i = (i + 1) % seq.length; setStep(i); t = setTimeout(next, seq[i]); };
     t = setTimeout(next, seq[0]);
     return () => clearTimeout(t);
   }, []);
-  const card: CardView = step >= 1 ? { ...DEMO_CARD, limit: { ...DEMO_CARD.limit, remainingBase: "28000000" } } : DEMO_CARD;
+  const left = step >= 1 ? "$28.00" : "$40.00";
   return (
-    <figure className="relative mx-auto w-[min(360px,46vh)]" aria-label="Illustration: a Temu card is approved for $12, then the same number is declined at Amazon">
-      <div className="mb-3 flex justify-center">
-        <span className="tnum inline-flex items-center gap-2 rounded-full bg-[#0b0618]/60 px-3.5 py-1.5 text-[14px] font-semibold text-white ring-1 ring-white/15 backdrop-blur-sm">
-          <Icon name="wallet" className="h-4 w-4 text-white/60" />Your wallet
-          <span key={step >= 2 ? "88" : "100"} className="anim-fade">{step >= 2 ? "$88.00" : "$100.00"}</span>
-        </span>
+    <figure className="relative mx-auto w-[min(360px,46vh)]" aria-label="Illustration: an Amazon card pays $12 at Amazon, then the same number is declined at Temu">
+      <div className={`relative aspect-[1.586] w-full overflow-hidden rounded-[20px] text-white shadow-[0_1px_0_rgb(255_255_255/.2)_inset,0_18px_40px_-16px_rgb(0_0_0/.7)] transition-transform duration-500 ${step === 2 ? "translate-x-3 rotate-[2deg]" : ""}`}>
+        <div className="card-noise card-sheen absolute inset-0 rounded-[inherit]" style={{ background: AMAZON.background }} aria-hidden="true" />
+        {AMAZON.accentBar && <div className="absolute inset-x-0 bottom-0 h-[3px]" style={{ background: AMAZON.accentBar }} aria-hidden="true" />}
+        <div className="relative flex h-full flex-col justify-between p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <span className="grid h-9 w-9 place-items-center rounded-[10px] bg-white/15 text-[18px] font-bold ring-1 ring-white/25" aria-hidden="true">{AMAZON.monogram}</span>
+              <p className="text-[16px] font-semibold leading-5">Amazon card<span className="block text-[11px] font-medium uppercase tracking-[0.1em] text-white/55">Sandbox</span></p>
+            </div>
+            <p className="tnum text-right text-[22px] font-semibold leading-6">
+              <span key={left} className="anim-fade">{left}</span>
+              <span className="block text-[12px] font-medium text-white/65">left of $40</span>
+            </p>
+          </div>
+          <div className="flex items-end justify-between">
+            <p className="tnum font-mono text-[16px] tracking-[0.14em]">•••• 4242</p>
+            <span className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-[0.1em] text-[#ffb547]"><Icon name="lock" className="h-3.5 w-3.5" strokeWidth={2.2} />Amazon only</span>
+          </div>
+        </div>
       </div>
-      <div className={`transition-transform duration-500 ${step === 3 ? "translate-x-3 rotate-[2deg]" : ""}`}><CardVisual card={card} showLimit /></div>
-      <div className="relative mt-3 h-[60px] text-white" aria-hidden="true">
-        {step >= 1 && step < 3 && (
-          <div key="ok" className="anim-rise absolute inset-x-0 flex items-center gap-3 rounded-[16px] bg-[#1a0b3d] px-3.5 py-2.5 shadow-lg ring-1 ring-white/15">
+      <div className="relative mt-3 h-[56px] text-white" aria-hidden="true">
+        {step === 1 && (
+          <div key="ok" className="anim-rise absolute inset-x-0 flex items-center gap-3 rounded-[16px] bg-black/80 px-3.5 py-3 shadow-lg ring-1 ring-white/10">
             <span className="anim-pop grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#14f195] text-[#04130d]"><Icon name="check" className="h-4 w-4" strokeWidth={3} /></span>
-            <div className="min-w-0 text-[14px] leading-5"><p className="font-semibold">Approved · $12.00 at Temu</p><p className="flex items-center gap-1 text-[13px] text-white/60"><OnchainGlyph className="h-3.5 w-3.5" />paid on Solana first · 0.7 s</p></div>
+            <p className="text-[15px] font-semibold">Approved · $12.00 at Amazon</p>
           </div>
         )}
-        {step >= 3 && (
-          <div key="no" className="anim-rise absolute inset-x-0 flex items-center gap-3 rounded-[16px] bg-[#1a0b3d] px-3.5 py-2.5 shadow-lg ring-1 ring-white/15">
-            <StoreTile merchant="Amazon" size={32} />
-            <div className="min-w-0 text-[14px] leading-5"><p className="font-semibold text-[#ff8a8a]">Declined at Amazon</p><p className="text-[13px] text-white/60">Locked to Temu, so a leaked number is useless</p></div>
+        {step === 2 && (
+          <div key="no" className="anim-rise absolute inset-x-0 flex items-center gap-3 rounded-[16px] bg-black/80 px-3.5 py-2.5 shadow-lg ring-1 ring-white/10">
+            <StoreTile merchant="Temu" size={32} />
+            <div className="min-w-0 text-[14px] leading-5"><p className="font-semibold text-[#ff8a8a]">Declined at Temu</p><p className="text-[13px] text-white/60">This card only works at Amazon</p></div>
           </div>
         )}
       </div>
-      <figcaption className="mt-1 text-center text-[11px] font-medium text-white/45">Illustration of the sandbox demo</figcaption>
     </figure>
   );
 }
@@ -212,7 +219,6 @@ function LandingInner() {
               <>
                 <button type="button" onClick={() => void s.logout().then(() => router.replace("/"))} title={s.email ?? undefined}
                   className="min-h-9 rounded-full px-3 text-[13.5px] font-medium text-white/85 hover:bg-white/15 hover:text-white">Log out</button>
-                <Link href="/cards/new" className="landing-cta">New card</Link>
               </>
             ) : (
               <button type="button" onClick={() => login()} className="landing-cta" aria-label="Try the sandbox demo">
@@ -239,7 +245,7 @@ function LandingInner() {
                 {cta}
                 <p className="text-[13px] font-medium text-white/75">{hint}</p>
               </div>
-              <ul aria-label="Why it's safer" className="mt-7 grid max-w-xl gap-3.5 rounded-[20px] bg-[#0b0618]/50 p-4 ring-1 ring-white/10 backdrop-blur-md tall:gap-4 tall:p-5">
+              <ul aria-label="Why it's safer" className="mt-7 grid max-w-xl gap-3.5 rounded-[20px] bg-black p-4 ring-1 ring-white/10 tall:gap-4 tall:p-5">
                 {WHY.map((w) => <Point key={w.title} badge={iconBadge(w.icon)} title={w.title} body={w.body} />)}
               </ul>
             </div>
