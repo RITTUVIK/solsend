@@ -9,7 +9,7 @@ import { Logo } from "@/components/AppShell";
 import { StoreTile } from "@/components/CardVisual";
 import { GlyphField } from "@/components/GlyphField";
 import { safeNext, useLoginThenGo } from "@/components/PublicChrome";
-import { Icon, MockBadge, Spinner } from "@/components/ui";
+import { Icon, Spinner } from "@/components/ui";
 
 /** Space Grotesk, used only for the "How it works" steps. */
 const grotesk = Space_Grotesk({ subsets: ["latin"], weight: ["400", "500", "600"], display: "swap" });
@@ -207,7 +207,6 @@ function LandingInner({ split }: { split: boolean }) {
         <header className="grid h-16 shrink-0 grid-cols-[1fr_auto] items-center gap-3 px-4 sm:px-8 lg:grid-cols-[1fr_auto_1fr]">
           <div className="flex items-center gap-2">
             <Link href="/" className="rounded-lg" aria-label="SolSend home"><Logo className="text-white" /></Link>
-            <MockBadge className="bg-white/90 max-sm:hidden" />
           </div>
           {/* Split: the app pane on the right has the tabs and Log out, so the left keeps only the logo. */}
           {!split && <nav aria-label="Primary" className="hidden items-center gap-1 rounded-full bg-white/10 p-1 ring-1 ring-white/15 backdrop-blur-md lg:flex">
@@ -236,7 +235,7 @@ function LandingInner({ split }: { split: boolean }) {
         {split && (
           <div key="side" className="hidden min-h-0 flex-1 flex-col overflow-y-auto px-8 pb-16 lg:flex xl:px-12">
             <div className="my-auto w-full max-w-xl py-4">
-              <h1 className="landing-title landing-title--split">SolSend</h1>
+              <h1 className="landing-title landing-title--split" aria-label="SolSend"><span className="landing-sol">sol</span><span className="landing-send">send</span></h1>
               <p className="mt-2 text-[clamp(17px,1.45vw,21px)] font-medium leading-[1.25] tracking-[-0.02em] [text-shadow:0_2px_20px_rgba(11,6,24,0.6)]">
                 A burner card for every store,<br />paid straight from your Solana wallet.
               </p>
@@ -258,7 +257,7 @@ function LandingInner({ split }: { split: boolean }) {
         <div className={`mx-auto hidden min-h-0 w-full max-w-6xl flex-1 flex-col px-8 ${split ? "" : "lg:flex"}`}>
           <div className="grid min-h-0 flex-1 grid-cols-[1.15fr_1fr] items-center gap-10">
             <div>
-              <h1 className="landing-title landing-title--side">SolSend</h1>
+              <h1 className="landing-title landing-title--side" aria-label="SolSend"><span className="landing-sol">sol</span><span className="landing-send">send</span></h1>
               <p className="mt-2 text-[clamp(18px,1.7vw,24px)] font-medium leading-[1.25] tracking-[-0.02em] [text-shadow:0_2px_20px_rgba(11,6,24,0.6)]">
                 A burner card for every store,<br />paid straight from your Solana wallet.
               </p>
@@ -287,7 +286,7 @@ function LandingInner({ split }: { split: boolean }) {
         {/* ---------- Phones and tablets: pitch, then the explanations in tabs (hidden behind the app when split) ---------- */}
         <div className="flex min-h-0 flex-1 flex-col items-center gap-4 px-4 pb-4 pt-3 text-center lg:hidden short:gap-2 short:pt-1">
           <div className="flex flex-1 flex-col items-center [justify-content:safe_center]">
-            <h1 className="landing-title">SolSend</h1>
+            <h1 className="landing-title" aria-label="SolSend"><span className="landing-sol">sol</span><span className="landing-send">send</span></h1>
             <p className="mt-1 text-[clamp(16px,2.6vw,22px)] font-medium leading-[1.25] tracking-[-0.02em] [text-shadow:0_2px_20px_rgba(11,6,24,0.6)] short:hidden">
               A burner card for every store,<br />paid straight from your Solana wallet.
             </p>
