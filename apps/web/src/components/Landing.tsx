@@ -83,7 +83,7 @@ function DemoLoop() {
 function Step({ n, title, body }: { n: number; title: string; body: string }) {
   return (
     <li className={`${grotesk.className} border-t border-white/15 pt-3`}>
-      <p className="text-[13px] font-medium text-[#14f195]">0{n}</p>
+      <p className="text-[13px] font-medium text-black">0{n}</p>
       <p className="mt-1 text-[17px] font-semibold leading-6 tracking-[-0.01em]">{title}</p>
       <p className="mt-1 text-[14px] leading-5 text-white/60">{body}</p>
     </li>
@@ -243,7 +243,7 @@ function LandingInner({ split }: { split: boolean }) {
               <ul aria-label="Why it's safer" className="mt-6 grid gap-3.5 rounded-[20px] bg-black p-4 ring-1 ring-white/10">
                 {WHY.map((w) => <Point key={w.title} badge={iconBadge(w.icon)} title={w.title} body={w.body} />)}
               </ul>
-              <p className={`${grotesk.className} mb-2 mt-6 text-[12px] font-semibold uppercase tracking-[0.12em] text-[#14f195]`}>How it works</p>
+              <p className={`${grotesk.className} mb-2 mt-6 text-[12px] font-semibold uppercase tracking-[0.12em] text-black`}>How it works</p>
               <ol className="grid gap-4">
                 {STEPS.map((st, i) => (
                   <Step key={st.title} n={i + 1} title={st.title} body={st.body} />
@@ -273,7 +273,7 @@ function LandingInner({ split }: { split: boolean }) {
             <DemoLoop />
           </div>
           <div className="shrink-0 pb-4">
-            <p className={`${grotesk.className} mb-2 text-[12px] font-semibold uppercase tracking-[0.12em] text-[#14f195]`}>How it works</p>
+            <p className={`${grotesk.className} mb-2 text-[12px] font-semibold uppercase tracking-[0.12em] text-black`}>How it works</p>
             <ol className="grid grid-cols-3 gap-8">
               {STEPS.map((st, i) => (
                 <Step key={st.title} n={i + 1} title={st.title} body={st.body} />
