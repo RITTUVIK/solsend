@@ -8,7 +8,7 @@ import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } fr
 
 const STORAGE_KEY = "solsend.appPaneWidth";
 const MIN_PANE = 420; // narrowest the app stays usable
-const MIN_LANDING = 360; // always leave this much of the landing visible
+const MIN_LANDING = 440; // always leave this much of the landing visible (and clear of the sandbox pill, bottom-left, ~417 px wide)
 const STEP = 40;
 
 const maxPane = () => Math.max(MIN_PANE, window.innerWidth - MIN_LANDING);

@@ -75,6 +75,10 @@ function DemoLoop() {
           <div className="min-w-0 text-[14px] leading-5"><p className="font-semibold text-[#ff8a8a]">Declined at Temu</p><p className="text-[13px] text-white/60">This card only works at Amazon</p></div>
         </li>
       </ul>
+      {/* Always visible: the card above is a drawing, not a real issued card, and has nothing to do with Amazon. */}
+      <figcaption data-illustration-caption className="mt-2.5 rounded-2xl bg-black/80 px-3 py-1.5 text-center text-[12px] font-medium leading-4 text-white ring-1 ring-white/10">
+        <span className="block font-bold uppercase tracking-[0.1em]">Illustration</span>Not a real card · not affiliated with Amazon
+      </figcaption>
     </figure>
   );
 }
@@ -83,7 +87,7 @@ function DemoLoop() {
 function Step({ n, title, body }: { n: number; title: string; body: string }) {
   return (
     <li className={`${grotesk.className} border-t border-white/15 pt-3`}>
-      <p className="text-[13px] font-medium text-black">0{n}</p>
+      <p className="text-[13px] font-medium text-white [text-shadow:0_0_6px_#0b0618,0_0_2px_#0b0618]">0{n}</p>
       <p className="mt-1 text-[17px] font-semibold leading-6 tracking-[-0.01em]">{title}</p>
       <p className="mt-1 text-[14px] leading-5 text-white/60">{body}</p>
     </li>
@@ -233,7 +237,7 @@ function LandingInner({ split }: { split: boolean }) {
 
         {/* ---------- Desktop, app open on the right: one compact column (pitch, why, steps) ---------- */}
         {split && (
-          <div key="side" className="hidden min-h-0 flex-1 flex-col overflow-y-auto px-8 pb-16 lg:flex xl:px-12">
+          <div key="side" className="hidden min-h-0 flex-1 flex-col overflow-y-auto px-8 pb-2 lg:mb-[52px] lg:flex xl:px-12 [mask-image:linear-gradient(to_bottom,#000_calc(100%-14px),transparent)]">
             <div className="my-auto w-full max-w-xl py-4">
               <h1 className="landing-title landing-title--split" aria-label="SolSend"><span className="landing-sol">sol</span><span className="landing-send">send</span></h1>
               <p className="mt-2 text-[clamp(17px,1.45vw,21px)] font-medium leading-[1.25] tracking-[-0.02em] [text-shadow:0_2px_20px_rgba(11,6,24,0.6)]">
@@ -242,7 +246,7 @@ function LandingInner({ split }: { split: boolean }) {
               <ul aria-label="Why it's safer" className="mt-6 grid gap-3.5 rounded-[20px] bg-black p-4 ring-1 ring-white/10">
                 {WHY.map((w) => <Point key={w.title} badge={iconBadge(w.icon)} title={w.title} body={w.body} />)}
               </ul>
-              <p className={`${grotesk.className} mb-2 mt-6 text-[12px] font-semibold uppercase tracking-[0.12em] text-black`}>How it works</p>
+              <p className={`${grotesk.className} mb-2 mt-6 text-[12px] font-semibold uppercase tracking-[0.12em] text-white [text-shadow:0_0_6px_#0b0618,0_0_2px_#0b0618]`}>How it works</p>
               <ol className="grid gap-4">
                 {STEPS.map((st, i) => (
                   <Step key={st.title} n={i + 1} title={st.title} body={st.body} />
@@ -254,8 +258,8 @@ function LandingInner({ split }: { split: boolean }) {
         )}
 
         {/* ---------- Desktop: pitch + why on the left, the card on the right, steps along the bottom ---------- */}
-        <div className={`mx-auto hidden min-h-0 w-full max-w-6xl flex-1 flex-col px-8 ${split ? "" : "lg:flex"}`}>
-          <div className="grid min-h-0 flex-1 grid-cols-[1.15fr_1fr] items-center gap-10">
+        <div className={`mx-auto hidden min-h-0 w-full max-w-6xl flex-1 flex-col px-8 ${split ? "" : "lg:flex lg:overflow-y-auto lg:[@media(max-height:680px)]:mb-[52px]"}`}>
+          <div className="grid min-h-[430px] flex-1 grid-cols-[1.15fr_1fr] items-center gap-10">
             <div>
               <h1 className="landing-title landing-title--side" aria-label="SolSend"><span className="landing-sol">sol</span><span className="landing-send">send</span></h1>
               <p className="mt-2 text-[clamp(18px,1.7vw,24px)] font-medium leading-[1.25] tracking-[-0.02em] [text-shadow:0_2px_20px_rgba(11,6,24,0.6)]">
@@ -272,7 +276,7 @@ function LandingInner({ split }: { split: boolean }) {
             <DemoLoop />
           </div>
           <div className="shrink-0 pb-4">
-            <p className={`${grotesk.className} mb-2 text-[12px] font-semibold uppercase tracking-[0.12em] text-black`}>How it works</p>
+            <p className={`${grotesk.className} mb-2 text-[12px] font-semibold uppercase tracking-[0.12em] text-white [text-shadow:0_0_6px_#0b0618,0_0_2px_#0b0618]`}>How it works</p>
             <ol className="grid grid-cols-3 gap-8">
               {STEPS.map((st, i) => (
                 <Step key={st.title} n={i + 1} title={st.title} body={st.body} />
