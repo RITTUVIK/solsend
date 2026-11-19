@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "@/client/session";
 import type { CardView } from "@/client/format";
 import { CardVisual, StoreTile } from "@/components/CardVisual";
-import { PublicHeader, SiteFooter, safeNext, useLoginThenGo } from "@/components/PublicChrome";
+import { HowItWorksLink, PublicHeader, SiteFooter, revealHowItWorks, safeNext, useLoginThenGo } from "@/components/PublicChrome";
 import { Icon, OnchainGlyph, Spinner } from "@/components/ui";
 
 const DEMO_CARD: CardView = {
@@ -77,6 +77,13 @@ function LandingInner() {
   // Signed-in users may visit Home (this page) from the tabs. Only a deep link (/?next=…) sends them on; logging in
   // from this page goes to the wallet via useLoginThenGo.
   useEffect(() => { if (s.ready && s.authenticated && next) router.replace(next); }, [s.ready, s.authenticated, next, router]);
+  // Arriving at /#how (link from another page, or a fresh load): this page renders after the browser's own hash jump,
+  // so reveal the section once it exists.
+  useEffect(() => {
+    if (location.hash !== "#how") return;
+    const t = window.setTimeout(() => revealHowItWorks(), 60);
+    return () => window.clearTimeout(t);
+  }, []);
 
   return (
     <div className="mx-auto max-w-5xl px-4 pb-10">
@@ -92,7 +99,7 @@ function LandingInner() {
               : <button type="button" onClick={login} className="btn-primary !min-h-[52px] !px-7 !text-[17px]">
                   {pending ? <Spinner /> : null}Try the sandbox demo
                 </button>}
-            <a href="#how" className="btn-ghost !min-h-[52px]">How it works<Icon name="chevron" className="h-4 w-4" /></a>
+            <HowItWorksLink className="btn-ghost !min-h-[52px]">How it works<Icon name="chevron" className="h-4 w-4" /></HowItWorksLink>
           </div>
           <p className="mt-3 text-[13px] text-ink-3">Free to try · test money only · no real merchants.</p>
         </div>
@@ -102,7 +109,7 @@ function LandingInner() {
       <p className="mt-12 text-center text-[13px] font-medium text-ink-3">Settles on <span className="text-ink-2">Solana</span> · Cards via <span className="text-ink-2">Lithic</span> sandbox · Events via <span className="text-ink-2">QuickNode</span> Streams</p>
 
       <section aria-labelledby="how-title" className="mt-14 scroll-mt-16" id="how">
-        <h2 id="how-title" className="text-[22px] font-semibold tracking-[-0.02em]">How it works</h2>
+        <h2 id="how-title" tabIndex={-1} className="text-[22px] font-semibold tracking-[-0.02em] focus:outline-none">How it works</h2>
         <ol className="-mx-4 mt-4 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0">
           {STEPS.map((st, i) => (
             <li key={st.title} className="surface w-[78%] shrink-0 snap-start sm:w-auto">

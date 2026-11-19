@@ -152,6 +152,9 @@ body {
 .anim-breathe { animation: breathe 1.6s ease-in-out infinite; }
 .anim-born { animation: born .48s var(--ease-spring) both; }
 .anim-stamp { animation: stamp .3s var(--ease-out) both; }
+/* "How it works" reveal: on big screens the section is already in view and can't scroll, so flash the steps. */
+@keyframes how-flash { 0%, 35% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--mint) 85%, transparent); } 100% { box-shadow: 0 0 0 0 transparent; } }
+.how-flash .surface { animation: how-flash 1.6s var(--ease-out) both; }
 .stagger > * { animation: rise .36s var(--ease-out) both; }
 .stagger > *:nth-child(2) { animation-delay: 60ms; }
 .stagger > *:nth-child(3) { animation-delay: 120ms; }
