@@ -196,27 +196,29 @@ dialog.sheet[open] > .sheet-body { animation: sheet-up .32s var(--ease-out) both
   .rm-hide { display: none !important; }
 }
 
-/* Home hero (navy → white, adapted from the MIT "Onward Summit Template"). Keeps its own colours in dark mode too. */
+/* Home hero, "Midnight Mint": near-black → deep Solana purple → near-black, with a faint mint glow at the bottom.
+   Layout adapted from the MIT "Onward Summit Template". Keeps its own colours in dark mode too. */
 .landing-bg {
   background:
-    radial-gradient(ellipse 34% 30% at 50% 47%, color-mix(in srgb, #2659d9 55%, #a9c3f3) 0%, transparent 100%),
-    linear-gradient(180deg, #06174a 0%, color-mix(in srgb, #06174a 45%, #2659d9) 16%, #2659d9 40%, color-mix(in srgb, #2659d9 45%, #a9c3f3) 60%, #a9c3f3 74%, color-mix(in srgb, #a9c3f3 30%, #fff) 88%, #fff 100%);
+    radial-gradient(ellipse 34% 30% at 50% 47%, color-mix(in srgb, #4c1d95 55%, #7c3aed) 0%, transparent 100%),
+    radial-gradient(ellipse 70% 28% at 50% 104%, rgba(20, 241, 149, .16) 0%, transparent 100%),
+    linear-gradient(180deg, #0b0618 0%, #1a0b3d 18%, #4c1d95 44%, #3b1578 60%, #1a0b3d 80%, #0b0618 100%);
 }
 .landing-title {
   font-size: clamp(40px, min(10.4vw, 15vh), 136px); font-weight: 600; letter-spacing: -0.055em; line-height: .98; padding-bottom: .06em;
-  text-shadow: 0 10px 50px color-mix(in srgb, #06174a 45%, transparent);
+  text-shadow: 0 10px 50px color-mix(in srgb, #0b0618 55%, transparent);
 }
 .landing-cta {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 36px; padding: 0 16px; border-radius: 999px;
-  background: #e4f222; color: #0c0e13; font-size: 13.5px; font-weight: 600; letter-spacing: -0.01em; white-space: nowrap;
+  background: #14f195; color: #04130d; font-size: 13.5px; font-weight: 600; letter-spacing: -0.01em; white-space: nowrap;
   box-shadow: inset 0 -1px 0 rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.14); transition: box-shadow .25s, transform .2s;
 }
-.landing-cta:hover { box-shadow: inset 0 -1px 0 rgba(0,0,0,.12), 0 10px 26px -10px color-mix(in srgb, #e4f222 80%, #000); }
+.landing-cta:hover { box-shadow: inset 0 -1px 0 rgba(0,0,0,.12), 0 10px 26px -10px color-mix(in srgb, #14f195 70%, #000); }
 .landing-cta:active, .landing-cta-2:active { transform: scale(.97); }
 .landing-cta-2 {
   display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 24px; border-radius: 999px;
-  background: #fff; color: #06174a; font-size: 16px; font-weight: 600; letter-spacing: -0.01em;
-  box-shadow: 0 12px 30px -12px rgba(6,23,74,.6); transition: box-shadow .25s, transform .2s;
+  background: #fff; color: #1a0b3d; font-size: 16px; font-weight: 600; letter-spacing: -0.01em;
+  box-shadow: 0 12px 30px -12px rgba(11,6,24,.7); transition: box-shadow .25s, transform .2s;
 }
-.landing-cta-2:hover { box-shadow: 0 16px 36px -12px rgba(6,23,74,.8); }
+.landing-cta-2:hover { box-shadow: 0 16px 36px -12px rgba(20,241,149,.35); }
 @media (max-width: 359px) { .landing-cta { padding: 0 12px; font-size: 12.5px; } }

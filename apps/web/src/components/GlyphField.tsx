@@ -1,5 +1,5 @@
 "use client";
-// Arrow-glyph field for the Home hero: a canvas of tiny arrows over the navy→white gradient, thinning out around the
+// Arrow-glyph field for the Home hero: a canvas of tiny arrows over the hero gradient, thinning out around the
 // title. Adapted from "Onward Summit Template" by Kedhareswer Naidu (MIT, https://kedhar.pages.dev), cut down to the
 // hero field and deliberately calmer: arrows only lean a little near the pointer (no swelling, no click ripples, no
 // intro pulse), the idle shimmer is slow, and it redraws at ~30 fps when nothing is moving. Static under
@@ -7,8 +7,8 @@
 import { useEffect, useRef } from "react";
 
 const CELL = 13;
-const LIGHT = "#dbe6ff"; // arrows on the navy
-const DARK = "#3a6be0"; // arrows on the pale part
+const LIGHT = "#c4b5fd"; // violet arrows over the purple
+const DARK = "#14f195"; // mint arrows toward the bottom
 
 const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
 const smoothstep = (a: number, b: number, x: number) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
@@ -37,7 +37,7 @@ function weights(u: number, v: number, aspect: number): [number, number] {
   const dx = (u - 0.5) * aspect;
   const dy = (v - 0.47) * 1.25;
   const part = 0.1 + 0.9 * smoothstep(0.1, 0.4, Math.sqrt(dx * dx + dy * dy));
-  return [light * part, dark * part * 0.9];
+  return [light * part * 0.8, dark * part * 0.55];
 }
 function arrowSprite(color: string, dpr: number) {
   const c = document.createElement("canvas");

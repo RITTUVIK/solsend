@@ -39,7 +39,7 @@ function useBannerHeight() {
 }
 
 /**
- * Home: one screen, no scrolling. A navy-to-white hero with a calm field of arrows, the top nav to every page, and
+ * Home: one screen, no scrolling. A midnight-purple hero with a calm field of arrows, the top nav to every page, and
  * one primary action. Layout and field adapted from the MIT "Onward Summit Template" (see components/GlyphField.tsx).
  */
 function LandingInner() {
@@ -63,7 +63,7 @@ function LandingInner() {
     const active = n.href === "/";
     return (
       <Link key={n.href} href={n.href} onClick={(e) => onNav(e, n.href, n.app)} aria-current={active ? "page" : undefined}
-        className={`shrink-0 rounded-full font-medium transition-colors ${compact ? "px-3 py-1.5 text-[13px]" : "px-3.5 py-1.5 text-[14px]"} ${active ? "bg-white text-[#06174a]" : "text-white/85 hover:bg-white/15 hover:text-white"}`}>
+        className={`shrink-0 rounded-full font-medium transition-colors ${compact ? "px-3 py-1.5 text-[13px]" : "px-3.5 py-1.5 text-[14px]"} ${active ? "bg-white text-[#1a0b3d]" : "text-white/85 hover:bg-white/15 hover:text-white"}`}>
         {n.label}
       </Link>
     );
@@ -105,7 +105,7 @@ function LandingInner() {
 
         <div className="flex min-h-0 flex-1 flex-col items-center px-5 pb-[6vh] text-center [justify-content:safe_center] short:pb-2">
           <h1 className="landing-title anim-rise">SolSend</h1>
-          <p className="mt-2 text-[clamp(17px,1.95vw,24px)] font-medium leading-[1.25] tracking-[-0.02em] [text-shadow:0_2px_20px_rgba(6,23,74,0.5)]">
+          <p className="mt-2 text-[clamp(17px,1.95vw,24px)] font-medium leading-[1.25] tracking-[-0.02em] [text-shadow:0_2px_20px_rgba(11,6,24,0.6)]">
             A burner card for every store,<br />paid straight from your Solana wallet.
           </p>
           <div className="mt-6 short:mt-3 flex flex-wrap items-center justify-center gap-2">
@@ -113,12 +113,12 @@ function LandingInner() {
               ? <Link href="/home" className="landing-cta-2">Open your wallet</Link>
               : <button type="button" onClick={() => login("/cards/new")} className="landing-cta-2">Make your first card</button>}
           </div>
-          <p className="mt-3 text-[13px] font-medium text-white/80 short:hidden [text-shadow:0_1px_8px_rgba(6,23,74,0.5)]">
+          <p className="mt-3 text-[13px] font-medium text-white/80 short:hidden [text-shadow:0_1px_8px_rgba(11,6,24,0.6)]">
             {!authenticated && next && PAGE_NAME[next] ? `Log in to open ${PAGE_NAME[next]}.` : "Each card holds $0 · test money only · free"}
           </p>
         </div>
 
-        <p className="shrink-0 px-4 pb-4 text-center short:hidden text-[12px] font-medium text-[#0c0e13]/55">
+        <p className="shrink-0 px-4 pb-4 text-center short:hidden text-[12px] font-medium text-white/50">
           Settles on Solana · Cards via Lithic sandbox · Events via QuickNode Streams
         </p>
       </section>
