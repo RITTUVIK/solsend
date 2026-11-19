@@ -14,12 +14,14 @@ export async function GET(): Promise<Response> {
 }
 
 async function compute() {
-  let rpc: RpcLike | null = null, settler = null, feePayer = null, configError: string | undefined;
+  let rpc: RpcLike | null = null, settler = null, feePayer = null, faucet = null, faucetAmountBase: bigint | undefined, configError: string | undefined;
   try {
-    const { connection, settlementAuthority, feePayerKey } = await import("@/server/keys");
+    const { connection, settlementAuthority, feePayerKey, faucetKey } = await import("@/server/keys");
     rpc = connection() as unknown as RpcLike;
     settler = settlementAuthority().publicKey;
     feePayer = feePayerKey().publicKey;
+    // The faucet is optional: a deployment without one simply has no faucet check.
+    try { faucet = faucetKey().publicKey; faucetAmountBase = (await import("@/server/env")).env().FAUCET_AMOUNT_BASE; } catch { faucet = null; }
   } catch {
     configError = "server env incomplete (RPC / keys)"; // message only; never echo which value or its content
   }
@@ -34,5 +36,5 @@ async function compute() {
       waitUntil(maybePiggybackSweep(reconcileDeps, store));
     } catch { /* best effort */ }
   }
-  return runChecks({ rpc, settler, feePayer, store, lithicPing: () => lithicPing(process.env.LITHIC_API_KEY), configError });
+  return runChecks({ rpc, settler, feePayer, store, lithicPing: () => lithicPing(process.env.LITHIC_API_KEY), configError, faucet, faucetAmountBase });
 }

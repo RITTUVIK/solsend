@@ -1,7 +1,7 @@
 // /api/status checks (W4). Public, read-only, secret-free: never includes keys, RPC URLs or tokens, only booleans,
 // public addresses' balances and short human details. Each check is isolated so one failure never hides the rest.
 import "server-only";
-import { api, configPda, DEVNET_GENESIS_HASH, decodeConfig, LITHIC_SANDBOX_BASE, SOLSEND_PROGRAM_ID, treasuryAta } from "@solsend/shared";
+import { api, configPda, DEVNET_GENESIS_HASH, decodeConfig, LITHIC_SANDBOX_BASE, SOLSEND_PROGRAM_ID, treasuryAta, usdcAta } from "@solsend/shared";
 import type { PublicKey } from "@solana/web3.js";
 import type { Store } from "../store";
 import { toFeedRow } from "../feed";
@@ -18,6 +18,8 @@ export type RpcLike = {
 export type StatusDeps = {
   rpc: RpcLike | null; settler: PublicKey | null; feePayer: PublicKey | null; store: Store | null;
   lithicPing: () => Promise<boolean>; now?: () => number; configError?: string;
+  /** Demo faucet wallet and the amount one claim pays out (base units). Omitted when the faucet is not configured. */
+  faucet?: PublicKey | null; faucetAmountBase?: bigint;
 };
 
 export const MIN_SETTLER_LAMPORTS = 50_000_000; // 0.05 SOL: settle txs pay fees + record rent
@@ -27,6 +29,10 @@ export const UNRECONCILED_AFTER_SECS = 120;
  *  lamports/B) + one 5,000-lamport signature fee. Records are permanent (Upgrade 1), so every settle consumes it. */
 export const SETTLE_COST_LAMPORTS = 1_571_000;
 export const MIN_RUNWAY_SETTLES = 20;
+/** Below this many faucet claims left, /status warns: every new user needs one claim before a first purchase. */
+export const MIN_FAUCET_CLAIMS = 4;
+/** "12.5" (6-decimal UI amount) → base units, without floating point. */
+const uiToBase = (ui: string): bigint => { const [w = "0", f = ""] = ui.split("."); return BigInt(w || "0") * 1_000_000n + BigInt((f + "000000").slice(0, 6)); };
 
 const sol = (l: number) => (l / 1e9).toFixed(3);
 async function run(name: string, fn: () => Promise<{ ok: boolean; detail: string; warn?: boolean }>): Promise<Check> {
@@ -72,6 +78,20 @@ export async function runChecks(d: StatusDeps): Promise<ReturnType<typeof api.St
         return { ok: true, detail: `${b.value.uiAmountString ?? "0"} devnet USDC in treasury ATA` };
       } catch { return { ok: false, detail: "treasury ATA not found (deploy/init-config creates it)" }; }
     }));
+    const faucet = d.faucet;
+    if (faucet) {
+      // A new user's first step is one faucet claim. An empty faucet stops onboarding while every other check stays
+      // green, so it is reported here as a warning (payments for funded wallets do not depend on it).
+      checks.push(await run("test-money faucet", async () => {
+        const per = d.faucetAmountBase ?? 5_000_000n;
+        let ui = "0";
+        try { ui = (await rpc.getTokenAccountBalance(usdcAta(faucet))).value.uiAmountString ?? "0"; } catch { /* no token account yet: empty */ }
+        const claims = per > 0n ? uiToBase(ui) / per : 0n;
+        const detail = `${ui} devnet USDC: ${claims} claim${claims === 1n ? "" : "s"} of ${Number(per) / 1e6} left`;
+        if (claims === 0n) return { ok: true, warn: true, detail: `EMPTY (${detail}): new users cannot get test money until the faucet wallet is topped up` };
+        return claims < BigInt(MIN_FAUCET_CLAIMS) ? { ok: true, warn: true, detail: `LOW (${detail})` } : { ok: true, detail };
+      }));
+    }
   }
 
   checks.push(await run("lithic sandbox", async () => {

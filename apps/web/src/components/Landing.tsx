@@ -28,7 +28,7 @@ const PAGE_NAME: Record<string, string> = { "/home": "your wallet", "/merchant":
 const STEPS = [
   { title: "Get free test money", body: "Sign in with your email. You get a Solana wallet with free test dollars." },
   { title: "Make a card for one store", body: "Pick a store and a limit, like “Temu, $40 total”." },
-  { title: "Pay. The money moves first.", body: "Dollars stay in your wallet until you buy. Solana pays, then the card says yes." },
+  { title: "Pay. The money moves first.", body: "Dollars stay in your wallet until you buy. They move on Solana first, then the card says yes." },
 ] as const;
 
 const WHY = [
@@ -39,7 +39,7 @@ const WHY = [
 
 const REAL = [
   { icon: "flask", title: "Test version", body: "Sandbox cards and test USDC. No real store is ever charged." },
-  { icon: "chain", title: "Real Solana transactions", body: "Every payment is a real devnet transaction you can look up." },
+  { icon: "chain", title: "Real Solana transactions", body: "Every approval and onchain decline is a real devnet transaction you can look up." },
 ] as const;
 
 const AMAZON = cardArt("Amazon");

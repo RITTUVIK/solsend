@@ -4,7 +4,7 @@ import { usePoll } from "@/client/hooks";
 import { PublicHeader, SiteFooter } from "@/components/PublicChrome";
 import { ErrorNote, Icon, Skeleton } from "@/components/ui";
 
-const SPONSOR: Record<string, string> = { "QuickNode Stream": "QuickNode", "Lithic sandbox": "Lithic", "Solana devnet RPC": "Solana", "quicknode last delivery": "QuickNode Stream" };
+const SPONSOR: Record<string, string> = { "QuickNode Stream": "QuickNode", "Lithic sandbox": "Lithic", "Solana devnet RPC": "Solana", "quicknode last delivery": "QuickNode Stream", "test-money faucet": "Devnet USDC" };
 const warnings = (checks: { warn?: boolean }[]) => { const n = checks.filter((c) => c.warn).length; return n ? ` · ${n} warning${n > 1 ? "s" : ""}` : ""; };
 
 export default function StatusPage() {

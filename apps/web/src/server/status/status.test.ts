@@ -8,11 +8,11 @@ const disc = Uint8Array.from((IDL.accounts ?? []).find((a) => a.name === "Config
 const k = () => Keypair.generate().publicKey.toBytes();
 const configData = (paused: boolean) => concat(disc, k(), k(), k(), k(), u64le(1n), u64le(60n), Uint8Array.of(paused ? 1 : 0), Uint8Array.of(1), Uint8Array.of(1));
 
-const rpc = (o: { genesis?: string; deployed?: boolean; paused?: boolean; lamports?: number; treasury?: boolean } = {}): RpcLike => ({
+const rpc = (o: { genesis?: string; deployed?: boolean; paused?: boolean; lamports?: number; treasury?: boolean; usdc?: string } = {}): RpcLike => ({
   getGenesisHash: async () => o.genesis ?? DEVNET_GENESIS_HASH,
   getAccountInfo: async (key) => (key.equals(SOLSEND_PROGRAM_ID) ? (o.deployed === false ? null : { executable: true, data: new Uint8Array() }) : { executable: false, data: configData(!!o.paused) }),
   getBalance: async () => o.lamports ?? 1_000_000_000,
-  getTokenAccountBalance: async () => { if (o.treasury === false) throw new Error("nf"); return { value: { uiAmountString: "12.5" } }; },
+  getTokenAccountBalance: async () => { if (o.treasury === false) throw new Error("nf"); return { value: { uiAmountString: o.usdc ?? "12.5" } }; },
 });
 const base = (over = {}) => ({ rpc: rpc(), settler: Keypair.generate().publicKey, feePayer: Keypair.generate().publicKey, store: new MemoryStore(), lithicPing: async () => true, ...over });
 
@@ -58,6 +58,19 @@ describe("status checks", () => {
     const w = (await runChecks(base({ store, now: () => now }))).checks.find((c) => c.name === "quicknode last delivery")!;
     expect(w.warn).toBeUndefined();
     expect(w.detail).toMatch(/^waiting for the Stream/);
+  });
+  it("faucet: reports claims left; low and empty are warnings, never a silent green", async () => {
+    const faucet = Keypair.generate().publicKey;
+    const check = async (usdc: string | null, per = 5_000_000n) =>
+      (await runChecks(base({ rpc: usdc === null ? rpc({ treasury: false }) : rpc({ usdc }), faucet, faucetAmountBase: per }))).checks.find((c) => c.name === "test-money faucet")!;
+    expect(await check("100")).toEqual({ name: "test-money faucet", ok: true, detail: "100 devnet USDC: 20 claims of 5 left" });
+    expect(await check("12.5")).toMatchObject({ ok: true, warn: true, detail: "LOW (12.5 devnet USDC: 2 claims of 5 left)" });
+    expect(await check("4.999999")).toMatchObject({ ok: true, warn: true });
+    expect((await check("4.999999")).detail).toMatch(/^EMPTY \(4\.999999 devnet USDC: 0 claims of 5 left\): new users cannot get test money/);
+    expect((await check(null)).detail).toMatch(/^EMPTY \(0 devnet USDC/); // no token account yet
+    expect((await check("5", 1_000_000n)).detail).toBe("5 devnet USDC: 5 claims of 1 left");
+    // No faucet configured: no faucet check at all.
+    expect((await runChecks(base())).checks.some((c) => c.name === "test-money faucet")).toBe(false);
   });
   it("a throwing check is isolated and leaks no secret-looking text", async () => {
     const bad = { ...rpc(), getBalance: async () => { throw new Error("https://x.quiknode.pro/SECRETTOKEN123"); } };
