@@ -61,7 +61,7 @@ export function OutagePanel({ outage = false }: { outage?: boolean }) {
         <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-[12px] ${outage ? "bg-warn text-paper" : "bg-surface text-ink"}`}><Icon name="shield" className="h-5 w-5" /></span>
         <div className="min-w-0">
           <h2 id="outage-title" className="text-[17px] font-semibold tracking-[-0.01em]">{outage ? "Card issuer unreachable (simulated)" : "If the card issuer goes down"}</h2>
-          <p className="mt-0.5 text-[15px] leading-[22px] text-ink-2">Your money never left your wallet. Cards only pull at the moment of a swipe — and you can revoke every one of them in a single Solana transaction, even without SolSend or the issuer.</p>
+          <p className="mt-0.5 text-[15px] leading-[22px] text-ink-2">Your money never left your wallet. Cards only pull at the moment of a swipe — and you can revoke every one of them in a single Solana transaction that you sign yourself, even if the issuer is down.</p>
         </div>
       </div>
       <div className="mt-4 flex items-end justify-between gap-3 rounded-[14px] bg-surface px-3.5 py-3">
@@ -106,7 +106,7 @@ export function OutagePanel({ outage = false }: { outage?: boolean }) {
       <Sheet open={confirm} onClose={() => { if (!busy) setConfirm(false); }} labelledBy="revoke-title" dismissible={!busy} testId="revoke-sheet">
         <div className="space-y-4 pt-1">
           <h3 id="revoke-title" className="text-[22px] font-semibold tracking-[-0.02em]">Revoke {live} card{live === 1 ? "" : "s"}?</h3>
-          <p className="text-[15px] leading-[22px] text-ink-2">One Solana transaction removes every card&apos;s allowance{live > canPull ? ", including expired and frozen ones" : ""}. It works even if SolSend and the issuer are down. Your balance doesn&apos;t move; the cards can never pull again.</p>
+          <p className="text-[15px] leading-[22px] text-ink-2">One Solana transaction removes every card&apos;s allowance{live > canPull ? ", including expired and frozen ones" : ""}. It works even if the card issuer is down: you sign it yourself and it goes to Solana&apos;s Allowances program. Your balance doesn&apos;t move; the cards can never pull again.</p>
           <p className="text-[13px] leading-5 text-ink-3">Next, your wallet asks you to approve one transaction. Nothing is revoked until you approve it.</p>
           <div className="flex flex-col gap-2">
             <button type="button" className="btn-primary w-full !bg-no !text-paper" onClick={() => void revoke()} disabled={busy} data-testid="revoke-confirm">

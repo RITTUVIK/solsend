@@ -77,11 +77,11 @@ function Balance() {
         <div className="mt-2 text-[15px] leading-[22px] text-ink-2" data-testid="blast-radius">
           <span>
             {br.count > 0
-              ? <>Most that can ever be pulled: <strong className="tnum font-semibold text-ink" data-testid="blast-amount">{usd(br.base)}</strong> across {br.count} live card{br.count === 1 ? "" : "s"} — even by SolSend.</>
+              ? <>{br.renews ? "Most that can be pulled this month" : "Most that can ever be pulled"}: <strong className="tnum font-semibold text-ink" data-testid="blast-amount">{usd(br.base)}</strong> across {br.count} live card{br.count === 1 ? "" : "s"} — even by SolSend.</>
               : <>Nothing can be pulled from this wallet: <strong className="tnum font-semibold text-ink" data-testid="blast-amount">{usd(0n)}</strong> across 0 live cards.</>}
           </span>
           <InfoDisclosure label="How is this enforced?">
-            Each card is an onchain allowance. Nothing — not a hacked store, not a leaked number, not our server — can pull more than these caps. Revoke any of them in one transaction, even without SolSend.
+            Each card is an onchain allowance. Nothing — not a hacked store, not a leaked number, not our server — can pull more than these caps. A monthly card&apos;s cap comes back each month until you close it. You can revoke any of them in one transaction that you sign yourself.
           </InfoDisclosure>
         </div>
       )}

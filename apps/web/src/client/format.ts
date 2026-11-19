@@ -59,14 +59,24 @@ export function expiresIn(c: CardView, now = Date.now()): string | null {
   return `Expires in ${Math.round(s / 86400)}d`;
 }
 
-/** The most that can EVER be pulled from the wallet right now: sum of remaining caps on live, usable cards. */
-export function blastRadius(cards: CardView[] | null | undefined): { base: bigint; count: number } {
+/** A per-period cap that comes back: a monthly card with no expiry, or one that outlives its current period. */
+export function capRenews(c: CardView): boolean {
+  if (c.limit.type !== "per_period") return false;
+  if (!c.expiresAt) return true;
+  const life = Date.parse(c.expiresAt) - Date.parse(c.createdAt);
+  return c.limit.periodSecs != null && Number.isFinite(life) && life > c.limit.periodSecs * 1000;
+}
+
+/** The most that can be pulled from the wallet right now: sum of remaining caps on live, usable cards. `renews` is true
+ *  when one of them is a monthly cap that comes back next period, so the sum is "this month", not "ever". */
+export function blastRadius(cards: CardView[] | null | undefined): { base: bigint; count: number; renews: boolean } {
   let base = 0n;
   let count = 0;
+  let renews = false;
   for (const c of cards ?? []) {
-    if (c.status === "ACTIVE" && c.delegationLive && !isExpired(c) && c.issueState === "issued") { base += BigInt(c.limit.remainingBase); count++; }
+    if (c.status === "ACTIVE" && c.delegationLive && !isExpired(c) && c.issueState === "issued") { base += BigInt(c.limit.remainingBase); count++; renews ||= capRenews(c); }
   }
-  return { base, count };
+  return { base, count, renews };
 }
 
 export const limitSuffix = (c: CardView): string => (c.limit.type === "per_period" ? "/ month cap" : "lifetime cap");
