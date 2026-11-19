@@ -6,7 +6,7 @@ import { usePoll } from "@/client/hooks";
 import { useSession } from "@/client/session";
 import { sandboxName, storeName, timeAgo, usd, type FeedRow } from "@/client/format";
 import { voidErrorCopy, voidPurchase, type Voided } from "@/client/void";
-import { streamSummary } from "@/client/stream";
+import { approvalTokens, purchaseToken, streamDetail, streamSummary } from "@/client/stream";
 import { StoreTile } from "./CardVisual";
 import { ErrorNote, Icon, ProofField, ProofRow, QuickNodeBadge, Sheet, Skeleton, Spinner } from "./ui";
 
@@ -30,19 +30,22 @@ interface Item {
 
 function buildItems(rows: FeedRow[]): Item[] {
   const byToken = new Map<string, { approved?: FeedRow; settled?: FeedRow; refunded?: FeedRow }>();
+  const approvals = approvalTokens(rows);
   for (const r of rows) {
-    if (!r.lithicToken || !["authorization_approved", "settled", "refunded"].includes(r.kind)) continue;
-    const g = byToken.get(r.lithicToken) ?? {};
+    const token = purchaseToken(r, approvals);
+    if (!token || !["authorization_approved", "settled", "refunded"].includes(r.kind)) continue;
+    const g = byToken.get(token) ?? {};
     if (r.kind === "authorization_approved") g.approved ??= r;
     if (r.kind === "settled") g.settled ??= r;
     if (r.kind === "refunded") g.refunded ??= r;
-    byToken.set(r.lithicToken, g);
+    byToken.set(token, g);
   }
   const out: Item[] = [];
   const used = new Set<string>();
   for (const r of rows) {
     if (used.has(r.id)) continue;
-    const g = r.lithicToken ? byToken.get(r.lithicToken) : undefined;
+    const token = purchaseToken(r, approvals);
+    const g = token ? byToken.get(token) : undefined;
     if (g && (g.approved || g.settled) && ["authorization_approved", "settled", "refunded"].includes(r.kind)) {
       const head = g.approved ?? g.settled!;
       for (const x of [g.approved, g.settled, g.refunded]) if (x) used.add(x.id);
@@ -195,7 +198,7 @@ function DetailSheet({ it, onClose }: { it: Item | null; onClose: () => void }) 
               {r.lithicToken && <ProofField k="Card network">Lithic sandbox · auth <code className="break-all font-mono text-[12px]">{r.lithicToken}</code></ProofField>}
               {settlement(it)!.remainingBase != null && <ProofField k="Left on card">{usd(settlement(it)!.remainingBase)}</ProofField>}
               <ProofField k="Commitment"><code className="font-mono text-[12px]">sha256(&apos;solsend:auth:v1:&apos; + token)</code>, shown in the CardSettled event. The token itself is not written onchain.</ProofField>
-              <ProofField k="Seen by">{it.settled ? SOURCE[it.settled.source] : NOT_STREAMED}</ProofField>
+              <ProofField k="Seen by">{it.settled ? SOURCE[it.settled.source] : NOT_STREAMED}{streamDetail(it.settled) && <span className="tnum mt-0.5 block text-ink-3" data-testid="qn-detail">{streamDetail(it.settled)}</span>}</ProofField>
             </>} />
         )}
         {purchase && it.refunded?.signature && <ProofRow sig={it.refunded.signature} title="Refund on Solana" linkLabel="Refund transaction (devnet)" />}

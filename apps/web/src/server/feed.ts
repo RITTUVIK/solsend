@@ -10,7 +10,7 @@ export function toFeedRow(r: FeedEventRow): TFeedRow | null {
   return {
     id: r.id, cardPda: r.card_pda, kind: r.kind as TFeedRow["kind"], at: new Date(r.at).toISOString(), source: r.source,
     amountBase: r.amount_base, remainingBase: r.remaining_base, signature: r.signature, explorer: r.signature ? explorerTx(r.signature) : null,
-    lithicToken: r.lithic_token, merchant: r.merchant, reason: r.reason, sandbox: true,
+    lithicToken: r.lithic_token, merchant: r.merchant, reason: r.reason, sandbox: true, slot: r.slot == null ? null : Number(r.slot),
   };
 }
 

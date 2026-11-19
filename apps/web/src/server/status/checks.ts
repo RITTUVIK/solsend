@@ -4,8 +4,11 @@ import "server-only";
 import { api, configPda, DEVNET_GENESIS_HASH, decodeConfig, LITHIC_SANDBOX_BASE, SOLSEND_PROGRAM_ID, treasuryAta } from "@solsend/shared";
 import type { PublicKey } from "@solana/web3.js";
 import type { Store } from "../store";
+import { toFeedRow } from "../feed";
+import { streamSummary } from "../../client/stream";
 
 type Check = ReturnType<typeof api.StatusCheck.parse>;
+const ago = (ms: number) => (ms < 120_000 ? `${Math.max(0, Math.round(ms / 1000))} s` : ms < 7_200_000 ? `${Math.round(ms / 60_000)} min` : `${(ms / 3_600_000).toFixed(1)} h`);
 export type RpcLike = {
   getGenesisHash(): Promise<string>;
   getAccountInfo(k: PublicKey): Promise<{ executable: boolean; data: Uint8Array } | null>;
@@ -26,7 +29,7 @@ export const SETTLE_COST_LAMPORTS = 1_571_000;
 export const MIN_RUNWAY_SETTLES = 20;
 
 const sol = (l: number) => (l / 1e9).toFixed(3);
-async function run(name: string, fn: () => Promise<{ ok: boolean; detail: string }>): Promise<Check> {
+async function run(name: string, fn: () => Promise<{ ok: boolean; detail: string; warn?: boolean }>): Promise<Check> {
   try { return { name, ...(await fn()) }; } catch (e) { return { name, ok: false, detail: `check failed (${e instanceof Error ? e.constructor.name : "error"})` }; }
 }
 
@@ -82,11 +85,14 @@ export async function runChecks(d: StatusDeps): Promise<ReturnType<typeof api.St
       return { ok: true, detail: `${store.kind} reachable` };
     }));
     checks.push(await run("quicknode last delivery", async () => {
-      const rows = await store.listFeed({ limit: 100 });
-      const last = rows.find((r) => r.source === "quicknode");
-      if (!last) return { ok: true, detail: "no deliveries yet (stream is kept paused outside demo windows)" };
-      const age = Math.max(0, Math.round((now() - Date.parse(last.at)) / 1000));
-      return { ok: true, detail: `last quicknode feed row ${age}s ago` };
+      // Same rule as the Activity header: is the NEWEST onchain event backed by a recorded Stream delivery? A paused or
+      // failing stream is a warning (payments never depend on it), never a silent "ok".
+      const s = streamSummary((await store.listFeed({ limit: 100 })).map(toFeedRow).filter((r) => r !== null), now());
+      const last = s.lastDeliveryAt ? `last delivery ${ago(now() - Date.parse(s.lastDeliveryAt))} ago` : "no delivery recorded";
+      if (s.state === "delivered") return { ok: true, detail: `delivering: the newest onchain event was streamed; ${last}` };
+      if (s.state === "none") return { ok: true, detail: `no onchain events yet; ${last}` };
+      if (s.state === "pending") return { ok: true, detail: `waiting for the Stream to deliver the newest onchain event; ${last}` };
+      return { ok: true, warn: true, detail: `NOT DELIVERING: the newest onchain event (${ago(now() - Date.parse(s.newestEventAt!))} ago) was not streamed; ${last}. The stream is paused outside demo windows, or failing` };
     }));
     checks.push(await run("refunds failing", async () => {
       const n = await store.countAuthorizations({ reconcileAction: "anomaly_refund_failing" });

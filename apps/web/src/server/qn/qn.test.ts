@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { MemoryStore } from "../store";
-import { handleQuickNodeWebhook } from "./handler";
+import { AUTH_LOOKUP_RETRY_MS, handleQuickNodeWebhook, verifySettlement } from "./handler";
 import { signQuickNode, timestampFresh, verifyQuickNodeSignature } from "./verify";
+
+const noSleep = async () => {};
 
 const TOKEN = "unit-test-token-0123456789abcdef";
 const SIG = "5".repeat(87);
@@ -59,10 +61,35 @@ describe("quicknode webhook handler", () => {
     expect(r2.status).toBe(200);
     expect(store.feed).toHaveLength(1);
   });
-  it("unknown auth hash or store without the lookup -> lithic_token null", async () => {
+  it("unknown auth hash or store without the lookup -> lithic_token null, after ONE retry, with a Stream alert", async () => {
     const store = new MemoryStore();
-    await handleQuickNodeWebhook(mkReq(JSON.stringify(payload())), { token: TOKEN, store });
+    const waits: number[] = [];
+    await handleQuickNodeWebhook(mkReq(JSON.stringify(payload())), { token: TOKEN, store, sleep: async (ms) => { waits.push(ms); } });
     expect(store.feed[0]!.lithic_token).toBeNull();
+    expect(waits).toEqual([AUTH_LOOKUP_RETRY_MS]);
+    expect(store.feed[0]!.reason).toMatch(/^Stream alert: no card-network authorization/);
+  });
+  it("race: the delivery beats the ASA's authorization write -> retried once, then linked and cross-checked", async () => {
+    const store = new MemoryStore();
+    const row = { lithic_token: "lithic-tok-1", card_pda: CARD, amount_cents: 1, decision: "APPROVED", confirmed_at: new Date(Date.now() - 600).toISOString() };
+    let calls = 0;
+    (store as any).getAuthorizationByAuthHash = async () => (++calls === 1 ? null : row);
+    const ok = await handleQuickNodeWebhook(mkReq(JSON.stringify(payload())), { token: TOKEN, store, sleep: noSleep });
+    expect(ok.status).toBe(200);
+    expect(calls).toBe(2);
+    expect(store.feed[0]).toMatchObject({ lithic_token: "lithic-tok-1", slot: 123 });
+    expect(store.feed[0]!.reason).toMatch(/^Amount and card match the card-network authorization · delivered \d+ ms after SolSend confirmed the settle$/);
+  });
+  it("verifySettlement: exact match with latency; amount/card mismatch, declined and missing authorizations are alerts", () => {
+    const ev = { name: "CardSettled", card: CARD, amount: "120000" };
+    const auth = { lithic_token: "t", card_pda: CARD, amount_cents: 12, decision: "APPROVED", confirmed_at: "2026-11-19T22:00:00.000Z" };
+    const at = Date.parse("2026-11-19T22:00:00.584Z");
+    expect(verifySettlement(ev, auth, at)).toBe("Amount and card match the card-network authorization · delivered 584 ms after SolSend confirmed the settle");
+    expect(verifySettlement(ev, { ...auth, confirmed_at: null }, at)).toBe("Amount and card match the card-network authorization");
+    expect(verifySettlement(ev, { ...auth, amount_cents: 13 }, at)).toMatch(/^Stream alert: the onchain amount differs/);
+    expect(verifySettlement(ev, { ...auth, card_pda: OWNER }, at)).toMatch(/^Stream alert: the onchain card differs/);
+    expect(verifySettlement(ev, { ...auth, decision: "INSUFFICIENT_FUNDS" }, at)).toMatch(/did not approve/);
+    expect(verifySettlement(ev, null, at)).toMatch(/no card-network authorization/);
   });
   it("tampered body -> 401, wrong key -> 401, no rows", async () => {
     const store = new MemoryStore();
@@ -78,11 +105,15 @@ describe("quicknode webhook handler", () => {
     const old = String(Math.floor(Date.now() / 1000) - 3600);
     expect((await handleQuickNodeWebhook(mkReq(JSON.stringify(payload()), { ts: old }), { token: TOKEN, store })).status).toBe(401);
   });
-  it("replayed nonce -> 409", async () => {
+  it("replayed nonce -> acknowledged (2xx, so QuickNode never pauses the stream) but not processed again", async () => {
     const store = new MemoryStore();
     const body = JSON.stringify(payload());
-    expect((await handleQuickNodeWebhook(mkReq(body), { token: TOKEN, store })).status).toBe(200);
-    expect((await handleQuickNodeWebhook(mkReq(body), { token: TOKEN, store })).status).toBe(409);
+    expect((await handleQuickNodeWebhook(mkReq(body), { token: TOKEN, store, sleep: noSleep })).status).toBe(200);
+    store.feed.length = 0;
+    const again = await handleQuickNodeWebhook(mkReq(body), { token: TOKEN, store, sleep: noSleep });
+    expect(again.status).toBe(200);
+    expect(await again.json()).toEqual({ ok: true, duplicate: true });
+    expect(store.feed).toHaveLength(0);
   });
   it("unsigned payload that is not QnPayload -> 400; unconfigured token -> 503", async () => {
     const store = new MemoryStore();

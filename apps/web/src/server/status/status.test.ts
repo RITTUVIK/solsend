@@ -38,8 +38,26 @@ describe("status checks", () => {
     await store.upsertAuthorization({ lithic_token: "old", decision: "APPROVED" });
     store.auths.get("old")!.created_at = new Date(now - 600_000).toISOString();
     const r = await runChecks(base({ store, now: () => now }));
-    expect(r.checks.find((c) => c.name === "quicknode last delivery")!.detail).toMatch(/30s ago/);
+    expect(r.checks.find((c) => c.name === "quicknode last delivery")!.detail).toBe("delivering: the newest onchain event was streamed; last delivery 30 s ago");
     expect(r.checks.find((c) => c.name === "unreconciled authorizations")!.ok).toBe(false);
+  });
+  it("quicknode: a newer onchain event without a delivery is a WARNING (not a silent ok, not an outage)", async () => {
+    const store = new MemoryStore();
+    const now = Date.parse("2026-11-19T22:00:00Z");
+    const row = (o: Record<string, unknown>) => ({ owner_wallet: null, card_pda: "c", amount_base: null, remaining_base: null, lithic_token: null, merchant: null, reason: null, slot: null, ...o }) as Parameters<MemoryStore["insertFeedEvent"]>[0];
+    await store.insertFeedEvent(row({ kind: "settled", signature: "old", source: "quicknode", slot: 1, at: new Date(now - 39 * 3_600_000).toISOString() }));
+    await store.insertFeedEvent(row({ kind: "authorization_approved", signature: "new", source: "lithic", at: new Date(now - 28 * 3_600_000).toISOString() }));
+    await store.insertFeedEvent(row({ kind: "faucet", signature: "f", source: "app", at: new Date(now - 60_000).toISOString() })); // never streamed
+    const r = await runChecks(base({ store, now: () => now }));
+    const qn = r.checks.find((c) => c.name === "quicknode last delivery")!;
+    expect(qn).toMatchObject({ ok: true, warn: true });
+    expect(qn.detail).toBe("NOT DELIVERING: the newest onchain event (28.0 h ago) was not streamed; last delivery 39.0 h ago. The stream is paused outside demo windows, or failing");
+    expect(api.StatusResponse.parse(r).checks.find((c) => c.name === "quicknode last delivery")!.warn).toBe(true);
+    // a fresh event still inside the delivery window is "waiting", not a warning
+    await store.insertFeedEvent(row({ kind: "registered", signature: "fresh", source: "app", at: new Date(now - 5_000).toISOString() }));
+    const w = (await runChecks(base({ store, now: () => now }))).checks.find((c) => c.name === "quicknode last delivery")!;
+    expect(w.warn).toBeUndefined();
+    expect(w.detail).toMatch(/^waiting for the Stream/);
   });
   it("a throwing check is isolated and leaks no secret-looking text", async () => {
     const bad = { ...rpc(), getBalance: async () => { throw new Error("https://x.quiknode.pro/SECRETTOKEN123"); } };

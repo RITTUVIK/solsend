@@ -78,6 +78,8 @@ export const FeedRow = z.object({
   id: z.string(), cardPda: Pubkey.nullable(), kind: FeedKindZ, at: z.string(), source: z.enum(["quicknode", "lithic", "reconciler", "app"]),
   amountBase: Base.nullable(), remainingBase: Base.nullable(), signature: Signature.nullable(), explorer: z.string().nullable(),
   lithicToken: z.string().nullable(), merchant: z.string().nullable(), reason: z.string().nullable(), sandbox: z.literal(true),
+  /** Devnet slot, known only from a QuickNode Stream delivery (rows SolSend writes itself carry none). */
+  slot: z.number().nullable().optional(),
 });
 /** GET /api/feed?cardPda=&since=<iso> — UI polls every ~1.5 s (no direct browser→Supabase access). */
 export const FeedResponse = z.object({ rows: z.array(FeedRow), cursor: z.string().nullable() }); // rows newest-first; cursor = newest `at` (pass as since=)
@@ -99,7 +101,8 @@ export const QnMatch = z.object({ signature: Signature, slot: z.number(), blockT
 export const QnPayload = z.object({ solsend: z.literal("v1"), matches: z.array(QnMatch) });
 
 // ── Ops / status ─────────────────────────────────────────────────────────────────────────
-export const StatusCheck = z.object({ name: z.string(), ok: z.boolean(), detail: z.string() });
+/** `warn`: degraded but not failing (e.g. the QuickNode Stream is not delivering; payments do not depend on it). */
+export const StatusCheck = z.object({ name: z.string(), ok: z.boolean(), detail: z.string(), warn: z.boolean().optional() });
 export const StatusResponse = z.object({ ok: z.boolean(), checkedAt: z.string(), checks: z.array(StatusCheck) });
 export const IssuerOutageRequest = z.object({ enabled: z.boolean() });
 

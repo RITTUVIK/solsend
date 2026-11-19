@@ -7,7 +7,8 @@ import { FEED_POLL_MS } from "@/client/config";
 import { usePoll } from "@/client/hooks";
 import { declineCopy, declineStory, sandboxName, usd, type CardView, type DeclineFix } from "@/client/format";
 import { voidErrorCopy, voidPurchase, type Voided } from "@/client/void";
-import { QN_LATE_MS, QN_WATCH_MS, streamedBy } from "@/client/stream";
+import { QN_LATE_MS, QN_WATCH_MS, streamDetail, streamedRow } from "@/client/stream";
+import type { FeedRow } from "@/client/format";
 import { AllowanceFlow, WalletDelta } from "./AllowanceFlow";
 import { CardVisual } from "./CardVisual";
 import { ErrorNote, Icon, ProofField, ProofRow, QuickNodeBadge, Sheet, Spinner } from "./ui";
@@ -59,11 +60,11 @@ export function ApprovalSheet({ attempt, walletNow, onClose, onFix, onVoided }: 
     return () => { clearTimeout(late); clearTimeout(stop); };
   }, [settleSig]);
   const refundPending = !!v && !v.refundSignature;
-  const [qnSeen, setQnSeen] = useState(false);
-  useEffect(() => { setQnSeen(false); }, [settleSig]);
+  const [qnSeen, setQnSeen] = useState<FeedRow | null>(null); // the recorded delivery itself (slot + cross-check)
+  useEffect(() => { setQnSeen(null); }, [settleSig]);
   const watchQn = !!settleSig && !qnSeen && qnPhase !== "stopped";
   const feed = usePoll(() => client.feed(attempt?.card.cardPda), FEED_POLL_MS, (refundPending || watchQn) && !!attempt);
-  useEffect(() => { if (!qnSeen && streamedBy(feed.data, settleSig)) setQnSeen(true); }, [feed.data, settleSig, qnSeen]);
+  useEffect(() => { const r = qnSeen ? null : streamedRow(feed.data, settleSig); if (r) setQnSeen(r); }, [feed.data, settleSig, qnSeen]);
   const fromFeed = feed.data?.find((r) => r.kind === "refunded" && r.lithicToken === res?.lithicToken && r.signature);
   const refundSig = v?.refundSignature ?? fromFeed?.signature ?? null;
 
@@ -154,8 +155,8 @@ export function ApprovalSheet({ attempt, walletNow, onClose, onFix, onVoided }: 
               </div>
             )}
             {settleSig && (
-              <div className="flex justify-end" aria-live="polite" data-testid="qn-evidence" data-state={qnSeen ? "delivered" : qnPhase === "watch" ? "pending" : "not_delivered"}>
-                {qnSeen ? <QuickNodeBadge label="Settlement streamed by QuickNode" />
+              <div className="flex flex-col items-end gap-1" aria-live="polite" data-testid="qn-evidence" data-state={qnSeen ? "delivered" : qnPhase === "watch" ? "pending" : "not_delivered"}>
+                {qnSeen ? <><QuickNodeBadge label="Settlement streamed by QuickNode" />{streamDetail(qnSeen) && <span className="tnum text-right text-[11px] leading-4 text-ink-3" data-testid="qn-detail">{streamDetail(qnSeen)}</span>}</>
                   : qnPhase === "watch" ? <span className="inline-flex h-6 items-center gap-1.5 rounded-full bg-sunken px-2.5 text-[11px] font-semibold text-ink-3"><Spinner className="h-3 w-3" />Waiting for QuickNode Stream…</span>
                   : <span className="inline-flex h-6 items-center gap-1.5 rounded-full bg-sunken px-2.5 text-[11px] font-semibold text-ink-3"><span className="h-1.5 w-1.5 rounded-full bg-ink-3" aria-hidden="true" />Not streamed yet · QuickNode Stream may be paused</span>}
               </div>
