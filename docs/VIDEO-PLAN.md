@@ -35,7 +35,7 @@ Stream OFF for all of this.
 |---|---|---|---|
 | 1 | Ritty | Set up the window as in section 1. Hide the bookmarks bar. Do Not Disturb on. Undock DevTools into its own window | A 10-second test capture is sharp and shows only the page |
 | 2 | Ritty | Sign in. **Close the old Temu card** from its card page. One approval | Only cards you will use on camera remain |
-| 3 | Ritty | **New card** → **Netflix** → expiry **2 minutes (demo)** → create. One approval | It must be at least 3 minutes old before take F |
+| 3 | Ritty | **New card** → **Netflix** → **More options** → expiry **2 minutes (demo)** → create. One approval | It must be at least 3 minutes old before take F |
 | 4 | Ritty | Drag the app pane to its widest. Open **Wallet** | Balance about $28. Two $12 payments fit |
 | 5 | Darren | From `scripts/`: `pnpm qn:stream activate`, then `pnpm qn:stream get` | `"status":"active"`. Start recording within a few minutes |
 
@@ -55,7 +55,7 @@ Rules while recording:
 | **A2** | **Done**. Then **Pay $12.00** again and wait, without talking | The same result at real speed. This payment is warm, so the time chip is the one to read aloud | 0:42, 1:16 |
 | **B** | In the open panel: **Settled on Solana** → **View settlement on Explorer (devnet)**. Hold 6 seconds | **Success**, and the instruction list with both program addresses | 1:04 |
 | **C** | Back in the app: **Try this card's number at Amazon** → the amber callout → **Try the leaked number at Amazon**. Hold 3 seconds | The callout, then **Declined**, "Card locked to another store", "Your USDC didn't move" | 0:07 |
-| **D** | **Done** → **Wallet**. Hold 4 seconds | The balance and "Most that can ever be pulled: $X across N live cards — even by SolSend." | 0:16 |
+| **D** | **Done** → **Wallet**. Hold 4 seconds | The balance and "Your cards can spend at most $X." | 0:16 |
 | **E** | **Activity**. Scroll once slowly, then open the $12 purchase | **Streamed by QuickNode · last event …**; in the purchase, **Seen by** with the slot line | 1:16 |
 | **F** | **Wallet**: the Netflix card stamped **EXPIRED**. Then **Demo store** → select the Netflix card → **Monthly plan $15.49** → pay | The stamp, then **Declined**: "This card expired when your free trial ended." | 1:38 |
 | **G** (last) | **Wallet** → **Revoke all cards…** → **Revoke all cards** → approve. **This really revokes every card** | "All cards revoked in one transaction." and "Balance still $X — nothing was moved." | 1:56 |

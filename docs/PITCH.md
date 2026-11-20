@@ -33,7 +33,7 @@ About 300 words outside the live part.
 
 **Idea (0:30).** "SolSend gives every store its own card, and the card holds nothing. Your money stays in your own wallet until the second you pay. Watch."
 
-**Pay (live 1).** Point at "Most that can ever be pulled". Demo store, **Earbuds $12**, **Pay**. Stay silent through "Settling on Solana before approval…". At **Approved**: "The money moved first, on Solana. Then we said yes." When **Settlement streamed by QuickNode** appears: "And that badge is a QuickNode Stream delivering the event to us." Open the Explorer link only if you are ahead of time.
+**Pay (live 1).** Point at "Your cards can spend at most". Demo store, **Earbuds $12**, **Pay**. Stay silent through "Settling on Solana before approval…". At **Approved**: "The money moved first, on Solana. Then we said yes." When **Settlement streamed by QuickNode** appears: "And that badge is a QuickNode Stream delivering the event to us." Open the Explorer link only if you are ahead of time.
 
 **Leaked number (live 2).** "Now imagine Temu leaks this card's number." Tap **Try this card's number at Amazon**, then **Try the leaked number at Amazon**. **Declined.** Pause for two full seconds. "Useless anywhere else. My money didn't move."
 

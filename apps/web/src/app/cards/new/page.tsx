@@ -13,10 +13,10 @@ import { ErrorNote, Icon, Spinner, radioKeys } from "@/components/ui";
 type Kind = keyof typeof KIND_LABEL;
 const MIN_PER_DAY = 1440;
 const STORES: { name: string; kind: Kind; dollars: string; expires: number | null; tag: string }[] = [
-  { name: "Temu", kind: "STORE_LOCKED", dollars: "40", expires: null, tag: "First try" },
+  { name: "Temu", kind: "STORE_LOCKED", dollars: "40", expires: null, tag: "New store" },
   { name: "Amazon", kind: "STORE_LOCKED", dollars: "50", expires: null, tag: "Everyday" },
   { name: "Netflix", kind: "SUBSCRIPTION", dollars: "15.49", expires: 7 * MIN_PER_DAY, tag: "Free trial" },
-  { name: "Other", kind: "ONE_TIME", dollars: "25", expires: null, tag: "One-time" },
+  { name: "Other", kind: "ONE_TIME", dollars: "25", expires: null, tag: "One purchase" },
 ];
 const KINDS: { kind: Kind; title: string; hint: string }[] = [
   { kind: "STORE_LOCKED", title: "Store-locked", hint: "One lifetime cap" },
@@ -58,6 +58,7 @@ function Content() {
   const [failure, setFailure] = useState<string | null>(null);
   const [needSetup, setNeedSetup] = useState(false);
   const [setupDone, setSetupDone] = useState(false);
+  const [more, setMore] = useState(false);
 
   const merchantName = (store === "Other" ? custom.trim() : store) || "";
   const cents = Math.round(Number(dollars) * 100);
@@ -127,12 +128,13 @@ function Content() {
     );
   }
 
-  // ── Form ─────────────────────────────────────────────────────────────────────
+  // ── Form: name it, pick where it works, set a limit. Everything else is under "More options". ──────────────────
+  const kindTitle = KINDS.find((k) => k.kind === kind)!.title;
   return (
     <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); if (formOk) void create(); }}>
       <div>
         <h1 className="text-[28px] font-semibold leading-8 tracking-[-0.03em]">New card</h1>
-        <p className="mt-1 text-[15px] text-ink-2">One card per store. It holds $0 and can only pull what you allow.</p>
+        <p className="mt-1 text-[15px] text-ink-2">Name it, pick where it works, set a limit.</p>
       </div>
 
       {/* Live preview: what you configure is what you get */}
@@ -142,8 +144,13 @@ function Content() {
 
       {(setupNeeded || setupDone) && <WalletSetup onDone={() => { setNeedSetup(false); setSetupDone(true); }} />}
 
+      <div>
+        <label className="label" htmlFor="label">Card name</label>
+        <input id="label" className="input" value={label} maxLength={32} placeholder={cardLabel} onChange={(e) => setLabel(e.target.value)} />
+      </div>
+
       <fieldset className="min-w-0">
-        <legend className="label">Store</legend>
+        <legend className="label">Where will you use it?</legend>
         <div className="grid grid-cols-4 gap-2" role="radiogroup" onKeyDown={radioKeys} aria-label="Store">
           {STORES.map((s) => (
             <button key={s.name} type="button" role="radio" aria-checked={store === s.name} onClick={() => pickStore(s)}
@@ -162,19 +169,8 @@ function Content() {
         )}
       </fieldset>
 
-      <fieldset className="min-w-0">
-        <legend className="label">Card type</legend>
-        <div className="grid grid-cols-3 gap-1 rounded-[14px] bg-sunken p-1" role="radiogroup" onKeyDown={radioKeys} aria-label="Card type">
-          {KINDS.map((k) => (
-            <button key={k.kind} type="button" role="radio" aria-checked={kind === k.kind} onClick={() => setKind(k.kind)}
-              className={`min-h-11 rounded-[11px] px-1 text-[14px] font-semibold transition ${kind === k.kind ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"}`}>{k.title}</button>
-          ))}
-        </div>
-        <p className="mt-1.5 text-[13px] text-ink-3">{KINDS.find((k) => k.kind === kind)!.hint}</p>
-      </fieldset>
-
       <div>
-        <label className="label" htmlFor="limit">{kind === "SUBSCRIPTION" ? "Monthly limit (USD)" : "Lifetime limit (USD)"}</label>
+        <label className="label" htmlFor="limit">{kind === "SUBSCRIPTION" ? "Monthly limit (USD)" : "Spending limit (USD)"}</label>
         <div className="flex items-center gap-1 rounded-[14px] bg-surface px-3.5 ring-1 ring-line ring-inset focus-within:ring-2 focus-within:ring-ink">
           <span className="text-[22px] font-semibold text-ink-3" aria-hidden="true">$</span>
           <input id="limit" className="tnum min-h-14 w-full bg-transparent text-[22px] font-semibold outline-none" inputMode="decimal" type="number" min={1} max={500} step="0.01"
@@ -186,33 +182,45 @@ function Content() {
         {!limitOk && <p id="limit-err" className="mt-1.5 text-sm text-no" role="alert">Pick a limit between $1.00 and $500.00.</p>}
       </div>
 
-      <fieldset className="min-w-0">
-        <legend className="label">Auto-expire this card</legend>
-        <div className="flex flex-wrap gap-2" role="radiogroup" onKeyDown={radioKeys} aria-label="Auto-expire this card">
-          {EXPIRY.map((e) => (
-            <button key={e.label} type="button" role="radio" aria-checked={expires === e.minutes} onClick={() => setExpires(e.minutes)} className="pick aria-checked:bg-ink aria-checked:text-paper aria-checked:ring-ink"
-              data-testid={`expiry-${e.minutes ?? "never"}`}>{e.label}</button>
-          ))}
-        </div>
-        <p className="mt-1.5 text-[13px] text-ink-3">Enforced onchain: after expiry, every pull fails — a free trial can&apos;t quietly roll into a paid plan.</p>
-      </fieldset>
-
       <div>
-        <label className="label" htmlFor="label">Card name</label>
-        <input id="label" className="input" value={label} maxLength={32} placeholder={cardLabel} onChange={(e) => setLabel(e.target.value)} />
-      </div>
-
-      <div className="rounded-[16px] bg-surface p-4 text-[15px] leading-[22px] text-ink-2 ring-1 ring-line ring-inset" data-testid="explain">
-        <p>
-          <strong className="text-ink">Your USDC stays in your wallet.</strong> This card can pull at most <strong className="tnum text-ink">${limitOk ? (cents / 100).toFixed(2) : "X"}</strong>
-          {kind === "SUBSCRIPTION" ? " per month" : ""}, only at <strong className="text-ink">{merchantName ? (preset ? `${merchantName} (sandbox)` : "the first store that charges it") : "the store you pick"}</strong>
-          {expires != null ? <>, and it expires <strong className="text-ink">{exp.short}</strong></> : null}.
-        </p>
-        <p className="mt-1.5 text-[13px] text-ink-3">{preset ? `Locked to ${merchantName} (sandbox) from the moment it's created, so a leaked number is useless anywhere else.` : "Other-store cards lock to the first store that charges them."} You&apos;ll approve one signature in your wallet.</p>
+        <button type="button" aria-expanded={more} aria-controls="more-options" onClick={() => setMore((m) => !m)} data-testid="more-options"
+          className="flex min-h-11 w-full items-center justify-between gap-3 rounded-[12px] text-left text-[15px] font-medium text-ink-2 hover:text-ink">
+          <span>More options <span className="font-normal text-ink-3">· {kindTitle}{expires != null ? ` · ends ${exp.short}` : ""}</span></span>
+          <Icon name="chevron" className={`h-4 w-4 shrink-0 transition-transform duration-200 ${more ? "rotate-180" : ""}`} />
+        </button>
+        {more && (
+          <div id="more-options" className="anim-rise mt-2 space-y-5 rounded-[16px] bg-sunken/60 p-4">
+            <fieldset className="min-w-0">
+              <legend className="label">Card type</legend>
+              <div className="grid grid-cols-3 gap-1 rounded-[14px] bg-sunken p-1" role="radiogroup" onKeyDown={radioKeys} aria-label="Card type">
+                {KINDS.map((k) => (
+                  <button key={k.kind} type="button" role="radio" aria-checked={kind === k.kind} onClick={() => setKind(k.kind)}
+                    className={`min-h-11 rounded-[11px] px-1 text-[14px] font-semibold transition ${kind === k.kind ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"}`}>{k.title}</button>
+                ))}
+              </div>
+              <p className="mt-1.5 text-[13px] text-ink-3">{KINDS.find((k) => k.kind === kind)!.hint}</p>
+            </fieldset>
+            <fieldset className="min-w-0">
+              <legend className="label">Auto-expire this card</legend>
+              <div className="flex flex-wrap gap-2" role="radiogroup" onKeyDown={radioKeys} aria-label="Auto-expire this card">
+                {EXPIRY.map((e) => (
+                  <button key={e.label} type="button" role="radio" aria-checked={expires === e.minutes} onClick={() => setExpires(e.minutes)} className="pick aria-checked:bg-ink aria-checked:text-paper aria-checked:ring-ink"
+                    data-testid={`expiry-${e.minutes ?? "never"}`}>{e.label}</button>
+                ))}
+              </div>
+              <p className="mt-1.5 text-[13px] text-ink-3">Enforced onchain: after expiry, every pull fails, so a free trial can&apos;t quietly roll into a paid plan.</p>
+            </fieldset>
+          </div>
+        )}
       </div>
 
       {err && <ErrorNote>{err}</ErrorNote>}
-      <div className="sticky bottom-[calc(60px+env(safe-area-inset-bottom))] z-10 -mx-4 bg-gradient-to-t from-paper from-70% to-transparent px-4 pb-3 pt-4 sm:static sm:mx-0 sm:bg-none sm:p-0">
+      <p className="text-center text-[14px] leading-5 text-ink-2" data-testid="explain">
+        <strong className="font-semibold text-ink">Your USDC stays in your wallet.</strong> It can spend at most <strong className="tnum font-semibold text-ink">${limitOk ? (cents / 100).toFixed(2) : "X"}</strong>
+        {kind === "SUBSCRIPTION" ? " a month" : ""}, only at {merchantName ? (preset ? `${merchantName} (sandbox)` : "the first store that charges it") : "the store you pick"}
+        {expires != null ? `, and it expires ${exp.short}` : ""}.
+      </p>
+      <div className="sticky bottom-[calc(60px+env(safe-area-inset-bottom))] z-10 -mx-4 !mt-3 bg-gradient-to-t from-paper from-70% to-transparent px-4 pb-3 pt-4 sm:static sm:mx-0 sm:bg-none sm:p-0">
         <button type="submit" disabled={!formOk} className="btn-primary w-full !min-h-14 !text-[17px]" data-testid="create-card" aria-describedby={blocker ? "create-blocker" : undefined}>
           {stage === "preparing" ? <Spinner /> : <Icon name="plus" className="h-5 w-5" strokeWidth={2.4} />}Create {merchantName || "store"} card · ${limitOk ? (cents / 100).toFixed(2) : "—"}
         </button>

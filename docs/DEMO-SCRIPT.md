@@ -19,7 +19,7 @@ Commands run from `scripts/` ([DEPLOY.md](DEPLOY.md) section 4; credentials are 
 | 30 min before | Open `https://solsend-ashen.vercel.app/status` and `/api/status` | All checks green, including the settler SOL runway line and no failing refunds. Checkout returns 503 `demo_paused_low_sol` below 0.03 SOL |
 | 30 min before | Log in on the presenter device; wallet funded with **$40+ devnet USDC**; wallet already set up | **Wallet** shows the balance. The faucet default is 5 USDC per claim, once per hour per wallet, so raise `FAUCET_AMOUNT_BASE` on Vercel or pre-fund the wallet. Use **Add test USDC** if needed. (If the checklist still shows "Set up your wallet", tap **Set up wallet · free** and approve once) |
 | 30 min before | Pre-create a spare Temu card (**New card**, Temu tile "First try", $40) | Visible as a card on **Wallet** |
-| **At least 3 minutes before stage** | Create the Netflix 2-minute trial: **New card**, tile **Netflix** ("Free trial"), expiry chip **2 minutes (demo)**, then **Create Netflix card · $15.49** and approve once | Card named "Netflix free trial"; it will read "Expired" by the time you reach beat 5. If you create it too late, skip beat 5 |
+| **At least 3 minutes before stage** | Create the Netflix 2-minute trial: **New card**, tile **Netflix** ("Free trial"), **More options** → expiry chip **2 minutes (demo)**, then **Create Netflix card · $15.49** and approve once | Card named "Netflix free trial"; it will read "Expired" by the time you reach beat 5. If you create it too late, skip beat 5 |
 | Right before | `pnpm qn:stream activate` (from `scripts/`) | `pnpm qn:stream get` shows active, and **Activity** reads **Streamed by QuickNode · last event …** after the next onchain action |
 | Right after | `pnpm qn:stream pause`, then `pnpm qn:stream get` | `paused` (Streams bill per processed block) |
 | Always | Backup video open in a second window; a second browser profile already logged in | See fallback plan |
@@ -73,7 +73,7 @@ Cumulative timing. "Say" is one or two plain sentences.
 
 ### 7. The issuer dies (3:30 to 4:00)
 
-- **Click:** on **Wallet**, scroll to the Safety card "If the card issuer goes down". Tap **Revoke all cards…**. In the sheet "Revoke N cards?" tap **Revoke all cards**. The sheet closes, the Safety card shows "Approve the revoke in your wallet window", and Privy's approval window opens on top. Approve once. If you cancel, it says nothing was sent and the cards are unchanged; tap **Try revoking again…**.
+- **Click:** on **Wallet**, scroll to the row "Turn off every card". Tap **Revoke all cards…**. In the sheet "Revoke N cards?" tap **Revoke all cards**. The sheet closes, the Safety card shows "Approve the revoke in your wallet window", and Privy's approval window opens on top. Approve once. If you cancel, it says nothing was sent and the cards are unchanged; tap **Try revoking again…**.
 - **Expect:** "All cards revoked in one transaction." "Balance still $Y — nothing was moved. No card can pull again." and a **Revoked on Solana** proof row.
 - **Say:** "When Solflare's card issuer Kulipa wound down, the card paused but the money stayed in wallets. Same here: if our issuer disappears, my money never left my wallet, and one transaction that I sign revokes every card. It is addressed to Solana's Allowances program, not ours."
 - **Optional:** the URL `/home?demo=outage` shows the Safety card as "Card issuer unreachable (simulated)".

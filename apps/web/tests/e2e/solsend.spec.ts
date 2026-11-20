@@ -37,6 +37,7 @@ async function createCard(page: Page, opts: { label?: string; dollars?: string; 
   await expect(page.getByTestId("explain")).toContainText("Your USDC stays in your wallet");
   await setupWallet(page);
   if (opts.store) await page.getByRole("radio", { name: new RegExp(`^${opts.store}`) }).click();
+  if (opts.kind || opts.expiry) await page.getByTestId("more-options").click(); // card type and expiry are folded away
   if (opts.kind) await page.getByRole("radio", { name: opts.kind, exact: true }).click();
   if (opts.expiry) await page.getByTestId(`expiry-${opts.expiry}`).click();
   if (opts.dollars) await page.getByLabel(/limit \(USD\)/).fill(opts.dollars);
@@ -164,7 +165,7 @@ test("judge journey: login → faucet → card → approve → void → decline 
 
   // Revoke all (confirm sheet)
   await page.goto("/home");
-  await expect(page.getByTestId("outage-balance")).toContainText("$100.00");
+  await expect(page.getByTestId("balance")).toContainText("$100.00");
   await shot(page, "11-home-outage");
   // Rehearsal bug (2026-11-18): our modal confirm <dialog> stayed open in the browser top layer and covered the wallet's
   // approval window. Manual mock-wallet mode: the test must CLICK the wallet's buttons, which fails if anything covers them.
@@ -288,6 +289,8 @@ test("free-trial card: expiry chip, then expired card is declined with free-tria
   await expect(page.getByTestId("faucet-done")).toBeVisible();
   // Netflix defaults to the free-trial template: SUBSCRIPTION $15.49/month, expires after 7 days
   await createCard(page, { store: "Netflix" });
+  await expect(page.getByTestId("more-options")).toContainText("ends in 7 days");
+  await page.getByTestId("more-options").click();
   await expect(page.getByRole("radio", { name: "After a 7-day free trial" })).toHaveAttribute("aria-checked", "true");
   await expect(page.getByTestId("explain")).toContainText("expires in 7 days");
   await page.getByTestId("expiry-2").click(); // "2 minutes (demo)"

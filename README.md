@@ -55,7 +55,7 @@ The failed transactions are the proof that no money moved: the program rejected 
 3. **New card**: tile **Temu** ($40), **Create Temu card · $40.00** (one signature). It is capped and locked to Temu from creation.
 4. **Demo store**: **Phone case $5**, **Pay $5.00** (one faucet claim covers it; with more test money try **Earbuds $12**). The sheet shows **Approved** and **Settled onchain first**, with an Explorer link to the settle that confirmed *before* the card network was told yes.
 5. In the same sheet tap **Try this card's number at Amazon**: **Declined**, with **Rejected onchain** and the failed transaction. Back at Temu, try the **Drone $45**: declined by the card's limit.
-6. **New card** with **Netflix** and the **2 minutes (demo)** expiry: after two minutes it is stamped **EXPIRED** and every pull fails onchain.
+6. **New card** with **Netflix**, then **More options** → **2 minutes (demo)**: after two minutes it is stamped **EXPIRED** and every pull fails onchain.
 7. **Activity**: every purchase and card change, with a line showing whether the QuickNode Stream delivered it; **Simulate store refund** voids a purchase and returns the USDC. **Wallet** shows "Most that can ever be pulled" and **Revoke all cards…** (one transaction, straight to Solana's Allowances program).
 
 The full presenter walkthrough is in [docs/DEMO-SCRIPT.md](docs/DEMO-SCRIPT.md).

@@ -3,14 +3,13 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { explorerAddress } from "@solsend/shared";
 import { ApiCallError, client, humanError } from "@/client/api";
 import { blastRadius, displayStatus, shortId, usd, type CardView } from "@/client/format";
 import { useAppData } from "@/components/AppShell";
 import { CardVisual } from "@/components/CardVisual";
 import { OutagePanel } from "@/components/OutagePanel";
 import { WalletSetup } from "@/components/WalletSetup";
-import { ErrorNote, Icon, InfoDisclosure, SigLink, Skeleton, Spinner } from "@/components/ui";
+import { ErrorNote, Icon, SigLink, Skeleton, Spinner } from "@/components/ui";
 
 const DEAD = ["Closed", "Revoked", "Used", "Expired", "Failed"];
 
@@ -53,17 +52,14 @@ function Balance() {
   const br = blastRadius(cards.data);
   const [dollars, cents] = w ? usd(w.usdcBase).split(".") : ["", ""];
   return (
-    <section aria-labelledby="bal" className="pb-2 pt-3">
+    <section aria-labelledby="bal" className="pt-3">
       <div className="flex items-center justify-between gap-3">
-        <h2 id="bal" className="text-[13px] font-medium text-ink-3">Wallet balance</h2>
+        <h2 id="bal" className="text-[13px] font-medium text-ink-3">Balance</h2>
         {w && (
-          <span className="inline-flex items-center gap-1">
-            <button type="button" className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-sunken px-3 font-mono text-[12px] text-ink-2 hover:text-ink"
-              onClick={() => { void navigator.clipboard?.writeText(w.wallet).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1200); }); }} aria-label="Copy wallet address" title={w.wallet}>
-              {copied ? "Copied" : shortId(w.wallet, 4)}<Icon name={copied ? "check" : "copy"} className="h-3.5 w-3.5" />
-            </button>
-            <a href={explorerAddress(w.wallet)} target="_blank" rel="noreferrer" className="grid h-9 w-9 place-items-center rounded-full text-ink-3 hover:bg-sunken hover:text-ink" aria-label="View wallet on Solana Explorer (devnet)"><Icon name="ext" className="h-4 w-4" /></a>
-          </span>
+          <button type="button" className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-sunken px-3 font-mono text-[12px] text-ink-2 hover:text-ink"
+            onClick={() => { void navigator.clipboard?.writeText(w.wallet).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1200); }); }} aria-label="Copy wallet address" title={w.wallet}>
+            {copied ? "Copied" : shortId(w.wallet, 4)}<Icon name={copied ? "check" : "copy"} className="h-3.5 w-3.5" />
+          </button>
         )}
       </div>
       {w ? (
@@ -74,16 +70,9 @@ function Balance() {
       ) : <Skeleton className="mt-2 h-[52px] w-48" />}
       {wallet.error && !w && <div className="mt-3"><ErrorNote onRetry={() => void wallet.refresh()}>{wallet.error}</ErrorNote></div>}
       {cards.data && (
-        <div className="mt-2 text-[15px] leading-[22px] text-ink-2" data-testid="blast-radius">
-          <span>
-            {br.count > 0
-              ? <>{br.renews ? "Most that can be pulled this month" : "Most that can ever be pulled"}: <strong className="tnum font-semibold text-ink" data-testid="blast-amount">{usd(br.base)}</strong> across {br.count} live card{br.count === 1 ? "" : "s"} — even by SolSend.</>
-              : <>Nothing can be pulled from this wallet: <strong className="tnum font-semibold text-ink" data-testid="blast-amount">{usd(0n)}</strong> across 0 live cards.</>}
-          </span>
-          <InfoDisclosure label="How is this enforced?">
-            Each card is an onchain allowance. Nothing — not a hacked store, not a leaked number, not our server — can pull more than these caps. A monthly card&apos;s cap comes back each month until you close it. You can revoke any of them in one transaction that you sign yourself.
-          </InfoDisclosure>
-        </div>
+        <p className="mt-1.5 text-[15px] leading-[22px] text-ink-2" data-testid="blast-radius">
+          Your cards can spend at most <strong className="tnum font-semibold text-ink" data-testid="blast-amount">{usd(br.count > 0 ? br.base : 0n)}</strong>{br.count > 0 && br.renews ? " this month" : ""}.
+        </p>
       )}
     </section>
   );
@@ -163,12 +152,12 @@ function Content() {
   return (
     <div className="space-y-7">
       <Balance />
-      {hasCards && <div className="-mt-3"><Faucet primary={false} /></div>}
+      {hasCards && <div className="-mt-4"><Faucet primary={false} /></div>}
       <Checklist />
 
       <section aria-labelledby="cards-h">
         <div className="mb-3 flex items-center justify-between">
-          <h2 id="cards-h" className="text-[22px] font-semibold tracking-[-0.02em]">Cards</h2>
+          <h2 id="cards-h" className="text-[22px] font-semibold tracking-[-0.02em]">Your cards</h2>
           <Link href="/cards/new" className="btn-primary !min-h-10 !rounded-full !px-4 !text-[14px]" data-testid="new-card" aria-label="New card"><Icon name="plus" className="h-4 w-4" strokeWidth={2.4} />New card</Link>
         </div>
         {cards.error && !list && <ErrorNote onRetry={() => void cards.refresh()}>{cards.error}</ErrorNote>}
@@ -176,16 +165,10 @@ function Content() {
         {list && list.length === 0 && (
           <div className="rounded-[20px] border-2 border-dashed border-line p-6 text-center">
             <p className="text-[15px] font-semibold">No cards yet</p>
-            <p className="mt-1 text-[14px] text-ink-3">Each card holds $0 and can only pull what you allow, at one store.</p>
+            <p className="mt-1 text-[14px] text-ink-3">Each card holds $0 and only works at one store.</p>
           </div>
         )}
         {hasCards && <CardList list={list} />}
-        {hasCards && (
-          <Link href="/merchant" className="mt-4 flex min-h-14 items-center justify-between gap-3 rounded-[16px] bg-surface px-4 py-3 ring-1 ring-line ring-inset hover:bg-sunken">
-            <span><span className="block text-[15px] font-semibold">Try a card at the sandbox store</span><span className="text-[13px] text-ink-3">Swipe, get declined on purpose, void.</span></span>
-            <Icon name="arrow" className="h-5 w-5 shrink-0 text-ink-3" />
-          </Link>
-        )}
       </section>
 
       <OutagePanel outage={outage} />
