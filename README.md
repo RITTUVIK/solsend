@@ -119,6 +119,8 @@ The full presenter walkthrough is in [docs/DEMO-SCRIPT.md](docs/DEMO-SCRIPT.md).
 
 ## Architecture
 
+![How a payment works: the card network asks, the SolSend server pays on Solana first, Solana confirms, then the payment is approved; a QuickNode Stream independently delivers and cross-checks each settlement](docs/images/architecture.jpg)
+
 ```
 Browser (Privy) -> Next.js on Vercel -> Solana devnet [SolSend program + Allowances program]
 Lithic sandbox -> /api/lithic/asa (settle, confirm, reply)     Lithic events -> reconciler -> onchain refund
