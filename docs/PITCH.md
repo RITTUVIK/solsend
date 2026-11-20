@@ -13,8 +13,8 @@ Target 3:45 on a stopwatch. A little under half of it is the live product; slide
 | Time | Slide or screen | What happens | Criterion |
 |---|---|---|---|
 | 0:00 to 0:20 | **Cover** "A burner card for every store." | Hook, then the sandbox sentence | Impact |
-| 0:20 to 0:30 | **"One leaked number works everywhere."** | The problem in two sentences | Product & UX |
-| 0:30 to 0:40 | **"Each card holds $0."** | The idea; switch to the app | Innovation |
+| 0:20 to 0:33 | **"One leaked number works everywhere."** | The problem in two sentences | Product & UX |
+| 0:33 to 0:48 | **"Each card holds $0."** | The idea; switch to the app | Innovation |
 | 0:48 to 2:25 | **Live app** (cue slide "Three things to watch") | (1) Pay $12 with a card that holds $0; (2) the same card's number tried at Amazon, declined, pause; (3) the expired free trial, declined | Demo, Technical |
 | 2:25 to 3:00 | **"Money moves first. Approval second."** | Network asks → Solana moves the money → then yes; 0.9 s of a 6 s limit; why Solana; QuickNode in one sentence | Technical |
 | 3:00 to 3:45 | **"Worst case: the sum of your limits."** | The guarantee, revoke-all in words, what you still trust, everyday use, what is next, the closing line; leave the slide up | Impact |
