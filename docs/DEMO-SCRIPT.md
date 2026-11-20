@@ -21,7 +21,7 @@ Commands run from `scripts/` ([DEPLOY.md](DEPLOY.md) section 4; credentials are 
 | 30 min before | Pre-create a spare Temu card (**New card**, Temu tile "First try", $40) | Visible as a card on **Wallet** |
 | **At least 3 minutes before stage** | Create the Netflix 2-minute trial: **New card**, tile **Netflix** ("Free trial"), expiry chip **2 minutes (demo)**, then **Create Netflix card · $15.49** and approve once | Card named "Netflix free trial"; it will read "Expired" by the time you reach beat 5. If you create it too late, skip beat 5 |
 | Right before | `pnpm qn:stream activate` (from `scripts/`) | `pnpm qn:stream get` shows active, and **Activity** reads **Streamed by QuickNode · last event …** after the next onchain action |
-| Right after | `pnpm qn:stream pause`, then `pnpm qn:stream get` | `paused` (the trial bills per processed block) |
+| Right after | `pnpm qn:stream pause`, then `pnpm qn:stream get` | `paused` (Streams bill per processed block) |
 | Always | Backup video open in a second window; a second browser profile already logged in | See fallback plan |
 
 Demo store limits: amounts from $0.01 to $50.00; checkout has per-wallet limits (30 per day, 10 per minute), so rehearse sparingly.

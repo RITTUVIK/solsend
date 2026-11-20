@@ -177,7 +177,7 @@ Summary of [TRUST.md](TRUST.md); read that file for the full statement.
 | **Fee payer** (server key) | Pay fees and rent; co-sign only a message byte-identical to a stored, unexpired, unconsumed intent | Move user funds; sign arbitrary transactions | Devnet SOL balance |
 | **Program upgrade authority** (deployer key) | Upgrade the SolSend program on devnet | | **Largest assumption.** Freeze the program after the hackathon |
 | **Lithic (sandbox)** | Sends HMAC-signed authorization requests and events; outer spending limits | Settle without our reply | The program cannot verify Lithic's signature onchain |
-| **QuickNode** | RPC and Stream delivery | Authorize anything | Deliveries are notifications; decisions use RPC reads at `confirmed`. Trial limits apply |
+| **QuickNode** | RPC and Stream delivery | Authorize anything | Deliveries are notifications; decisions use RPC reads at `confirmed`. Streams bill per processed block, so the stream runs during test and demo windows |
 | **Supabase** | Holds app state | Be reached from the browser | Server secret key; RLS is on with no policies |
 
 Boundary rules worth restating: the chain, not Lithic or the database, is the spending gate; Lithic limits are a looser outer circuit breaker (2x); every ASA path that is not a confirmed settle declines.

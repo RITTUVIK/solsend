@@ -80,6 +80,7 @@ Earlier real-Lithic runs against a local server through a tunnel (W2) are record
 | Q4 | Filter decodes all 7 SolSend events; ignores `Program data:` lines emitted in a CPI to another program; runs in a sandboxed `vm` self-test; QuickNode's own filter test returned HTTP 201 with no errors; CI fails on filter drift | [w4-streams.md](evidence/w4-streams.md) |
 | Q5 | CP0b live Stream (earlier spike program, not the final one): 5 real transactions delivered and HMAC-verified, confirmed to webhook p50 373 ms (n=5); replay returned 409 (the current webhook acknowledges a repeated delivery with 200 and does not process it, so retries cannot pause the stream); tampered or forged returned 401 | [GATE0.md](../GATE0.md) (G0.7) |
 | Q6 | Limits found: free plan caps `getMultipleAccounts` at 5; `programs_with_logs` lists top-level instructions only (so the program emits its own events); billed per processed block; usage API returns 403 for the Streams key | GATE0.md, w4-streams.md |
+| Q7 | Production, current release (2026-11-19): `CardSettled` for a live $5 purchase delivered **356 ms** after the settle was confirmed, in slot 524,157,165; the webhook's cross-check matched the amount and the card against the card-network authorization. The stream was activated for the test (start moved to the tip), processed 2,946 blocks in 11.5 minutes, and was paused afterwards | [smoke-test-2026-11-19.md](evidence/smoke-test-2026-11-19.md); settle [`5qyveH99…`](https://explorer.solana.com/tx/5qyveH99KSZjZPhEaTQQqLNtbjV4zbnm8LSL6fXTGD2mxP3kXLHWjYRvgxncdHEy2tLexEwWx8jXYQS7nNeLBERg?cluster=devnet) |
 
 ## 5. Audits and security review
 
@@ -131,3 +132,12 @@ A real Privy login, real Lithic sandbox authorizations and devnet USDC. Every ro
 | R5 | The Temu card's number at Amazon was declined onchain (SolSend 6005). No USDC moved. | [`ko4XZjax…`](https://explorer.solana.com/tx/ko4XZjaxq6btWc4mnojTe1VzPvf9p8KBkfZpkEE6t3JNdyJJNZDfdTaD2H6otsReMQjFWajat1uVoxKKzMfvLTP?cluster=devnet) |
 | R6 | $45 against $28 remaining was declined onchain (Allowances 300). No USDC moved. | [`b6sGxACn…`](https://explorer.solana.com/tx/b6sGxACnkkYBm9Lnm9huRqgZ1iNn4A4bjFwAg7zm4PRBFgHrv5a5LZBamJbDDaRidtcdYi8wK5bHXPz2S66r7s9?cluster=devnet) |
 | R7 | Void refunded exactly $1.14, once, to the owner's own USDC account. | [`63fBvpBw…`](https://explorer.solana.com/tx/63fBvpBwpFd8cr2iaZoeSaiK5DfJpMhHKA6cqURAJnincqicdhUU4KX1tmvhjp3t1VzZG795pFKFwKg2h76d7mB?cluster=devnet) |
+
+## Live smoke test on the current release (2026-11-19)
+
+A real sign-in and a real Lithic sandbox authorization on the release that went live that afternoon. Checked independently against the chain. Full write-up: [smoke-test-2026-11-19.md](evidence/smoke-test-2026-11-19.md).
+
+| # | Claim | Proof |
+|---|---|---|
+| S1 | $5 approved only after the settle confirmed. Wallet 33.00 → 28.00, treasury 16.02 → 21.02. Finalized in slot 524,157,165 | [`5qyveH99…`](https://explorer.solana.com/tx/5qyveH99KSZjZPhEaTQQqLNtbjV4zbnm8LSL6fXTGD2mxP3kXLHWjYRvgxncdHEy2tLexEwWx8jXYQS7nNeLBERg?cluster=devnet) |
+| S2 | The QuickNode Stream delivered that settlement to the production webhook and the cross-check matched (see Q7) | [smoke-test-2026-11-19.md](evidence/smoke-test-2026-11-19.md) |

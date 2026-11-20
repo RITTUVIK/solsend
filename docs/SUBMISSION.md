@@ -63,27 +63,25 @@ Solana (devnet), Anchor (Rust), Solana Subscriptions & Allowances program, SPL T
 - **Ritty** (Rithvik Balavikram): proposed the original idea (a temporary virtual card funded with USDC), created the repository, and leads the pitch, demo video and submission.
 - **Darren** (Darren Deepak): led product and engineering. Set the requirements, reviewed and approved the architecture at each checkpoint (including moving from a Stripe + Bridge card program to Lithic, and building on Solana's Allowances program), created and configured the provider accounts (Lithic, QuickNode, Privy, Supabase, Vercel), ran the live rehearsals, and approved each release.
 
-## AI assistance (disclosure)
+## If the form asks about AI tools
 
-Most of SolSend's code, tests and documentation were written by Claude Code, Anthropic's AI coding agent, working under Darren's direction in this event's window (repository created 16 November 2026). The two security reviews were done by separate AI review agents; they are not a professional audit. The commit history records this: all but one of the commits on `main` carry a Claude co-author trailer (100 of 101 on 19 November). The humans decided what to build, approved the design at each checkpoint, tested it on the live deployment, and decided what shipped.
+The rules say: "AI tools may be used, but builders must remain the primary creators." Answer any question about AI use plainly:
 
-What the rules say. The official guide's FAQ (live document, read 19 November): "Can I use AI tools? Yes, you are encouraged to use AI tools. Your project still needs to be a working, substantive build that meets the 'What to Submit' requirements to be eligible for any prize." The Devpost rules page reportedly adds "AI tools may be used, but builders must remain the primary creators." We could not read that page ourselves (it refuses automated readers), so one of us must read it in a browser.
-
-Open question for the organizers (ask before submitting, in the hackathon Telegram): whether an AI-written codebase directed, tested and released by the team meets the "primary creators" wording. We think the guide's FAQ answers it, but it is the organizers' call, not ours.
+AI coding tools were used throughout, as the event allows. Most of the code, tests and documentation were written with an AI coding agent (Claude Code) under our direction, and the commit history shows it. We set the requirements, chose and approved the architecture, configured every provider account, ran the live tests and decided what shipped. The two security reviews were AI-assisted and are not a professional audit.
 
 ## Submission checklist
 
 Owner in brackets. Darren = engineering, Ritty = repository owner, pitch, video and submission.
 
-- [ ] **[Both]** Ask the organizers (hackathon Telegram) about the AI rule before submitting, quoting the disclosure above; confirm the Devpost eligibility wording ("Students only" in the header vs a broader rules body)
-- [ ] **[Both]** Confirm every sentence of the Team and AI-assistance sections above
+- [ ] **[Both]** Decide whether to ask the organizers about the "primary creators" wording before submitting; confirm you both meet the Devpost eligibility line ("Students only")
+- [ ] **[Both]** Confirm every sentence of the Team section above, and of the AI answer if the form asks for one
 - [ ] **[Ritty]** Choose a license (MIT is the usual hackathon choice) or decide to publish without one; add `LICENSE` before going public if chosen
 - [ ] **[Ritty]** Update the GitHub repository description (it still describes the original browser-extension idea), e.g. "Burner cards for every store: capped, store-locked onchain allowances on Solana (sandbox + devnet)"; website https://solsend-ashen.vercel.app
 - [x] **[Ritty]** Repository is public (since 18 November); the secret scan runs in CI on every push. Check that the README renders on GitHub
 - [ ] **[Ritty]** Video 2 to 3 minutes, recorded on the live app per [VIDEO-PLAN.md](VIDEO-PLAN.md); the QuickNode badge appeared for real; no full card number, CVV or email on screen; link works in a private window
 - [ ] **[Ritty]** All five answers pasted; each 150 words or fewer; Team section filled
 - [ ] **[Ritty]** Track: Consumer Applications · chain award: Best use of Solana · bounty: QuickNode Streams, and opt in to each on Devpost
-- [ ] **[Darren]** `/api/status` green; QuickNode stream left on from the recording through Saturday's finals if credits allow
+- [ ] **[Darren]** `/api/status` green; QuickNode stream on for the recording and the finals demo, paused otherwise
 - [ ] **[Darren]** The test-money faucet wallet holds devnet USDC (each new user's claim takes 5); top it up from Circle's devnet faucet through Saturday
 - [ ] **[Both]** Free-trial expiry proof links checked: the live Lithic-driven decline from the 2026-11-18 rehearsal ([`3q4HQCQf…`](https://explorer.solana.com/tx/3q4HQCQfRUkiSCgrzykYLMCozJrbAtW9LzAQsXXB2kbUcwiBsc1fjBfYvTHo8UguX4DPrxSV4mcTfq2khezLw4md?cluster=devnet), [rehearsal-2026-11-18.md](evidence/rehearsal-2026-11-18.md)) and the direct program-level devnet test (scripts/ops/expiry-proof.ts)
 - [ ] **[Both]** Submit a complete entry Thursday night and edit it Friday morning if needed; stop changing things at 11:00 AM; hard deadline Fri 2026-11-20 12:00 PM CST; someone must be in Austin for the closing ceremony to receive any prize

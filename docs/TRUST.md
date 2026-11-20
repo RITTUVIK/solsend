@@ -95,4 +95,4 @@ allowance with your own signature. The UI states this on every refund.
   to call Lithic's official simulation API. It is never returned to the browser, logged, stored or
   committed. It refuses any non-sandbox Lithic host, enforces bounded amounts and is rate-limited.
 - **Devnet is not mainnet.** There is no reorg handling beyond `confirmed` commitment, and the
-  QuickNode trial has its own limits (`GATE0.md`).
+  QuickNode stream runs only during test and demo windows (`GATE0.md`).

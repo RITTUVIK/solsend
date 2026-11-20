@@ -45,10 +45,10 @@ Monorepo with pnpm, Next.js app in `apps/web`.
 - **Lithic events:** create an event subscription for `card_transaction.updated` to `https://<app>/api/lithic/events`; its signing secret is `LITHIC_EVENTS_SECRET`.
 - **GitHub Actions** repo secrets: `APP_URL` (`https://<app>`), `RECONCILE_CRON_SECRET`. `reconcile.yml` runs every 10 min (and by hand); it skips when the secrets are unset.
 
-## 4. QuickNode Stream (free trial: 1 Solana stream, billed per processed block, so keep it PAUSED)
+## 4. QuickNode Stream (billed per processed block, so keep it PAUSED outside test and demo windows)
 All commands run from `scripts/`: `pnpm qn:stream <cmd>`. Needs `QUICKNODE_API_KEY` in `spikes/.env` (parsed in-process; nothing secret is printed).
 1. `pnpm qn:build-filter` regenerates `infra/quicknode/filter.dist.js` from `packages/shared/idl/solsend.json` (CI fails on drift). `pnpm qn:selftest` runs it in a sandboxed `vm`.
-2. `pnpm qn:stream list`. The trial allows one Solana stream; `pnpm qn:stream delete <id>` any old one first.
+2. `pnpm qn:stream list`. We run one stream; `pnpm qn:stream delete <id>` any old one first.
 3. `pnpm qn:stream create https://<app>/api/quicknode`. Creates `solsend-mvp-devnet` (devnet, `programs_with_logs`) **paused**, with a fresh random token written to `spikes/.env` as `QN_STREAM_SECURITY_TOKEN` (mode 600, never printed). Put the same value into Vercel and redeploy.
 4. Changing the URL later: `pnpm qn:stream set-url https://<new>/api/quicknode`.
 5. Demo / test window: `pnpm qn:stream activate` (first moves `start_range` to the current slot so the stream does not replay and bill the backlog), do the action, confirm the row in the feed, then `pnpm qn:stream pause`, then `pnpm qn:stream get` must show `paused`.
