@@ -1,5 +1,7 @@
 # CP1 contracts: architecture, flows, ownership
 
+> Historical. This is the working agreement used while the MVP was built on 17 and 18 November 2026. The current architecture is in [ARCHITECTURE.md](ARCHITECTURE.md).
+
 Frozen interfaces are listed below. Changing one requires coordinator (lead) approval. Request it in
 your final report rather than editing a file you don't own.
 

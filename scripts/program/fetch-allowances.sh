@@ -4,7 +4,7 @@
 #   bash scripts/program/fetch-allowances.sh mainnet    mainnet build  -> target/fixtures/subscriptions_mainnet.so
 # Output is gitignored (target/ and **/*.so). Never commit it.
 #
-# The two clusters run DIFFERENT builds of the program. Mainnet is the audited one: its bytes, with the trailing zero
+# The two clusters run DIFFERENT builds of the program. Mainnet is the verified one: its bytes, with the trailing zero
 # padding removed, hash to 056ca97c…0318, the hash OtterSec's service verified against the public source
 # (https://verify.osec.io/status/De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44). Devnet runs a newer build.
 # `pnpm test:program` uses the devnet build (what the deployed demo calls); `pnpm test:program:mainnet` runs the same

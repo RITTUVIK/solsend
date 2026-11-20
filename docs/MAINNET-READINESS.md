@@ -15,7 +15,7 @@ We looked hard at putting part of SolSend on mainnet before the hackathon deadli
 
 ## What we verified without touching mainnet
 
-- **The devnet and mainnet builds of the Allowances program are different.** Mainnet (133,856 bytes, deployed in slot 438,440,823) is the audited one: its bytes, with trailing padding removed, hash to `056ca97c…0318`, the hash [OtterSec's service](https://verify.osec.io/status/De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44) verified against the public source. Devnet (133,280 bytes, slot 506,642,674) is a newer build.
+- **The devnet and mainnet builds of the Allowances program are different.** Mainnet (133,856 bytes, deployed in slot 438,440,823) is the verified one: its bytes, with trailing padding removed, hash to `056ca97c…0318`, the hash [OtterSec's service](https://verify.osec.io/status/De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44) verified against the public source. Devnet (133,280 bytes, slot 506,642,674) is a newer build.
 - **Our program works against both.** All 41 program tests pass against the devnet build and against the mainnet build, in a local Solana VM, with no transaction sent to either network.
 
 Reproduce it:

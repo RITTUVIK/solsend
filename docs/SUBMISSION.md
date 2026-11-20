@@ -28,7 +28,7 @@ Creating a card is one owner signature: an Allowances delegation whose only dele
 
 ## What makes it unique?
 
-As far as we could find, this is the first working demo that backs each payment card, here a Lithic sandbox card, with its own capped, expiring delegation in Solana's Subscriptions & Allowances program, plus a store lock enforced by our own program. Capped, expiring allowances per AI agent already exist on that program (BudgetRail, for example); we found none tied to individual payment cards. The Solana Foundation named card-linked spending as a use; we take it to one permission per card. The card holds $0, nothing is pre-funded, and you can revoke each permission yourself. Free-trial cards expire onchain (a live sandbox charge after expiry, declined: [`3q4HQCQf…`](https://explorer.solana.com/tx/3q4HQCQfRUkiSCgrzykYLMCozJrbAtW9LzAQsXXB2kbUcwiBsc1fjBfYvTHo8UguX4DPrxSV4mcTfq2khezLw4md?cluster=devnet)). Our 41 program tests pass against both the devnet and the audited mainnet build of Allowances. Two AI-assisted security reviews, every High, Medium and Low finding fixed. Limits: sandbox, devnet, a trusted server relay, an upgradeable devnet program.
+As far as we could find, this is the first working demo that backs each payment card, here a Lithic sandbox card, with its own capped, expiring delegation in Solana's Subscriptions & Allowances program, plus a store lock enforced by our own program. Capped, expiring allowances per AI agent already exist on that program (BudgetRail, for example); we found none tied to individual payment cards. The Solana Foundation named card-linked spending as a use; we take it to one permission per card. The card holds $0, nothing is pre-funded, and you can revoke each permission yourself. Free-trial cards expire onchain (a live sandbox charge after expiry, declined: [`3q4HQCQf…`](https://explorer.solana.com/tx/3q4HQCQfRUkiSCgrzykYLMCozJrbAtW9LzAQsXXB2kbUcwiBsc1fjBfYvTHo8UguX4DPrxSV4mcTfq2khezLw4md?cluster=devnet)). Our 41 program tests pass against both the devnet and the OtterSec-verified mainnet build of Allowances. Two AI-assisted security reviews, every High, Medium and Low finding fixed. Limits: sandbox, devnet, a trusted server relay, an upgradeable devnet program.
 
 ## What would you build next?
 
@@ -52,7 +52,7 @@ Solana (devnet), Anchor (Rust), Solana Subscriptions & Allowances program, SPL T
 |---|---|
 | Live app (devnet + sandbox) | https://solsend-ashen.vercel.app |
 | Repository | https://github.com/RITTUVIK/solsend (public) |
-| Demo video | TODO: unlisted YouTube or Drive link (see [VIDEO-PLAN.md](VIDEO-PLAN.md)) |
+| Demo video | Added at submission (unlisted YouTube) |
 | SolSend program (devnet) | https://explorer.solana.com/address/GfMyGffqQA7KNUYWByEDtQKEFmHzBPTJgsuYSaruWdZp?cluster=devnet |
 | Evidence index | [EVIDENCE.md](EVIDENCE.md) |
 

@@ -26,7 +26,7 @@ SolSend is a **burner card per store whose limit is its own allowance on Solana,
 
 ## Why caps onchain matter, and the risk that comes with them
 
-A cap in a provider's database is a promise. Onchain card stacks carry exploit risk of their own: Gnosis Pay's onchain card modules were exploited on 2026-06-01 [10]. That is why we build on Solana's audited Allowances program and keep our own program small and reviewed: 41 LiteSVM tests against the real Allowances binaries (the devnet build and the audited mainnet build), and two adversarial **AI-assisted** security reviews with every High, Medium and Low finding fixed ([audit-program-cp1](evidence/audit-program-cp1.md), [audit-backend-cp1](evidence/audit-backend-cp1.md)). Those reviews are not a professional audit.
+A cap in a provider's database is a promise. Onchain card stacks carry exploit risk of their own: Gnosis Pay's onchain card modules were exploited on 2026-06-01 [10]. That is why we build on Solana's audited Allowances program and keep our own program small and reviewed: 41 LiteSVM tests against the real Allowances binaries (the devnet build and the verified mainnet build), and two adversarial **AI-assisted** security reviews with every High, Medium and Low finding fixed ([audit-program-cp1](evidence/audit-program-cp1.md), [audit-backend-cp1](evidence/audit-backend-cp1.md)). Those reviews are not a professional audit.
 
 ## The consumer pain
 
@@ -36,7 +36,7 @@ A cap in a provider's database is a promise. Onchain card stacks carry exploit r
 
 ## The primitive we build on
 
-Solana's **Subscriptions & Allowances** program (`De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44`) was published by the Solana Foundation on 2026-06-02 and built by Moonsong Labs. It is live on mainnet and devnet. Its mainnet build is audited by Cantina (audit scope is commit-based) [14] and verified against the public source through OtterSec's service [15]; devnet, where SolSend runs, has a newer build, and our program tests pass against both ([MAINNET-READINESS.md](MAINNET-READINESS.md)). Launch coverage: [16][17]. We did not write it. SolSend runs on devnet.
+Solana's **Subscriptions & Allowances** program (`De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44`) was published by the Solana Foundation on 2026-06-02 and built by Moonsong Labs. It is live on mainnet and devnet. The program is audited by Cantina (audit scope is commit-based) [14], and its mainnet build is verified against the public source through OtterSec's service [15]; devnet, where SolSend runs, has a newer build, and our program tests pass against both ([MAINNET-READINESS.md](MAINNET-READINESS.md)). Launch coverage: [16][17]. We did not write it. SolSend runs on devnet.
 
 ## Honest limits of this positioning
 

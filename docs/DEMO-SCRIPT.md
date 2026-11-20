@@ -81,7 +81,7 @@ Cumulative timing. "Say" is one or two plain sentences.
 ### 8. Tech close (4:00 to 4:20)
 
 - **On screen:** the architecture diagram ([ARCHITECTURE.md](ARCHITECTURE.md)) or `/status`.
-- **Say:** "Underneath: Solana's official Allowances program plus our Anchor program, with 41 tests that pass against both its devnet build and its audited mainnet build, and two adversarial AI-assisted security reviews with every High, Medium and Low finding fixed. We approve only after a confirmed settle: 0.9 seconds in our live run, against Lithic's 6-second limit. And a QuickNode Stream is our independent witness: it delivers each event from the chain and cross-checks it against the card authorization."
+- **Say:** "Underneath: Solana's official Allowances program plus our Anchor program, with 41 tests that pass against both its devnet build and its verified mainnet build, and two adversarial AI-assisted security reviews with every High, Medium and Low finding fixed. We approve only after a confirmed settle: 0.9 seconds in our live run, against Lithic's 6-second limit. And a QuickNode Stream is our independent witness: it delivers each event from the chain and cross-checks it against the card authorization."
 - **After:** `pnpm qn:stream pause`, confirm `paused`.
 
 ## Fallback plan
