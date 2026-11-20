@@ -8,19 +8,18 @@ State up front, once, calmly: this is Lithic sandbox cards and Solana devnet tes
 
 ## Timed outline
 
-Target 3:50 on a stopwatch. A little under half of it is the live product; slides carry only the ideas the product can't show.
+Target 3:45 on a stopwatch. A little under half of it is the live product; slides carry only the ideas the product can't show.
 
 | Time | Slide or screen | What happens | Criterion |
 |---|---|---|---|
 | 0:00 to 0:20 | **Cover** "A burner card for every store." | Hook, then the sandbox sentence | Impact |
 | 0:20 to 0:30 | **"One leaked number works everywhere."** | The problem in two sentences | Product & UX |
 | 0:30 to 0:40 | **"Each card holds $0."** | The idea; switch to the app | Innovation |
-| 0:40 to 2:20 | **Live app** (cue slide "Three things to watch") | (1) Pay $12 with a card that holds $0; (2) the same card's number tried at Amazon, declined, pause; (3) the expired free trial, declined | Demo, Technical |
-| 2:20 to 2:55 | **"Money moves first. Approval second."** | Network asks → Solana moves the money → then yes; 0.9 s of a 6 s limit; why Solana; QuickNode in one sentence | Technical |
-| 2:55 to 3:25 | **"Worst case: the sum of your limits."** | The guarantee, revoke-all in words, and what you still trust | Impact |
-| 3:25 to 3:50 | **Close** | Everyday use, what is next, the closing line; leave the slide up | All |
+| 0:48 to 2:25 | **Live app** (cue slide "Three things to watch") | (1) Pay $12 with a card that holds $0; (2) the same card's number tried at Amazon, declined, pause; (3) the expired free trial, declined | Demo, Technical |
+| 2:25 to 3:00 | **"Money moves first. Approval second."** | Network asks → Solana moves the money → then yes; 0.9 s of a 6 s limit; why Solana; QuickNode in one sentence | Technical |
+| 3:00 to 3:45 | **"Worst case: the sum of your limits."** | The guarantee, revoke-all in words, what you still trust, everyday use, what is next, the closing line; leave the slide up | Impact |
 
-Cut rule: if the live part passes 2:20, skip the Explorer tab first, then say step 3 over the next slide. Never cut the limits. Revoke-all is no longer done live: it needs a wallet approval window, the slowest step on stage. Show it only if a judge asks.
+Six slides in all. Cut rule: if the live part passes 2:25, skip the Explorer tab first, then say step 3 over the next slide. Never cut the limits. Revoke-all is no longer done live: it needs a wallet approval window, the slowest step on stage. Show it only if a judge asks.
 
 **Never show a full card number, expiry or CVV on the projector, even a sandbox one.** Do not open card **Details** on stage. The masked card (`•••• 1234`) is enough.
 
@@ -40,11 +39,9 @@ About 300 words outside the live part.
 
 **Free trial (live 3).** "I started this Netflix free trial before I walked up here. It has already expired." Pay **Monthly plan $15.49**: declined. "No cancellation flow. The card just stopped." *(Proof: on 2026-11-18 a real Lithic sandbox authorization after the trial ended was declined inside Allowances with `delegationExpired` (128), [`3q4HQCQf…`](https://explorer.solana.com/tx/3q4HQCQfRUkiSCgrzykYLMCozJrbAtW9LzAQsXXB2kbUcwiBsc1fjBfYvTHo8UguX4DPrxSV4mcTfq2khezLw4md?cluster=devnet). See [rehearsal-2026-11-18.md](evidence/rehearsal-2026-11-18.md).)*
 
-**How it works (2:20).** "What you just watched: the card network asked us to approve twelve dollars. Before answering, we asked a program on Solana to move the money. Solana, not our server, checks the limit and the expiry, and checks the store against the ID we relay. Only after it confirmed did we say yes: nine tenths of a second in our live test, against six allowed. The limit lives in the Solana Foundation's Allowances program, which is audited. Our own code is not professionally audited yet."
+**How it works (2:25).** "What you just watched: the card network asked us to approve twelve dollars. Before answering, we asked a program on Solana to move the money. Solana, not our server, checks the limit and the expiry, and checks the store against the ID we relay. Only after it confirmed did we say yes: nine tenths of a second in our live test, against six allowed. The limit lives in the Solana Foundation's Allowances program, which is audited. Our own code is not professionally audited yet."
 
-**Worst case (2:55).** "So the worst case is a number you chose: the sum of your limits. A hacked store, a leaked number, even our own server cannot take more, and one tap revokes every card. Two things you still trust us for: our server reports which store is charging, and on the test network we can still upgrade the program. Before real money, that gets locked and audited."
-
-**Close (3:25).** "You'd reach for this at every new store and every free trial: email login, no seed phrase, no fees. Next is the hard part, and we know it: a real card issuer, a professional audit, and a checkout extension so the card appears where you shop. SolSend: a burner card for every store. It holds nothing, it works in one place, and you can switch them all off." Stop. Leave the slide up.
+**Worst case and close (3:00).** "So the worst case is a number you chose: the sum of your limits. A hacked store, a leaked number, even our own server cannot take more, and one tap revokes every card. You'd reach for this at every new store and every free trial: email login, no seed phrase, no fees. Next is the hard part, and we know it: a real card issuer, a professional audit, and a checkout extension so the card appears where you shop. SolSend: a burner card for every store." Stop. Leave the slide up. (What you still trust, if asked: our server reports which store is charging, and on the test network we can still upgrade the program.)
 
 ## Live-demo safety plan
 
